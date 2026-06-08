@@ -67,12 +67,12 @@ const Field = ({
           type={inputType}
           className={[
             "h-12 w-full rounded-xl border bg-white text-sm text-slate-900 placeholder:text-slate-400 transition-all",
-            "focus:outline-none focus:ring-4 focus:ring-[#2D8CF0]/20",
+            "focus:outline-none focus:ring-4 focus:ring-[#059669]/20",
             Icon ? "pl-10" : "pl-4",
             showToggle || rightAdornment ? "pr-12" : "pr-4",
             error
               ? "border-rose-300 focus:border-rose-400 focus:ring-rose-100"
-              : "border-slate-200 focus:border-[#2D8CF0]",
+              : "border-slate-200 focus:border-[#059669]",
           ].join(" ")}
         />
         {showToggle && (
@@ -102,16 +102,16 @@ const RoleIndicator = ({ verb, role, onChange }) => (
   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
     <span className="inline-flex items-center gap-1.5 text-slate-600">
       {role === "admin" ? (
-        <ShieldCheck className="h-4 w-4 text-[#2D8CF0]" />
+        <ShieldCheck className="h-4 w-4 text-[#059669]" />
       ) : (
-        <GraduationCap className="h-4 w-4 text-[#2D8CF0]" />
+        <GraduationCap className="h-4 w-4 text-[#059669]" />
       )}
       {verb} as <span className="font-bold text-slate-900">{ROLE_LABEL[role]}</span>
     </span>
     <button
       type="button"
       onClick={onChange}
-      className="text-sm font-semibold text-[#2D8CF0] underline-offset-4 transition-colors hover:text-[#1E6FCC] hover:underline"
+      className="text-sm font-semibold text-[#059669] underline-offset-4 transition-colors hover:text-[#047857] hover:underline"
     >
       Change account type
     </button>
@@ -279,7 +279,7 @@ const LoginPage = () => {
                     name="remember"
                     checked={form.remember}
                     onChange={onChange}
-                    className="h-4 w-4 rounded border-slate-300 text-[#2D8CF0] focus:ring-[#2D8CF0]"
+                    className="h-4 w-4 rounded border-slate-300 text-[#059669] focus:ring-[#059669]"
                   />
                   Remember Me
                 </label>
@@ -289,7 +289,7 @@ const LoginPage = () => {
                       ? "mailto:security@schooladmin.com?subject=Admin%20Access%20Recovery"
                       : "mailto:support@scholarshipzone.org?subject=Password%20Reset"
                   }
-                  className="font-semibold text-[#2D8CF0] hover:text-[#1E6FCC]"
+                  className="font-semibold text-[#059669] hover:text-[#047857]"
                 >
                   Forgot?
                 </a>
@@ -301,8 +301,8 @@ const LoginPage = () => {
                 whileHover={isSubmitting ? undefined : { scale: 1.005 }}
                 whileTap={isSubmitting ? undefined : { scale: 0.99 }}
                 className={[
-                  "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2D8CF0] text-sm font-bold text-white shadow-sm transition-all",
-                  "hover:bg-[#1E7FE0] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2D8CF0]/30",
+                  "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#059669] text-sm font-bold text-white shadow-sm transition-all",
+                  "hover:bg-[#047857] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#059669]/30",
                   "disabled:cursor-not-allowed disabled:opacity-70",
                 ].join(" ")}
               >
@@ -322,7 +322,7 @@ const LoginPage = () => {
                 New here?{" "}
                 <Link
                   to="/signup"
-                  className="font-semibold text-[#2D8CF0] hover:text-[#1E6FCC]"
+                  className="font-semibold text-[#059669] hover:text-[#047857]"
                 >
                   Create account
                 </Link>

@@ -27,8 +27,8 @@ const AuthShell = ({
 
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
-      {/* ===================== LEFT: BLUE HERO ===================== */}
-      <section className="relative flex w-full flex-col overflow-hidden bg-[#2D8CF0] text-white lg:w-[55%]">
+      {/* ===================== LEFT: EMERALD HERO ===================== */}
+      <section className="relative flex w-full flex-col overflow-hidden bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-800 text-white lg:w-[55%]">
         {/* decorative shapes */}
         <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-white/5 blur-3xl" />

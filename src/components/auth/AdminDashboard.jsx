@@ -164,7 +164,7 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
                       fontSize: "12px",
                     }}
                   />
-                  <Line type="monotone" dataKey="applicants" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: "#16a34a" }} />
+                  <Line type="monotone" dataKey="applicants" stroke="#059669" strokeWidth={3} dot={{ r: 4, fill: "#059669" }} />
                   <Line type="monotone" dataKey="reviewed" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: "#f59e0b" }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -286,7 +286,7 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
                         fontSize: "12px",
                       }}
                     />
-                    <Bar dataKey="value" fill="#16a34a" radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="value" fill="#059669" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

@@ -80,12 +80,12 @@ const RoleCard = ({ role, selected, onSelect, onActivate, index }) => {
       whileTap={disabled ? undefined : { scale: 0.99 }}
       className={[
         "group relative flex w-full items-center gap-4 rounded-2xl px-5 py-4 text-left transition-all duration-200",
-        "min-h-[85px] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2D8CF0]/30",
+        "min-h-[85px] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#059669]/30",
         disabled
           ? "cursor-not-allowed bg-slate-100 text-slate-400 ring-1 ring-slate-200"
           : selected
-          ? "cursor-pointer bg-[#2D8CF0] text-white shadow-xl ring-2 ring-[#1E6FCC] ring-offset-2 ring-offset-[#F5F6F8]"
-          : "cursor-pointer bg-[#2D8CF0] text-white shadow-md hover:shadow-lg hover:bg-[#1E7FE0]",
+          ? "cursor-pointer bg-[#059669] text-white shadow-xl ring-2 ring-[#047857] ring-offset-2 ring-offset-[#F5F6F8]"
+          : "cursor-pointer bg-[#059669] text-white shadow-md hover:shadow-lg hover:bg-[#047857]",
       ].join(" ")}
     >
       <span
@@ -175,7 +175,7 @@ const HeroIllustration = () => (
         animate={{ y: [80, 72, 80] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
-      <rect x="74" y="98" width="60" height="8" rx="4" fill="#2D8CF0" opacity="0.8" />
+      <rect x="74" y="98" width="60" height="8" rx="4" fill="#059669" opacity="0.8" />
       <rect x="74" y="114" width="92" height="6" rx="3" fill="#94B8D9" />
       <rect x="74" y="126" width="70" height="6" rx="3" fill="#94B8D9" />
       <circle cx="160" cy="142" r="8" fill="#FFB547" />
@@ -192,11 +192,11 @@ const HeroIllustration = () => (
         animate={{ y: [60, 52, 60] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
       />
-      <circle cx="320" cy="82" r="10" fill="#2D8CF0" />
+      <circle cx="320" cy="82" r="10" fill="#059669" />
       <rect x="338" y="76" width="60" height="6" rx="3" fill="#94B8D9" />
       <rect x="338" y="88" width="40" height="6" rx="3" fill="#CBDDF0" />
-      <rect x="314" y="108" width="92" height="24" rx="8" fill="#2D8CF0" opacity="0.15" />
-      <rect x="324" y="116" width="50" height="8" rx="4" fill="#2D8CF0" />
+      <rect x="314" y="108" width="92" height="24" rx="8" fill="#059669" opacity="0.15" />
+      <rect x="324" y="116" width="50" height="8" rx="4" fill="#059669" />
     </g>
 
     {/* Central character group — abstract students */}
@@ -204,7 +204,7 @@ const HeroIllustration = () => (
       {/* Person 1 */}
       <circle cx="40" cy="40" r="26" fill="#FFD7B5" />
       <path d="M14 96 Q40 60 66 96 Z" fill="#FFB547" />
-      <rect x="20" y="86" width="40" height="50" rx="10" fill="#1E6FCC" />
+      <rect x="20" y="86" width="40" height="50" rx="10" fill="#047857" />
       <circle cx="32" cy="38" r="3" fill="#3B2E2A" />
       <circle cx="48" cy="38" r="3" fill="#3B2E2A" />
       <path d="M32 50 Q40 56 48 50" stroke="#3B2E2A" strokeWidth="2" fill="none" strokeLinecap="round" />
@@ -255,7 +255,7 @@ const RoleLandingPage = () => {
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
       {/* ============================ LEFT: HERO ============================ */}
-      <section className="relative flex w-full flex-col overflow-hidden bg-[#2D8CF0] text-white lg:w-[55%]">
+      <section className="relative flex w-full flex-col overflow-hidden bg-[#059669] text-white lg:w-[55%]">
         {/* Decorative shapes */}
         <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-white/5 blur-3xl" />
@@ -380,7 +380,7 @@ const RoleLandingPage = () => {
             whileTap={selectedId ? { scale: 0.99 } : undefined}
             className={[
               "mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-bold transition-all",
-              "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2D8CF0]/30",
+              "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#059669]/30",
               selectedId
                 ? "bg-slate-900 text-white shadow-md hover:bg-slate-800"
                 : "cursor-not-allowed bg-slate-100 text-slate-400",
@@ -394,7 +394,7 @@ const RoleLandingPage = () => {
             Already have an account?{" "}
             <Link
               to="/login/scholar"
-              className="font-semibold text-[#2D8CF0] hover:text-[#1E6FCC]"
+              className="font-semibold text-[#059669] hover:text-[#047857]"
             >
               Sign in
             </Link>

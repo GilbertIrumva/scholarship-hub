@@ -126,9 +126,9 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                     }}
                     className={[
                       "group flex items-start gap-4 rounded-2xl border-2 p-4 text-left transition-all duration-200",
-                      "focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2D8CF0]/30",
+                      "focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/25",
                       isSelected
-                        ? "border-[#2D8CF0] bg-[#2D8CF0]/5 shadow-sm"
+                        ? "border-emerald-600 bg-emerald-50 shadow-sm"
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
                     ].join(" ")}
                   >
@@ -136,7 +136,7 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                       className={[
                         "grid h-11 w-11 shrink-0 place-items-center rounded-xl transition-colors",
                         isSelected
-                          ? "bg-[#2D8CF0] text-white"
+                          ? "bg-emerald-600 text-white"
                           : "bg-slate-100 text-slate-600",
                       ].join(" ")}
                     >
@@ -155,7 +155,7 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                       className={[
                         "mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors",
                         isSelected
-                          ? "border-[#2D8CF0] bg-[#2D8CF0]"
+                          ? "border-emerald-600 bg-emerald-600"
                           : "border-slate-300 bg-white",
                       ].join(" ")}
                     >
@@ -182,7 +182,7 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                   onConfirm(selected);
                   onClose();
                 }}
-                className="rounded-xl bg-[#2D8CF0] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#1E7FE0] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#2D8CF0]/30"
+                className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/30"
               >
                 Continue
               </button>

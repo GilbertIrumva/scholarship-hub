@@ -5,9 +5,10 @@
    Tailwind v4 Theme — registers custom color/font utilities
    ============================================================ */
 @theme {
-  --color-primary: #16a34a;
-  --color-primary-dark: #166534;
-  --color-primary-light: #22c55e;
+  --color-primary: #059669;
+  --color-primary-dark: #047857;
+  --color-primary-light: #d1fae5;
+  --color-primary-soft: #10b981;
   --color-primary-foreground: #ffffff;
 
   --color-accent: #f59e0b;
@@ -22,7 +23,7 @@
   --color-muted: #64748b;
 
   --color-border: #e2e8f0;
-  --color-border-focus: #16a34a;
+  --color-border-focus: #059669;
 
   --color-danger: #dc2626;
   --color-success: #22c55e;
@@ -44,9 +45,10 @@
    ============================================================ */
 :root {
   /* Brand */
-  --primary:        #16a34a;
-  --primary-dark:   #166534;
-  --primary-light:  #22c55e;
+  --primary:        #059669;
+  --primary-dark:   #047857;
+  --primary-light:  #d1fae5;
+  --primary-soft:   #10b981;
   --accent:         #f59e0b;
   --accent-dark:    #d97706;
 
@@ -61,7 +63,7 @@
 
   /* Borders */
   --border:         #e2e8f0;
-  --border-focus:   #16a34a;
+  --border-focus:   #059669;
 
   /* Feedback */
   --danger:         #dc2626;
