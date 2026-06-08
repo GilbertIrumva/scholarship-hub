@@ -1,0 +1,99 @@
+import { Mail, Pencil, UserRound } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+const Field = ({ label, value }) => (
+  <div className="rounded-xl border border-border bg-slate-50/50 p-3">
+    <p className="text-xs font-bold uppercase tracking-wider text-muted">{label}</p>
+    <p className="mt-1.5 break-words text-sm font-semibold text-ink">
+      {value && String(value).trim() && value !== "Not supplied" ? value : "—"}
+    </p>
+  </div>
+);
+
+const ScholarProfileCard = ({ application, email, onEdit }) => {
+  const hasProfile = !!application;
+  const initials = (application?.name || email || "S")
+    .split(/[\s@]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        {/* Avatar + header */}
+        <div className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-slate-50 shadow-sm">
+              {application?.photo ? (
+                <img
+                  src={application.photo}
+                  alt={`${application.name || "Scholar"} avatar`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center bg-gradient-to-br from-primary to-emerald-700 text-white text-xl font-extrabold">
+                  {initials || <UserRound className="h-7 w-7" />}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                My profile
+              </p>
+              <h3 className="mt-1 text-xl font-extrabold text-ink tracking-tight truncate">
+                {application?.name || "Add your name"}
+              </h3>
+              <p className="mt-1 text-sm text-muted inline-flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5" />
+                {email}
+              </p>
+            </div>
+          </div>
+          {onEdit && (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+          )}
+        </div>
+
+        {/* Fields */}
+        {hasProfile ? (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Contact" value={application.contact} />
+            <Field label="Age" value={application.age} />
+            <Field label="Gender" value={application.gender} />
+            <Field label="Date of birth" value={application.dateOfBirth} />
+            <Field label="Nationality" value={application.nationality} />
+            <Field label="Marital status" value={application.status} />
+            <Field label="Education" value={application.education} />
+            <Field label="Address" value={application.address} />
+            <Field label="Application ID" value={application.id ? `#${application.id}` : null} />
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border-2 border-dashed border-border bg-slate-50/40 p-6 text-center">
+            <p className="text-sm font-semibold text-ink">No profile details yet</p>
+            <p className="mt-1 text-sm text-muted">
+              Click <span className="font-semibold text-ink">Edit</span> above to add your information.
+            </p>
+          </div>
+        )}
+
+        {/* Bio */}
+        {application?.bio && (
+          <div className="mt-4 rounded-xl border border-border bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">About</p>
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink">
+              {application.bio}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ScholarProfileCard;
