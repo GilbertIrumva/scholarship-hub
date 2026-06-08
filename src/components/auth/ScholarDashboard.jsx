@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import {
   Award,
   BookOpen,
+  Calculator,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -286,6 +287,12 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
                   : "Submit your first application to start tracking progress.",
                 href: "/scholar/applications",
                 icon: ClipboardList,
+              },
+              {
+                title: "Convert your grades",
+                description: "See how your certificate maps to US GPA, UK class, and ECTS.",
+                href: "/grade-converter",
+                icon: Calculator,
               },
             ].map((item) => (
               <button

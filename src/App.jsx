@@ -12,6 +12,7 @@ import ScholarDashboardPage from "./components/auth/ScholarDashboardPage";
 import ScholarshipsPage from "./components/scholar/ScholarshipsPage";
 import ScholarshipDetailPage from "./components/scholar/ScholarshipDetailPage";
 import MyApplicationsPage from "./components/scholar/MyApplicationsPage";
+import GradeConverterPage from "./components/GradeConverter/GradeConverterPage";
 import LegalPage from "./components/LegalPage";
 
 const App = () => {
@@ -19,6 +20,7 @@ const App = () => {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/get-started" element={<RoleLandingPage />} />
+      <Route path="/grade-converter" element={<GradeConverterPage />} />
 
       {/* Unified auth */}
       <Route path="/login" element={<LoginPage />} />

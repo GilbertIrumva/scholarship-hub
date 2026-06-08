@@ -382,6 +382,9 @@ const LandingPage = () => {
         </ul>
 
         <div className="flex shrink-0 items-center gap-2">
+          <Link to="/grade-converter" className="hidden md:inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-primary-dark hover:bg-primary/10 transition-colors">
+            Grade converter
+          </Link>
           <Link to="/login/admin" className="hidden md:block text-sm font-semibold text-muted hover:text-ink transition-colors px-2">
             Admin
           </Link>
@@ -421,6 +424,9 @@ const LandingPage = () => {
                 </li>
               ))}
               <li className="md:hidden border-t border-border mt-2 pt-2">
+                <Link to="/grade-converter" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-primary-dark hover:bg-primary/10">
+                  Grade converter
+                </Link>
                 <Link to="/login/admin" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-muted hover:bg-slate-100">
                   Admin sign in
                 </Link>
