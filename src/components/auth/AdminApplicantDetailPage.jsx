@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import {
   ArrowLeft,
   Cake,
+  FolderArchive,
   GraduationCap,
   Mail,
   MapPin,
@@ -88,6 +89,14 @@ const AdminApplicantDetailPage = () => {
               Back
             </Link>
           </Button>
+          {applicant?.scholarAccountId && (
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/admin/credentials?scholar=${applicant.scholarAccountId}`}>
+                <FolderArchive className="h-4 w-4" />
+                Credentials
+              </Link>
+            </Button>
+          )}
           <Button onClick={fetchApplicant} disabled={loading} size="sm">
             <RefreshCcw className="h-4 w-4" />
             Refresh

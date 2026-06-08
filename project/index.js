@@ -1053,6 +1053,113 @@ app.delete(
     }
 );
 
+// ----- Admin: review academic credentials ---------------------------------
+const CREDENTIAL_REVIEW_STATUSES = ['unverified', 'pending', 'verified', 'rejected'];
+
+const serializeCredentialForAdmin = (entry, scholarDoc) => {
+    const base = serializeCredential(entry);
+    const scholar = scholarDoc || entry.scholar;
+    return {
+        ...base,
+        downloadUrl: `/api/auth/admin/credentials/${entry._id}/download`,
+        scholar: scholar
+            ? {
+                id: pickId(scholar),
+                name: scholar.name,
+                email: scholar.email,
+            }
+            : null,
+        verifiedBy: entry.verifiedBy ? String(entry.verifiedBy) : null,
+    };
+};
+
+app.get('/api/auth/admin/credentials', requireAdminSession, async (req, res, next) => {
+    try {
+        const { status, type, scholar: scholarId } = req.query || {};
+        const filter = {};
+        if (status && CREDENTIAL_REVIEW_STATUSES.includes(String(status))) {
+            filter.verificationStatus = String(status);
+        }
+        if (type && CREDENTIAL_TYPES.includes(String(type))) {
+            filter.type = String(type);
+        }
+        if (scholarId && /^[0-9a-fA-F]{24}$/.test(String(scholarId))) {
+            filter.scholar = scholarId;
+        }
+
+        const entries = await AcademicCredential.find(filter)
+            .populate('scholar', 'name email legacyId')
+            .sort({ createdAt: -1 })
+            .limit(500);
+
+        res.json({ credentials: entries.map((e) => serializeCredentialForAdmin(e, e.scholar)) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.get('/api/auth/admin/credentials/:id', requireAdminSession, async (req, res, next) => {
+    try {
+        const entry = await AcademicCredential.findById(req.params.id)
+            .populate('scholar', 'name email legacyId');
+        if (!entry) return res.status(404).json({ message: 'Credential not found.' });
+        res.json({ credential: serializeCredentialForAdmin(entry, entry.scholar) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.get(
+    '/api/auth/admin/credentials/:id/download',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const entry = await AcademicCredential.findById(req.params.id);
+            if (!entry) return res.status(404).json({ message: 'Credential not found.' });
+            if (!fs.existsSync(entry.storagePath)) {
+                return res.status(410).json({ message: 'File is no longer available.' });
+            }
+            res.setHeader('Content-Type', entry.mimeType);
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
+            );
+            fs.createReadStream(entry.storagePath).pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.patch('/api/auth/admin/credentials/:id', requireAdminSession, async (req, res, next) => {
+    try {
+        const { verificationStatus, verificationNote } = req.body || {};
+        if (!CREDENTIAL_REVIEW_STATUSES.includes(String(verificationStatus))) {
+            return res.status(400).json({
+                message: `verificationStatus must be one of: ${CREDENTIAL_REVIEW_STATUSES.join(', ')}.`,
+            });
+        }
+        const entry = await AcademicCredential.findById(req.params.id);
+        if (!entry) return res.status(404).json({ message: 'Credential not found.' });
+
+        entry.verificationStatus = verificationStatus;
+        entry.verificationNote = String(verificationNote || '').slice(0, 1000);
+        if (verificationStatus === 'verified' || verificationStatus === 'rejected') {
+            entry.verifiedBy = req.admin._id;
+            entry.verifiedAt = new Date();
+        } else {
+            entry.verifiedBy = null;
+            entry.verifiedAt = null;
+        }
+        await entry.save();
+
+        const populated = await entry.populate('scholar', 'name email legacyId');
+        res.json({ credential: serializeCredentialForAdmin(populated, populated.scholar) });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ----- Admin: applicants --------------------------------------------------
 app.get('/api/auth/admin/applicants', requireAdminSession, async (req, res, next) => {
     try {

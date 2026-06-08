@@ -110,6 +110,35 @@ export const replyToAdminMessage = async (sessionToken, messageId, body) => {
   return response.data;
 };
 
+// ----- Academic credentials (Phase 5) -------------------------------------
+export const listAdminCredentials = async (sessionToken, params = {}) => {
+  const response = await axios.get(`${ADMIN_AUTH_BASE_URL}/credentials`, {
+    ...buildAuthConfig(sessionToken),
+    params,
+  });
+  return response.data;
+};
+
+export const getAdminCredential = async (sessionToken, credentialId) => {
+  const response = await axios.get(
+    `${ADMIN_AUTH_BASE_URL}/credentials/${credentialId}`,
+    buildAuthConfig(sessionToken),
+  );
+  return response.data;
+};
+
+export const reviewAdminCredential = async (sessionToken, credentialId, payload) => {
+  const response = await axios.patch(
+    `${ADMIN_AUTH_BASE_URL}/credentials/${credentialId}`,
+    payload,
+    buildAuthConfig(sessionToken),
+  );
+  return response.data;
+};
+
+export const adminCredentialDownloadUrl = (credentialId) =>
+  `${ADMIN_AUTH_BASE_URL}/credentials/${credentialId}/download`;
+
 export default {
   signInAdmin,
   signUpAdmin,
@@ -126,4 +155,8 @@ export default {
   updateAdminMessage,
   deleteAdminMessage,
   replyToAdminMessage,
+  listAdminCredentials,
+  getAdminCredential,
+  reviewAdminCredential,
+  adminCredentialDownloadUrl,
 };

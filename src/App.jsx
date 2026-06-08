@@ -8,6 +8,7 @@ import AdminSettingsPage from "./components/auth/AdminSettingsPage";
 import AdminApplicantsPage from "./components/auth/AdminApplicantsPage";
 import AdminApplicantDetailPage from "./components/auth/AdminApplicantDetailPage";
 import AdminMessagesPage from "./components/auth/AdminMessagesPage";
+import AdminCredentialsPage from "./components/auth/AdminCredentialsPage";
 import ScholarDashboardPage from "./components/auth/ScholarDashboardPage";
 import ScholarshipsPage from "./components/scholar/ScholarshipsPage";
 import ScholarshipDetailPage from "./components/scholar/ScholarshipDetailPage";
@@ -43,6 +44,7 @@ const App = () => {
       <Route path="/admin/applicants" element={<AdminApplicantsPage />} />
       <Route path="/admin/applicants/:id" element={<AdminApplicantDetailPage />} />
       <Route path="/admin/messages" element={<AdminMessagesPage />} />
+      <Route path="/admin/credentials" element={<AdminCredentialsPage />} />
       <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route path="/privacy" element={<LegalPage variant="privacy" />} />
       <Route path="/terms" element={<LegalPage variant="terms" />} />
