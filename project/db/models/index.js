@@ -5,4 +5,5 @@ module.exports = {
     Scholarship: require('./Scholarship'),
     ScholarshipApplication: require('./ScholarshipApplication'),
     ContactMessage: require('./ContactMessage'),
+    AcademicCredential: require('./AcademicCredential'),
 };

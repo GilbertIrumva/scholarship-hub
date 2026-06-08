@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  FolderArchive,
   GraduationCap,
   Mail,
   Pencil,
@@ -293,6 +294,12 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
                 description: "See how your certificate maps to US GPA, UK class, and ECTS.",
                 href: "/grade-converter",
                 icon: Calculator,
+              },
+              {
+                title: "Upload credentials",
+                description: "Add certificates, transcripts, and ID documents to speed up applications.",
+                href: "/scholar/credentials",
+                icon: FolderArchive,
               },
             ].map((item) => (
               <button

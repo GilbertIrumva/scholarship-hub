@@ -1,16 +1,62 @@
 require('dotenv').config();
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential } = require('./db/models');
 const { sendEmail } = require('./mailer');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// ---------------------------------------------------------------------------
+// File-upload setup (Phase 4: AcademicCredential vault)
+// ---------------------------------------------------------------------------
+const UPLOADS_ROOT = path.resolve(__dirname, 'uploads');
+const CREDENTIALS_ROOT = path.join(UPLOADS_ROOT, 'credentials');
+if (!fs.existsSync(CREDENTIALS_ROOT)) {
+    fs.mkdirSync(CREDENTIALS_ROOT, { recursive: true });
+}
+
+const credentialStorage = multer.diskStorage({
+    destination: (req, _file, cb) => {
+        const scholarId = req.scholar && String(req.scholar._id);
+        if (!scholarId) return cb(new Error('No scholar bound to request.'));
+        const dir = path.join(CREDENTIALS_ROOT, scholarId);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+        const safeExt = path.extname(file.originalname).toLowerCase().slice(0, 8);
+        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${safeExt}`;
+        cb(null, unique);
+    },
+});
+
+const CREDENTIAL_ALLOWED_MIME = new Set([
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+]);
+
+const uploadCredential = multer({
+    storage: credentialStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+        if (!CREDENTIAL_ALLOWED_MIME.has(file.mimetype)) {
+            return cb(new Error('Only PDF or image files (jpg, png, webp, heic) are allowed.'));
+        }
+        cb(null, true);
+    },
+});
 
 // ---------------------------------------------------------------------------
 // In-memory auth state (challenges & session tokens). Persisted state lives
@@ -843,6 +889,170 @@ app.post('/api/auth/student/applications', requireScholarSession, async (req, re
     }
 });
 
+// ----- Scholar: academic credentials --------------------------------------
+const CREDENTIAL_TYPES = [
+    'secondary-certificate',
+    'transcript',
+    'national-id',
+    'passport',
+    'language-test',
+    'recommendation-letter',
+    'cv',
+    'other',
+];
+
+const serializeCredential = (entry) => ({
+    id: String(entry._id),
+    type: entry.type,
+    title: entry.title,
+    country: entry.country || '',
+    issuingBody: entry.issuingBody || '',
+    issuedYear: entry.issuedYear || null,
+    originalName: entry.originalName,
+    mimeType: entry.mimeType,
+    sizeBytes: entry.sizeBytes,
+    verificationStatus: entry.verificationStatus,
+    verificationNote: entry.verificationNote || '',
+    verifiedAt: entry.verifiedAt,
+    gradeConversion: entry.gradeConversion && entry.gradeConversion.systemId
+        ? {
+            systemId: entry.gradeConversion.systemId,
+            input: entry.gradeConversion.input,
+            percentage: entry.gradeConversion.percentage,
+            gpa4: entry.gradeConversion.gpa4,
+            ukClass: entry.gradeConversion.ukClass,
+            ects: entry.gradeConversion.ects,
+            tier: entry.gradeConversion.tier,
+            convertedAt: entry.gradeConversion.convertedAt,
+        }
+        : null,
+    downloadUrl: `/api/auth/student/credentials/${entry._id}/download`,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+});
+
+app.get('/api/auth/student/credentials', requireScholarSession, async (req, res, next) => {
+    try {
+        const entries = await AcademicCredential.find({ scholar: req.scholar._id })
+            .sort({ createdAt: -1 });
+        res.json({ credentials: entries.map(serializeCredential) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+const parseGradeConversionField = (raw) => {
+    if (!raw) return null;
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!parsed || typeof parsed !== 'object' || !parsed.systemId) return null;
+        return {
+            systemId: String(parsed.systemId).slice(0, 30),
+            input: String(parsed.input ?? '').slice(0, 30),
+            percentage: Number.isFinite(parsed.percentage) ? Number(parsed.percentage) : null,
+            gpa4: Number.isFinite(parsed.gpa4) ? Number(parsed.gpa4) : null,
+            ukClass: String(parsed.ukClass ?? '').slice(0, 20),
+            ects: String(parsed.ects ?? '').slice(0, 5),
+            tier: String(parsed.tier ?? '').slice(0, 30),
+            convertedAt: new Date(),
+        };
+    } catch {
+        return null;
+    }
+};
+
+app.post(
+    '/api/auth/student/credentials',
+    requireScholarSession,
+    uploadCredential.single('file'),
+    async (req, res, next) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'A file is required.' });
+            }
+            const { type, title, country, issuingBody, issuedYear, gradeConversion } = req.body || {};
+            if (!CREDENTIAL_TYPES.includes(type)) {
+                fs.unlink(req.file.path, () => {});
+                return res.status(400).json({ message: 'Unknown credential type.' });
+            }
+            const trimmedTitle = String(title || '').trim();
+            if (!trimmedTitle) {
+                fs.unlink(req.file.path, () => {});
+                return res.status(400).json({ message: 'A title is required.' });
+            }
+
+            const yearNum = issuedYear ? Number(issuedYear) : null;
+            if (issuedYear && (!Number.isFinite(yearNum) || yearNum < 1950 || yearNum > 2100)) {
+                fs.unlink(req.file.path, () => {});
+                return res.status(400).json({ message: 'Issued year must be between 1950 and 2100.' });
+            }
+
+            const created = await AcademicCredential.create({
+                scholar: req.scholar._id,
+                type,
+                title: trimmedTitle.slice(0, 200),
+                country: String(country || '').trim().toUpperCase().slice(0, 3),
+                issuingBody: String(issuingBody || '').trim().slice(0, 200),
+                issuedYear: yearNum,
+                originalName: req.file.originalname.slice(0, 300),
+                storagePath: req.file.path,
+                mimeType: req.file.mimetype,
+                sizeBytes: req.file.size,
+                gradeConversion: parseGradeConversionField(gradeConversion) || undefined,
+            });
+            return res.status(201).json({ credential: serializeCredential(created) });
+        } catch (err) {
+            if (req.file) fs.unlink(req.file.path, () => {});
+            next(err);
+        }
+    }
+);
+
+app.get(
+    '/api/auth/student/credentials/:id/download',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const entry = await AcademicCredential.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!entry) return res.status(404).json({ message: 'Credential not found.' });
+            if (!fs.existsSync(entry.storagePath)) {
+                return res.status(410).json({ message: 'File is no longer available.' });
+            }
+            res.setHeader('Content-Type', entry.mimeType);
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
+            );
+            fs.createReadStream(entry.storagePath).pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.delete(
+    '/api/auth/student/credentials/:id',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const entry = await AcademicCredential.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!entry) return res.status(404).json({ message: 'Credential not found.' });
+            const filePath = entry.storagePath;
+            await entry.deleteOne();
+            fs.unlink(filePath, () => {});
+            return res.json({ ok: true });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
 // ----- Admin: applicants --------------------------------------------------
 app.get('/api/auth/admin/applicants', requireAdminSession, async (req, res, next) => {
     try {
@@ -1048,6 +1258,15 @@ app.post('/api/scholarships', async (req, res, next) => {
 app.use((err, req, res, _next) => {
     console.error('[api] Unhandled error:', err);
     if (res.headersSent) return;
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ message: 'File is too large (max 10 MB).' });
+        }
+        return res.status(400).json({ message: err.message });
+    }
+    if (err && /Only PDF or image/.test(err.message || '')) {
+        return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({ message: 'Internal server error.' });
 });
 

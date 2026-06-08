@@ -12,6 +12,7 @@ import ScholarDashboardPage from "./components/auth/ScholarDashboardPage";
 import ScholarshipsPage from "./components/scholar/ScholarshipsPage";
 import ScholarshipDetailPage from "./components/scholar/ScholarshipDetailPage";
 import MyApplicationsPage from "./components/scholar/MyApplicationsPage";
+import CredentialsPage from "./components/scholar/CredentialsPage";
 import GradeConverterPage from "./components/GradeConverter/GradeConverterPage";
 import LegalPage from "./components/LegalPage";
 
@@ -37,6 +38,7 @@ const App = () => {
       <Route path="/scholar/scholarships" element={<ScholarshipsPage />} />
       <Route path="/scholar/scholarships/:id" element={<ScholarshipDetailPage />} />
       <Route path="/scholar/applications" element={<MyApplicationsPage />} />
+      <Route path="/scholar/credentials" element={<CredentialsPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/admin/applicants" element={<AdminApplicantsPage />} />
       <Route path="/admin/applicants/:id" element={<AdminApplicantDetailPage />} />

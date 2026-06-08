@@ -18,6 +18,7 @@ import {
   Inbox,
   Compass,
   FileText,
+  FolderArchive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -36,6 +37,7 @@ const SCHOLAR_NAV = [
   { to: "/scholar", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass },
   { to: "/scholar/applications", label: "My applications", icon: FileText },
+  { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive },
 ];
 
 const ROLE_CONFIG = {
