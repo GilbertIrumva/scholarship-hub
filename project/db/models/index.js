@@ -3,5 +3,6 @@ module.exports = {
     Scholar: require('./Scholar'),
     Application: require('./Application'),
     Scholarship: require('./Scholarship'),
+    ScholarshipApplication: require('./ScholarshipApplication'),
     ContactMessage: require('./ContactMessage'),
 };

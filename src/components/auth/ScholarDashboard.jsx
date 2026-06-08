@@ -276,7 +276,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
               {
                 title: "Browse opportunities",
                 description: "Explore the catalog and shortlist scholarships you qualify for.",
-                href: "/#scholarships",
+                href: "/scholar/scholarships",
                 icon: BookOpen,
               },
               {
@@ -284,6 +284,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
                 description: application
                   ? `Application #${application.id} is currently ${application.status}.`
                   : "Submit your first application to start tracking progress.",
+                href: "/scholar/applications",
                 icon: ClipboardList,
               },
             ].map((item) => (

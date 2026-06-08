@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ContactMessage } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage } = require('./db/models');
 const { sendEmail } = require('./mailer');
 
 const app = express();
@@ -271,6 +271,19 @@ app.get('/api/public/scholarships', async (req, res, next) => {
         const cap = Math.min(Number(limit) || 12, 50);
         const items = await Scholarship.find(filter).sort({ deadline: 1 }).limit(cap);
         res.json({ count: items.length, items });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.get('/api/public/scholarships/:id', async (req, res, next) => {
+    try {
+        if (!req.params.id || !req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ message: 'Invalid scholarship id.' });
+        }
+        const scholarship = await Scholarship.findOne({ _id: req.params.id, active: true });
+        if (!scholarship) return res.status(404).json({ message: 'Scholarship not found.' });
+        res.json({ scholarship });
     } catch (err) {
         next(err);
     }
@@ -742,6 +755,90 @@ app.put('/api/auth/student/profile', requireScholarSession, async (req, res, nex
 
         return res.json(buildScholarProfilePayload(scholar, application));
     } catch (err) {
+        next(err);
+    }
+});
+
+// ----- Scholar: scholarship applications ----------------------------------
+const APPLICATION_MOTIVATION_MAX = 2000;
+
+const serializeScholarshipApplication = (entry) => {
+    const scholarship = entry.scholarship && typeof entry.scholarship === 'object' && entry.scholarship.title
+        ? {
+              id: String(entry.scholarship._id),
+              title: entry.scholarship.title,
+              provider: entry.scholarship.provider || '',
+              amount: entry.scholarship.amount || 0,
+              currency: entry.scholarship.currency || 'USD',
+              deadline: entry.scholarship.deadline || null,
+          }
+        : null;
+    return {
+        id: String(entry._id),
+        scholarshipId: scholarship ? scholarship.id : String(entry.scholarship),
+        scholarship,
+        motivation: entry.motivation || '',
+        status: entry.status,
+        decisionNote: entry.decisionNote || '',
+        decidedAt: entry.decidedAt,
+        submittedAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+    };
+};
+
+app.get('/api/auth/student/applications', requireScholarSession, async (req, res, next) => {
+    try {
+        const entries = await ScholarshipApplication.find({ scholar: req.scholar._id })
+            .populate('scholarship')
+            .sort({ createdAt: -1 });
+        res.json({ applications: entries.map(serializeScholarshipApplication) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post('/api/auth/student/applications', requireScholarSession, async (req, res, next) => {
+    try {
+        const { scholarshipId, motivation } = req.body || {};
+        if (!scholarshipId || !String(scholarshipId).match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ message: 'A valid scholarship id is required.' });
+        }
+        const trimmedMotivation = String(motivation || '').trim();
+        if (trimmedMotivation.length > APPLICATION_MOTIVATION_MAX) {
+            return res.status(413).json({ message: 'Motivation statement is too long.' });
+        }
+
+        const scholarship = await Scholarship.findOne({ _id: scholarshipId, active: true });
+        if (!scholarship) {
+            return res.status(404).json({ message: 'Scholarship not found or no longer active.' });
+        }
+
+        if (scholarship.deadline && new Date(scholarship.deadline) < new Date()) {
+            return res.status(400).json({ message: 'This scholarship has closed.' });
+        }
+
+        const existing = await ScholarshipApplication.findOne({
+            scholar: req.scholar._id,
+            scholarship: scholarship._id,
+        });
+        if (existing) {
+            return res.status(409).json({
+                message: 'You have already applied to this scholarship.',
+                application: serializeScholarshipApplication(existing),
+            });
+        }
+
+        const created = await ScholarshipApplication.create({
+            scholar: req.scholar._id,
+            scholarship: scholarship._id,
+            motivation: trimmedMotivation,
+        });
+        const populated = await created.populate('scholarship');
+        return res.status(201).json({ application: serializeScholarshipApplication(populated) });
+    } catch (err) {
+        if (err && err.code === 11000) {
+            return res.status(409).json({ message: 'You have already applied to this scholarship.' });
+        }
         next(err);
     }
 });

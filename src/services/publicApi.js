@@ -17,8 +17,14 @@ export const searchPublicScholarships = async (params = {}) => {
   return data;
 };
 
+export const getPublicScholarshipById = async (id) => {
+  const { data } = await axios.get(`${BASE}/scholarships/${id}`);
+  return data;
+};
+
 export default {
   getPublicStats,
   getPublicFilters,
   searchPublicScholarships,
+  getPublicScholarshipById,
 };

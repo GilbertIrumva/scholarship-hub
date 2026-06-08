@@ -9,6 +9,9 @@ import AdminApplicantsPage from "./components/auth/AdminApplicantsPage";
 import AdminApplicantDetailPage from "./components/auth/AdminApplicantDetailPage";
 import AdminMessagesPage from "./components/auth/AdminMessagesPage";
 import ScholarDashboardPage from "./components/auth/ScholarDashboardPage";
+import ScholarshipsPage from "./components/scholar/ScholarshipsPage";
+import ScholarshipDetailPage from "./components/scholar/ScholarshipDetailPage";
+import MyApplicationsPage from "./components/scholar/MyApplicationsPage";
 import LegalPage from "./components/LegalPage";
 
 const App = () => {
@@ -29,6 +32,9 @@ const App = () => {
       <Route path="/signup/admin" element={<Navigate to="/signup" replace />} />
 
       <Route path="/scholar" element={<ScholarDashboardPage />} />
+      <Route path="/scholar/scholarships" element={<ScholarshipsPage />} />
+      <Route path="/scholar/scholarships/:id" element={<ScholarshipDetailPage />} />
+      <Route path="/scholar/applications" element={<MyApplicationsPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/admin/applicants" element={<AdminApplicantsPage />} />
       <Route path="/admin/applicants/:id" element={<AdminApplicantDetailPage />} />
