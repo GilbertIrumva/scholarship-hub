@@ -56,7 +56,7 @@ const ROLE_CONFIG = {
     accentLight: "bg-primary/10",
   },
   scholar: {
-    brand: "Scholar Hub",
+    brand: "Scholar",
     icon: GraduationCap,
     nav: SCHOLAR_NAV,
     accent: "bg-primary",
@@ -168,11 +168,12 @@ const DashboardLayout = ({
     <div className="flex h-full flex-col bg-white border-r border-border">
       {/* Brand */}
       <div className="flex items-center justify-between p-5 border-b border-border">
-        <Link to="/" className="flex items-center gap-2 font-extrabold text-ink">
-          <span className={cn("grid h-9 w-9 place-items-center rounded-lg text-white text-sm font-extrabold tracking-wider", cfg.accent)}>
-            SH
-          </span>
-          <span className="text-base">ScholarshipZone</span>
+        <Link to="/" className="flex items-center font-extrabold text-ink">
+          <img
+            src="/logo.png"
+            alt="ScholarshipZone"
+            className="h-24 w-auto object-contain"
+          />
         </Link>
         <button
           type="button"

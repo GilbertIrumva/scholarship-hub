@@ -66,16 +66,16 @@ const TIER_META = {
     description:
       "Strong fit for highly selective universities and major international scholarships.",
     icon: Trophy,
-    accent: "from-emerald-500 to-emerald-700",
-    chip: "bg-emerald-100 text-emerald-800",
+    accent: "from-primary to-primary-dark",
+    chip: "bg-primary-light text-primary-dark",
   },
   competitive: {
     label: "Competitive",
     description:
       "Eligible for most reputable universities; competitive for many full scholarships.",
     icon: Award,
-    accent: "from-emerald-500 to-emerald-700",
-    chip: "bg-emerald-100 text-emerald-800",
+    accent: "from-primary to-primary-dark",
+    chip: "bg-primary-light text-primary-dark",
   },
   standard: {
     label: "Standard pass",
@@ -337,11 +337,12 @@ const GradeConverterPage = () => {
     <main className="min-h-screen bg-background">
       {/* ====== Top bar ====== */}
       <header className="sticky top-3 z-40 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2 font-extrabold text-ink">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white text-sm font-extrabold tracking-wider">
-            SH
-          </span>
-          <span className="hidden sm:block text-base">ScholarshipZone</span>
+        <Link to="/" className="flex shrink-0 items-center">
+          <img
+            src="/logo.png"
+            alt="ScholarshipZone"
+            className="h-12 w-auto object-contain"
+          />
         </Link>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
@@ -359,7 +360,7 @@ const GradeConverterPage = () => {
 
       {/* ====== Hero ====== */}
       <section className="mx-auto mt-8 max-w-7xl px-4 sm:px-6">
-        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-emerald-800 p-8 text-white shadow-modal sm:p-12">
+        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-emerald-900 p-8 text-white shadow-modal sm:p-12">
           <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
@@ -377,7 +378,7 @@ const GradeConverterPage = () => {
               <div className="mt-6 flex flex-wrap gap-3">
                 <a
                   href="#converter"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-ink shadow-sm transition-all hover:bg-accent-dark"
                 >
                   Start converting <ArrowRight className="h-4 w-4" />
                 </a>
@@ -579,7 +580,7 @@ const GradeConverterPage = () => {
 
       {/* ====== Footer CTA ====== */}
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
-        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-8 text-center text-white shadow-modal sm:p-12">
+        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-emerald-900 p-8 text-center text-white shadow-modal sm:p-12">
           <h2 className="text-2xl font-extrabold sm:text-3xl">
             Ready to find scholarships that match your grades?
           </h2>
@@ -588,7 +589,7 @@ const GradeConverterPage = () => {
             scholarships worldwide — all in one place.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="bg-white text-emerald-700 hover:bg-emerald-50">
+            <Button asChild size="lg" variant="accent">
               <Link to="/signup">
                 Create free account <ArrowRight className="h-4 w-4" />
               </Link>

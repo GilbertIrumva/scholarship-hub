@@ -8,4 +8,5 @@ module.exports = {
     AcademicCredential: require('./AcademicCredential'),
     TravelDocument: require('./TravelDocument'),
     VisaWorkflow: require('./VisaWorkflow'),
+    Session: require('./Session'),
 };

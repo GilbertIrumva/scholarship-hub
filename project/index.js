@@ -5,15 +5,121 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const pino = require('pino');
+const pinoHttp = require('pino-http');
 const multer = require('multer');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session } = require('./db/models');
 const { sendEmail } = require('./mailer');
+const { validate } = require('./lib/validate');
+const {
+    AdminSignInSchema,
+    AdminVerifySchema,
+    AdminSignUpSchema,
+    ScholarSignInSchema,
+    ScholarSignUpSchema,
+    ContactMessageSchema,
+} = require('./lib/schemas');
+
+// ---------------------------------------------------------------------------
+// Logging — structured JSON in production, pretty-printed in dev.
+// ---------------------------------------------------------------------------
+const IS_PROD = process.env.NODE_ENV === 'production';
+const logger = pino({
+    level: process.env.LOG_LEVEL || (IS_PROD ? 'info' : 'debug'),
+    redact: {
+        paths: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'req.body.password',
+            'req.body.verificationCode',
+            'req.body.departmentCode',
+            'req.body.twoFactorCode',
+        ],
+        censor: '[redacted]',
+    },
+    ...(IS_PROD ? {} : {
+        transport: { target: 'pino-pretty', options: { translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' } },
+    }),
+});
 
 const app = express();
-app.use(cors());
+
+// Trust the first proxy hop so express-rate-limit and req.ip see the real
+// client address when deployed behind a reverse proxy (Render, Fly, nginx).
+app.set('trust proxy', 1);
+
+// Helmet — secure HTTP headers (CSP relaxed; the API serves JSON only).
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false,
+}));
+
+// CORS — an allow-list driven by CORS_ORIGINS (comma-separated). When unset
+// in development we fall back to permissive mode so `npm run dev` still works.
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+app.use(cors({
+    origin: (origin, cb) => {
+        // Same-origin / curl / server-to-server requests have no origin header.
+        if (!origin) return cb(null, true);
+        if (CORS_ORIGINS.length === 0) {
+            if (IS_PROD) {
+                return cb(new Error(`CORS blocked: set CORS_ORIGINS to allow ${origin}`));
+            }
+            return cb(null, true);
+        }
+        if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+}));
+
+app.use(pinoHttp({
+    logger,
+    customLogLevel: (_req, res, err) => {
+        if (err || res.statusCode >= 500) return 'error';
+        if (res.statusCode >= 400) return 'warn';
+        return 'info';
+    },
+    // Quiet healthchecks in the request log.
+    autoLogging: { ignore: (req) => req.url === '/healthz' || req.url === '/readyz' },
+}));
+
 app.use(express.json({ limit: '10mb' }));
+
+// ---------------------------------------------------------------------------
+// Rate limiters — protect auth + write endpoints from brute force / abuse.
+// ---------------------------------------------------------------------------
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,     // 15 minutes
+    max: 10,                      // 10 auth attempts per IP per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many authentication attempts. Please try again later.' },
+});
+
+const contactLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,     // 1 hour
+    max: 5,                       // 5 contact-form submissions per IP per hour
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many messages from this address. Please try again later.' },
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 600,                     // 600 general API calls per IP per window (~40/min)
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many requests. Please slow down and try again shortly.' },
+});
+app.use('/api/', apiLimiter);
 
 // ---------------------------------------------------------------------------
 // File-upload setup (Phase 4: AcademicCredential vault)
@@ -97,7 +203,11 @@ const uploadTravelDoc = multer({
 const TRAVEL_DOC_SECRET = process.env.TRAVEL_DOC_SECRET
     || 'dev-only-travel-doc-secret-please-set-TRAVEL_DOC_SECRET-in-prod';
 if (TRAVEL_DOC_SECRET.startsWith('dev-only')) {
-    console.warn('[api] TRAVEL_DOC_SECRET not set — using insecure dev fallback. Set it in production.');
+    if (IS_PROD) {
+        logger.fatal('TRAVEL_DOC_SECRET is unset in production. Refusing to start.');
+        process.exit(1);
+    }
+    logger.warn('TRAVEL_DOC_SECRET not set — using insecure dev fallback. Set it in production.');
 }
 const TRAVEL_DOC_KEY = crypto.createHash('sha256').update(TRAVEL_DOC_SECRET).digest();
 
@@ -132,19 +242,16 @@ const decryptDocNumber = (record) => {
         ]);
         return decrypted.toString('utf8');
     } catch (err) {
-        console.warn('[api] Failed to decrypt travel-doc number:', err.message);
+        logger.warn({ err: err.message }, 'Failed to decrypt travel-doc number');
         return '';
     }
 };
 
 // ---------------------------------------------------------------------------
-// In-memory auth state (challenges & session tokens). Persisted state lives
-// in MongoDB; only ephemeral, short-lived tokens are kept in memory.
+// Auth state — persisted in MongoDB via the Session model so tokens survive
+// process restarts and so the API can be horizontally scaled. Each Session
+// document has a TTL index on `expiresAt`, so Mongo purges them automatically.
 // ---------------------------------------------------------------------------
-const pendingAdminChallenges = new Map();
-const adminSessions = new Map();
-const scholarSessions = new Map();
-
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
@@ -176,11 +283,34 @@ const verifyPassword = (password, record) => {
     return safeEqual(candidate, record.passwordHash);
 };
 
-const cleanupExpiredEntries = (store) => {
-    const now = Date.now();
-    for (const [key, value] of store.entries()) {
-        if (value.expiresAt <= now) store.delete(key);
+const issueSession = async ({ kind, principalId, ttlMs, req }) => {
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + ttlMs);
+    await Session.create({
+        token,
+        kind,
+        principalId,
+        expiresAt,
+        ip: req?.ip,
+        userAgent: req?.headers?.['user-agent'],
+    });
+    return { token, expiresAt };
+};
+
+const findActiveSession = async (token, kind) => {
+    if (!token) return null;
+    const doc = await Session.findOne({ token, kind });
+    if (!doc) return null;
+    if (doc.expiresAt.getTime() <= Date.now()) {
+        await Session.deleteOne({ _id: doc._id }).catch(() => {});
+        return null;
     }
+    return doc;
+};
+
+const revokeSession = async (token) => {
+    if (!token) return;
+    await Session.deleteOne({ token }).catch(() => {});
 };
 
 // ---------------------------------------------------------------------------
@@ -312,18 +442,17 @@ const findByEitherId = async (Model, idParam) => {
 // ---------------------------------------------------------------------------
 const requireAdminSession = async (req, res, next) => {
     try {
-        cleanupExpiredEntries(adminSessions);
         const [scheme, token] = (req.headers.authorization || '').split(' ');
         if (scheme !== 'Bearer' || !token) {
             return res.status(401).json({ message: 'Admin session is required.' });
         }
-        const session = adminSessions.get(token);
+        const session = await findActiveSession(token, 'admin');
         if (!session) {
             return res.status(401).json({ message: 'Admin session is invalid or expired.' });
         }
-        const admin = await Admin.findById(session.adminId);
+        const admin = await Admin.findById(session.principalId);
         if (!admin) {
-            adminSessions.delete(token);
+            await revokeSession(token);
             return res.status(401).json({ message: 'Admin account was not found.' });
         }
         req.admin = admin;
@@ -336,18 +465,17 @@ const requireAdminSession = async (req, res, next) => {
 
 const requireScholarSession = async (req, res, next) => {
     try {
-        cleanupExpiredEntries(scholarSessions);
         const [scheme, token] = (req.headers.authorization || '').split(' ');
         if (scheme !== 'Bearer' || !token) {
             return res.status(401).json({ message: 'Scholar session is required.' });
         }
-        const session = scholarSessions.get(token);
+        const session = await findActiveSession(token, 'scholar');
         if (!session) {
             return res.status(401).json({ message: 'Scholar session is invalid or expired.' });
         }
-        const scholar = await Scholar.findById(session.scholarId);
+        const scholar = await Scholar.findById(session.principalId);
         if (!scholar) {
-            scholarSessions.delete(token);
+            await revokeSession(token);
             return res.status(401).json({ message: 'Scholar account was not found.' });
         }
         req.scholar = scholar;
@@ -362,6 +490,20 @@ const requireScholarSession = async (req, res, next) => {
 // Routes
 // ---------------------------------------------------------------------------
 app.get('/', (req, res) => res.send('ScholarshipZone API is running!'));
+
+// ----- Health probes (used by load balancers / orchestrators) ------------
+app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.get('/readyz', async (_req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        // 1 = connected, 2 = connecting
+        const ready = mongoose.connection.readyState === 1;
+        if (!ready) return res.status(503).json({ status: 'not-ready', db: 'disconnected' });
+        return res.json({ status: 'ready', db: 'connected' });
+    } catch (err) {
+        return res.status(503).json({ status: 'not-ready', error: err.message });
+    }
+});
 
 // ----- Public (no auth) endpoints for the marketing landing page ---------
 app.get('/api/public/stats', async (req, res, next) => {
@@ -434,33 +576,19 @@ app.get('/api/public/filters', async (req, res, next) => {
 // Contact form — persists messages to MongoDB for admin review.
 const CONTACT_MAX_LEN = 4000;
 
-app.post('/api/public/contact', async (req, res, next) => {
-    const { name, email, topic, message } = req.body || {};
-    const trimmedName = String(name || '').trim();
-    const trimmedEmail = String(email || '').trim().toLowerCase();
-    const trimmedTopic = String(topic || 'general').trim().slice(0, 40);
-    const trimmedMessage = String(message || '').trim();
-
-    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
-        return res.status(400).json({ message: 'Name, email, and message are required.' });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-        return res.status(400).json({ message: 'Enter a valid email address.' });
-    }
-    if (trimmedMessage.length > CONTACT_MAX_LEN) {
-        return res.status(413).json({ message: 'Message is too long.' });
-    }
+app.post('/api/public/contact', contactLimiter, validate(ContactMessageSchema), async (req, res, next) => {
+    const { name, email, topic, message } = req.body;
 
     try {
         const doc = await ContactMessage.create({
-            name: trimmedName,
-            email: trimmedEmail,
-            topic: trimmedTopic,
-            message: trimmedMessage,
+            name,
+            email,
+            topic,
+            message,
             ipAddress: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString(),
             userAgent: (req.headers['user-agent'] || '').toString().slice(0, 500),
         });
-        console.log('[contact] New message stored', { id: doc._id.toString(), email: trimmedEmail });
+        console.log('[contact] New message stored', { id: doc._id.toString(), email });
         return res.status(201).json({ message: 'Message received. We will reply soon.' });
     } catch (err) {
         return next(err);
@@ -566,23 +694,22 @@ app.post('/api/auth/admin/messages/:id/reply', requireAdminSession, async (req, 
 });
 
 // ----- Admin auth ---------------------------------------------------------
-app.post('/api/auth/admin/sign-in', async (req, res, next) => {
+app.post('/api/auth/admin/sign-in', authLimiter, validate(AdminSignInSchema), async (req, res, next) => {
     try {
-        const { email, password } = req.body || {};
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required.' });
-        }
-        const admin = await Admin.findOne({ email: normalizeEmail(email) });
+        const { email, password } = req.body;
+        const admin = await Admin.findOne({ email });
         if (!admin || !verifyPassword(password, admin)) {
             return res.status(401).json({ message: 'Invalid admin email or password.' });
         }
-        cleanupExpiredEntries(pendingAdminChallenges);
-        const challengeId = crypto.randomUUID();
-        const expiresAt = Date.now() + CHALLENGE_TTL_MS;
-        pendingAdminChallenges.set(challengeId, { adminId: admin._id.toString(), expiresAt });
+        const { token: challengeId, expiresAt } = await issueSession({
+            kind: 'admin-challenge',
+            principalId: admin._id,
+            ttlMs: CHALLENGE_TTL_MS,
+            req,
+        });
         return res.json({
             challengeId,
-            expiresAt,
+            expiresAt: expiresAt.getTime(),
             admin: toPublicAdmin(admin),
             verificationHint: `Enter the department code or 2FA code for ${admin.department}.`,
         });
@@ -591,20 +718,16 @@ app.post('/api/auth/admin/sign-in', async (req, res, next) => {
     }
 });
 
-app.post('/api/auth/admin/verify', async (req, res, next) => {
+app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), async (req, res, next) => {
     try {
-        const { challengeId, verificationCode } = req.body || {};
-        if (!challengeId || !verificationCode) {
-            return res.status(400).json({ message: 'Challenge id and verification code are required.' });
-        }
-        cleanupExpiredEntries(pendingAdminChallenges);
-        const challenge = pendingAdminChallenges.get(challengeId);
+        const { challengeId, verificationCode } = req.body;
+        const challenge = await findActiveSession(challengeId, 'admin-challenge');
         if (!challenge) {
             return res.status(410).json({ message: 'Verification challenge expired. Sign in again.' });
         }
-        const admin = await Admin.findById(challenge.adminId);
+        const admin = await Admin.findById(challenge.principalId);
         if (!admin) {
-            pendingAdminChallenges.delete(challengeId);
+            await revokeSession(challengeId);
             return res.status(404).json({ message: 'Admin account was not found.' });
         }
         const normalizedCode = String(verificationCode).trim();
@@ -613,12 +736,12 @@ app.post('/api/auth/admin/verify', async (req, res, next) => {
         if (!validCode) {
             return res.status(401).json({ message: 'Invalid department or 2FA code.' });
         }
-        pendingAdminChallenges.delete(challengeId);
-        cleanupExpiredEntries(adminSessions);
-        const sessionToken = crypto.randomUUID();
-        adminSessions.set(sessionToken, {
-            adminId: admin._id.toString(),
-            expiresAt: Date.now() + SESSION_TTL_MS,
+        await revokeSession(challengeId);
+        const { token: sessionToken } = await issueSession({
+            kind: 'admin',
+            principalId: admin._id,
+            ttlMs: SESSION_TTL_MS,
+            req,
         });
         return res.json({
             message: 'Admin verification complete.',
@@ -810,21 +933,18 @@ app.delete('/api/auth/admin/scholars/:id', requireAdminSession, async (req, res,
 });
 
 // ----- Scholar (student) auth & profile ----------------------------------
-app.post('/api/auth/student/sign-in', async (req, res, next) => {
+app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema), async (req, res, next) => {
     try {
-        const { email, password } = req.body || {};
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required.' });
-        }
-        const scholar = await Scholar.findOne({ email: normalizeEmail(email) });
+        const { email, password } = req.body;
+        const scholar = await Scholar.findOne({ email });
         if (!scholar || !verifyPassword(password, scholar)) {
             return res.status(401).json({ message: 'Invalid scholar email or password.' });
         }
-        cleanupExpiredEntries(scholarSessions);
-        const sessionToken = crypto.randomUUID();
-        scholarSessions.set(sessionToken, {
-            scholarId: scholar._id.toString(),
-            expiresAt: Date.now() + SESSION_TTL_MS,
+        const { token: sessionToken } = await issueSession({
+            kind: 'scholar',
+            principalId: scholar._id,
+            ttlMs: SESSION_TTL_MS,
+            req,
         });
         return res.json({
             message: 'Scholar sign-in complete.',
@@ -2197,39 +2317,29 @@ app.get('/api/auth/admin/applicants/:id', requireAdminSession, async (req, res, 
 });
 
 // ----- Sign-up ------------------------------------------------------------
-app.post('/api/auth/student/sign-up', async (req, res, next) => {
+app.post('/api/auth/student/sign-up', authLimiter, validate(ScholarSignUpSchema), async (req, res, next) => {
     try {
-        const { name, email, password } = req.body || {};
-        const trimmedName = String(name || '').trim();
-        const normalizedEmail = normalizeEmail(email);
+        const { name, email, password } = req.body;
 
-        if (!trimmedName) return res.status(400).json({ message: 'Scholar name is required.' });
-        if (!isValidEmail(normalizedEmail)) {
-            return res.status(400).json({ message: 'Enter a valid scholar email address.' });
-        }
-        if (!isValidPassword(password)) {
-            return res.status(400).json({ message: 'Scholar password must be at least 8 characters.' });
-        }
-
-        const existing = await Scholar.findOne({ email: normalizedEmail });
+        const existing = await Scholar.findOne({ email });
         if (existing) {
             return res.status(409).json({ message: 'A scholar account with this email already exists.' });
         }
 
         const passwordRecord = createPasswordRecord(password);
         const newScholar = await Scholar.create({
-            name: trimmedName,
-            email: normalizedEmail,
+            name,
+            email,
             role: 'student',
             application: null,
             ...passwordRecord,
         });
 
-        cleanupExpiredEntries(scholarSessions);
-        const sessionToken = crypto.randomUUID();
-        scholarSessions.set(sessionToken, {
-            scholarId: newScholar._id.toString(),
-            expiresAt: Date.now() + SESSION_TTL_MS,
+        const { token: sessionToken } = await issueSession({
+            kind: 'scholar',
+            principalId: newScholar._id,
+            ttlMs: SESSION_TTL_MS,
+            req,
         });
 
         return res.status(201).json({
@@ -2242,7 +2352,7 @@ app.post('/api/auth/student/sign-up', async (req, res, next) => {
     }
 });
 
-app.post('/api/auth/admin/sign-up', async (req, res, next) => {
+app.post('/api/auth/admin/sign-up', authLimiter, validate(AdminSignUpSchema), async (req, res, next) => {
     try {
         const {
             name,
@@ -2252,45 +2362,23 @@ app.post('/api/auth/admin/sign-up', async (req, res, next) => {
             departmentCode,
             twoFactorCode,
             inviteCode,
-        } = req.body || {};
-
-        const trimmedName = String(name || '').trim();
-        const normalizedEmail = normalizeEmail(email);
-        const trimmedDepartment = String(department || '').trim();
-        const trimmedDepartmentCode = String(departmentCode || '').trim();
-        const trimmedTwoFactorCode = String(twoFactorCode || '').trim();
-        const trimmedInviteCode = String(inviteCode || '').trim();
-
-        if (!trimmedName) return res.status(400).json({ message: 'Admin name is required.' });
-        if (!isValidEmail(normalizedEmail)) {
-            return res.status(400).json({ message: 'Enter a valid admin email address.' });
-        }
-        if (!normalizedEmail.endsWith('@schooladmin.com')) {
-            return res.status(400).json({ message: 'Admin email must use the @schooladmin.com domain.' });
-        }
-        if (!isValidPassword(password)) {
-            return res.status(400).json({ message: 'Admin password must be at least 8 characters.' });
-        }
-        if (!trimmedDepartment) return res.status(400).json({ message: 'Department is required.' });
-        if (!trimmedDepartmentCode) return res.status(400).json({ message: 'Department code is required.' });
-        if (!trimmedTwoFactorCode) return res.status(400).json({ message: '2FA code is required.' });
-        if (!trimmedInviteCode) return res.status(400).json({ message: 'An admin invite code is required.' });
+        } = req.body;
 
         const inviteAdmin = await Admin.findOne({
-            $or: [{ departmentCode: trimmedInviteCode }, { twoFactorCode: trimmedInviteCode }],
+            $or: [{ departmentCode: inviteCode }, { twoFactorCode: inviteCode }],
         });
         if (!inviteAdmin) return res.status(401).json({ message: 'Invalid admin invite code.' });
 
-        const dup = await Admin.findOne({ email: normalizedEmail });
+        const dup = await Admin.findOne({ email });
         if (dup) return res.status(409).json({ message: 'An admin with this email already exists.' });
 
         const newAdmin = await Admin.create({
-            name: trimmedName,
-            email: normalizedEmail,
+            name,
+            email,
             role: 'administrator',
-            department: trimmedDepartment,
-            departmentCode: trimmedDepartmentCode,
-            twoFactorCode: trimmedTwoFactorCode,
+            department,
+            departmentCode,
+            twoFactorCode,
             ...createPasswordRecord(password),
         });
 
@@ -2359,7 +2447,9 @@ app.post('/api/scholarships', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-    console.error('[api] Unhandled error:', err);
+    // req.log is attached by pino-http; falls back to the global logger.
+    const log = req.log || logger;
+    log.error({ err: { message: err.message, stack: err.stack }, url: req.url }, 'Unhandled error');
     if (res.headersSent) return;
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
@@ -2370,7 +2460,13 @@ app.use((err, req, res, _next) => {
     if (err && /Only PDF or image/.test(err.message || '')) {
         return res.status(400).json({ message: err.message });
     }
-    res.status(500).json({ message: 'Internal server error.' });
+    if (err && /CORS/.test(err.message || '')) {
+        return res.status(403).json({ message: 'CORS: origin not allowed.' });
+    }
+    // Never leak stack traces or internal messages to clients in production.
+    res.status(500).json({
+        message: IS_PROD ? 'Internal server error.' : (err.message || 'Internal server error.'),
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -2380,30 +2476,43 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = () => {
     app.listen(PORT, () => {
-        console.log(`[api] ScholarshipZone API listening on http://localhost:${PORT}`);
+        logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'ScholarshipZone API listening');
     });
 };
 
 const logMongoStartupFailure = (err) => {
     const message = String(err?.message || err || 'Unknown MongoDB connection error');
-    console.warn('[api] Starting without MongoDB:', message);
+    logger.warn({ err: message }, 'Starting without MongoDB');
 
     if (!process.env.MONGODB_URI) {
-        console.warn('[api] DB-backed endpoints will fail until MONGODB_URI is configured.');
+        logger.warn('DB-backed endpoints will fail until MONGODB_URI is configured.');
         return;
     }
 
     if (/auth|authentication/i.test(message)) {
-        console.warn('[api] DB-backed endpoints will fail until the MongoDB username/password in MONGODB_URI are corrected.');
+        logger.warn('DB-backed endpoints will fail until the MongoDB username/password in MONGODB_URI are corrected.');
         return;
     }
 
-    console.warn('[api] DB-backed endpoints will fail until the MongoDB connection in MONGODB_URI succeeds.');
+    logger.warn('DB-backed endpoints will fail until the MongoDB connection in MONGODB_URI succeeds.');
 };
 
-connectDb()
-    .then(() => startServer())
-    .catch((err) => {
-        logMongoStartupFailure(err);
-        startServer();
-    });
+// Only start the HTTP listener when run directly (e.g. `node index.js` or
+// `npm start`). When the file is `require()`'d (e.g. from a Supertest test
+// suite), we export the configured express `app` and a `boot()` helper
+// instead, so tests can drive requests in-process.
+if (require.main === module) {
+    connectDb()
+        .then(() => startServer())
+        .catch((err) => {
+            logMongoStartupFailure(err);
+            startServer();
+        });
+}
+
+module.exports = {
+    app,
+    logger,
+    connectDb,
+    startServer,
+};

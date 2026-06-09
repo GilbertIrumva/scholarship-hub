@@ -45,12 +45,14 @@ const AuthShell = ({
         <header className="relative z-10 flex items-center justify-between p-8 sm:p-10 lg:p-12">
           <Link
             to="/"
-            className="inline-flex items-center gap-2.5 font-extrabold text-white"
+            className="group inline-flex items-center font-extrabold text-white"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-sm font-extrabold tracking-wider backdrop-blur-md">
-              SH
-            </span>
-            <span className="text-lg tracking-tight">ScholarshipZone</span>
+            <img
+              src="/logo.png"
+              alt="ScholarshipZone"
+              className="h-20 w-auto object-contain drop-shadow-lg transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-105"
+              style={{ filter: "brightness(0) invert(1)" }}
+            />
           </Link>
 
           <Link

@@ -26,7 +26,7 @@
   --color-border-focus: #059669;
 
   --color-danger: #dc2626;
-  --color-success: #22c55e;
+  --color-success: #10b981;
   --color-warning: #f59e0b;
 
   --font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -67,7 +67,7 @@
 
   /* Feedback */
   --danger:         #dc2626;
-  --success:        #22c55e;
+  --success:        #10b981;
   --warning:        #f59e0b;
 
   /* Shadows */

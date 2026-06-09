@@ -18,4 +18,17 @@ const scholarshipSchema = new Schema(
     { timestamps: true }
 );
 
+// Common access patterns:
+//   - Public catalog filters by `active`, often combined with `deadline`.
+//   - Country / field / tag filters use $in over the array columns.
+//   - Free-text search runs across title + provider + description.
+scholarshipSchema.index({ active: 1, deadline: 1 });
+scholarshipSchema.index({ countries: 1 });
+scholarshipSchema.index({ fields: 1 });
+scholarshipSchema.index({ tags: 1 });
+scholarshipSchema.index(
+    { title: 'text', provider: 'text', description: 'text' },
+    { name: 'ScholarshipTextIndex', default_language: 'english' }
+);
+
 module.exports = model('Scholarship', scholarshipSchema);

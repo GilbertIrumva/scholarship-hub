@@ -193,8 +193,8 @@ const StatCard = ({ value, label, live, icon: Icon }) => {
       </div>
       <div className="mt-1 text-sm font-medium text-muted">{label}</div>
       {live && (
-        <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+        <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Live
         </span>
       )}
@@ -357,11 +357,12 @@ const LandingPage = () => {
     <main className="min-h-screen bg-background">
       {/* ===================== NAV ===================== */}
       <nav className="sticky top-3 z-50 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2 font-extrabold text-ink">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white text-sm font-extrabold tracking-wider">
-            SH
-          </span>
-          <span className="hidden sm:block text-base">ScholarshipZone</span>
+        <Link to="/" className="flex shrink-0 items-center font-extrabold text-ink">
+          <img
+            src="/logo.png"
+            alt="ScholarshipZone"
+            className="h-20 w-auto shrink-0 object-contain"
+          />
         </Link>
 
         <ul className="hidden lg:flex flex-1 items-center justify-center gap-1">
@@ -832,7 +833,7 @@ const LandingPage = () => {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-green-900 p-10 sm:p-16 text-center shadow-modal"
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-emerald-900 p-10 sm:p-16 text-center shadow-modal"
         >
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 left-0 h-64 w-64 rounded-full bg-white blur-3xl" />
@@ -860,20 +861,14 @@ const LandingPage = () => {
       {/* ===================== FOOTER ===================== */}
       <footer className="mx-auto mt-20 max-w-7xl px-4 sm:px-6 pb-10">
         <div className="border-t border-border pt-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white text-sm font-extrabold">SH</span>
-              <span className="font-extrabold text-ink">ScholarshipZone</span>
-            </div>
-            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-              <Link to="/login/scholar" className="text-muted hover:text-primary font-medium">Scholar sign in</Link>
-              <Link to="/login/admin" className="text-muted hover:text-primary font-medium">Admin sign in</Link>
-              <Link to="/get-started" className="text-muted hover:text-primary font-medium">All portals</Link>
-              <Link to="/privacy" className="text-muted hover:text-primary font-medium">Privacy</Link>
-              <Link to="/terms" className="text-muted hover:text-primary font-medium">Terms</Link>
-              <Link to="/accessibility" className="text-muted hover:text-primary font-medium">Accessibility</Link>
-            </nav>
-          </div>
+          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            <Link to="/login/scholar" className="text-muted hover:text-primary font-medium">Scholar sign in</Link>
+            <Link to="/login/admin" className="text-muted hover:text-primary font-medium">Admin sign in</Link>
+            <Link to="/get-started" className="text-muted hover:text-primary font-medium">All portals</Link>
+            <Link to="/privacy" className="text-muted hover:text-primary font-medium">Privacy</Link>
+            <Link to="/terms" className="text-muted hover:text-primary font-medium">Terms</Link>
+            <Link to="/accessibility" className="text-muted hover:text-primary font-medium">Accessibility</Link>
+          </nav>
           <div className="mt-8 text-center text-sm text-muted">
             © {new Date().getFullYear()} ScholarshipZone. Built with care for scholars everywhere.
           </div>
