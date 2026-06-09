@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getAdminApplicant } from "../../services/adminAuth";
 import AdminTravelDocsSection from "./AdminTravelDocsSection";
+import AdminVisaSection from "./AdminVisaSection";
 
 const STATUS_STYLES = {
   pending: "bg-amber-100 text-amber-800",
@@ -218,6 +219,13 @@ const AdminApplicantDetailPage = () => {
 
             {applicant.scholarAccountId && (
               <AdminTravelDocsSection
+                sessionToken={sessionToken}
+                scholarId={applicant.scholarAccountId}
+              />
+            )}
+
+            {applicant.scholarAccountId && (
+              <AdminVisaSection
                 sessionToken={sessionToken}
                 scholarId={applicant.scholarAccountId}
               />

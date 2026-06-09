@@ -32,6 +32,7 @@ const ADMIN_NAV = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/admin/applicants", label: "Applicants", icon: Users },
   { to: "/admin/credentials", label: "Credentials", icon: FolderArchive },
+  { to: "/admin/visa-tracker", label: "Visa tracker", icon: Plane },
   { to: "/admin/messages", label: "Messages", icon: Mail },
   { to: "/admin/settings", label: "Settings", icon: KeyRound },
 ];

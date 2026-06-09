@@ -81,6 +81,30 @@ export const listAdminVisaWorkflows = async (sessionToken, params = {}) => {
   return data;
 };
 
+export const getAdminVisaStats = async (sessionToken) => {
+  const { data } = await axios.get(`${ADMIN_BASE}/stats`, buildAuthConfig(sessionToken));
+  return data;
+};
+
+export const getAdminVisaWorkflow = async (sessionToken, id) => {
+  const { data } = await axios.get(`${ADMIN_BASE}/${id}`, buildAuthConfig(sessionToken));
+  return data;
+};
+
+export const updateAdminVisaWorkflow = async (sessionToken, id, payload) => {
+  const { data } = await axios.patch(`${ADMIN_BASE}/${id}`, payload, buildAuthConfig(sessionToken));
+  return data;
+};
+
+export const updateAdminMilestone = async (sessionToken, id, key, payload) => {
+  const { data } = await axios.patch(
+    `${ADMIN_BASE}/${id}/milestones/${key}`,
+    payload,
+    buildAuthConfig(sessionToken)
+  );
+  return data;
+};
+
 export const addAdminVisaNote = async (sessionToken, id, body) => {
   const { data } = await axios.post(
     `${ADMIN_BASE}/${id}/notes`,
@@ -101,5 +125,9 @@ export default {
   updateMilestone,
   addVisaNote,
   listAdminVisaWorkflows,
+  getAdminVisaStats,
+  getAdminVisaWorkflow,
+  updateAdminVisaWorkflow,
+  updateAdminMilestone,
   addAdminVisaNote,
 };

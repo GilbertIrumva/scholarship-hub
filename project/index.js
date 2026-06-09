@@ -1856,12 +1856,284 @@ app.get('/api/auth/admin/visa-workflows', requireAdminSession, async (req, res, 
     }
 });
 
+// Admin: analytics summary (Phase 8).
+app.get('/api/auth/admin/visa-workflows/stats', requireAdminSession, async (req, res, next) => {
+    try {
+        const all = await VisaWorkflow.find()
+            .populate('scholar', 'name email legacyId')
+            .populate({
+                path: 'scholarshipApplication',
+                populate: { path: 'scholarship', select: 'title provider country' },
+            });
+
+        const total = all.length;
+        const byStatus = Object.fromEntries(VISA_WORKFLOW_STATUSES.map((s) => [s, 0]));
+        const byVisaType = Object.fromEntries(VISA_TYPES.map((t) => [t, 0]));
+        const byDestination = {};
+
+        let totalMilestones = 0;
+        let doneMilestones = 0;
+        const milestoneByStatus = Object.fromEntries(
+            MILESTONE_STATUSES.map((s) => [s, 0])
+        );
+        const milestoneBreakdown = {};
+
+        const now = Date.now();
+        const ONE_DAY = 86400000;
+        const upcomingAppointments = [];
+        const overdueMilestones = [];
+        const expiringVisas = [];
+        const recentlyUpdated = [];
+
+        const scholarOf = (wf) =>
+            wf.scholar
+                ? { id: pickId(wf.scholar), name: wf.scholar.name, email: wf.scholar.email }
+                : null;
+
+        for (const wf of all) {
+            byStatus[wf.status] = (byStatus[wf.status] || 0) + 1;
+            byVisaType[wf.visaType] = (byVisaType[wf.visaType] || 0) + 1;
+            if (wf.destinationCountry) {
+                byDestination[wf.destinationCountry] =
+                    (byDestination[wf.destinationCountry] || 0) + 1;
+            }
+
+            for (const m of wf.milestones) {
+                totalMilestones += 1;
+                if (m.status === 'done') doneMilestones += 1;
+                milestoneByStatus[m.status] = (milestoneByStatus[m.status] || 0) + 1;
+                if (!milestoneBreakdown[m.key]) {
+                    milestoneBreakdown[m.key] = {
+                        key: m.key,
+                        label: m.label,
+                        pending: 0,
+                        'in-progress': 0,
+                        done: 0,
+                        blocked: 0,
+                        skipped: 0,
+                    };
+                }
+                milestoneBreakdown[m.key][m.status] =
+                    (milestoneBreakdown[m.key][m.status] || 0) + 1;
+
+                if (m.dueDate && m.status !== 'done' && m.status !== 'skipped') {
+                    const due = new Date(m.dueDate).getTime();
+                    if (Number.isFinite(due) && due < now) {
+                        overdueMilestones.push({
+                            workflowId: String(wf._id),
+                            scholar: scholarOf(wf),
+                            milestoneKey: m.key,
+                            milestoneLabel: m.label,
+                            dueDate: m.dueDate,
+                            daysOverdue: Math.floor((now - due) / ONE_DAY),
+                        });
+                    }
+                }
+            }
+
+            if (wf.appointmentDate) {
+                const appt = new Date(wf.appointmentDate).getTime();
+                if (Number.isFinite(appt) && appt > now && appt - now < 30 * ONE_DAY) {
+                    upcomingAppointments.push({
+                        workflowId: String(wf._id),
+                        scholar: scholarOf(wf),
+                        appointmentDate: wf.appointmentDate,
+                        destinationCountry: wf.destinationCountry || null,
+                        daysUntil: Math.ceil((appt - now) / ONE_DAY),
+                    });
+                }
+            }
+
+            if (wf.visaExpiry) {
+                const exp = new Date(wf.visaExpiry).getTime();
+                if (Number.isFinite(exp) && exp > now && exp - now < 90 * ONE_DAY) {
+                    expiringVisas.push({
+                        workflowId: String(wf._id),
+                        scholar: scholarOf(wf),
+                        visaExpiry: wf.visaExpiry,
+                        daysUntil: Math.ceil((exp - now) / ONE_DAY),
+                    });
+                }
+            }
+
+            recentlyUpdated.push({
+                workflowId: String(wf._id),
+                scholar: scholarOf(wf),
+                status: wf.status,
+                destinationCountry: wf.destinationCountry || null,
+                updatedAt: wf.updatedAt,
+            });
+        }
+
+        upcomingAppointments.sort((a, b) => a.daysUntil - b.daysUntil);
+        overdueMilestones.sort((a, b) => b.daysOverdue - a.daysOverdue);
+        expiringVisas.sort((a, b) => a.daysUntil - b.daysUntil);
+        recentlyUpdated.sort(
+            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+
+        const topDestinations = Object.entries(byDestination)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([country, count]) => ({ country, count }));
+
+        res.json({
+            total,
+            byStatus,
+            byVisaType,
+            topDestinations,
+            milestones: {
+                total: totalMilestones,
+                done: doneMilestones,
+                completionRate:
+                    totalMilestones > 0
+                        ? Math.round((doneMilestones / totalMilestones) * 100)
+                        : 0,
+                byStatus: milestoneByStatus,
+                breakdown: Object.values(milestoneBreakdown),
+            },
+            upcomingAppointments: upcomingAppointments.slice(0, 20),
+            overdueMilestones: overdueMilestones.slice(0, 20),
+            expiringVisas: expiringVisas.slice(0, 20),
+            recentlyUpdated: recentlyUpdated.slice(0, 15),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Admin: read a single workflow.
+app.get('/api/auth/admin/visa-workflows/:id', requireAdminSession, async (req, res, next) => {
+    try {
+        if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid workflow id.' });
+        }
+        const wf = await VisaWorkflow.findById(req.params.id)
+            .populate('scholar', 'name email legacyId')
+            .populate({
+                path: 'scholarshipApplication',
+                populate: { path: 'scholarship', select: 'title provider country' },
+            });
+        if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+        const base = serializeVisaWorkflow(wf, wf.scholarshipApplication);
+        res.json({
+            workflow: {
+                ...base,
+                scholar: wf.scholar
+                    ? {
+                        id: pickId(wf.scholar),
+                        name: wf.scholar.name,
+                        email: wf.scholar.email,
+                    }
+                    : null,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Admin: update workflow details.
+app.patch('/api/auth/admin/visa-workflows/:id', requireAdminSession, async (req, res, next) => {
+    try {
+        if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+            return res.status(400).json({ message: 'Invalid workflow id.' });
+        }
+        const wf = await VisaWorkflow.findById(req.params.id);
+        if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+        const body = req.body || {};
+        if (body.destinationCountry !== undefined) {
+            wf.destinationCountry = String(body.destinationCountry || '')
+                .toUpperCase()
+                .slice(0, 3);
+        }
+        if (body.visaType !== undefined && VISA_TYPES.includes(body.visaType)) {
+            wf.visaType = body.visaType;
+        }
+        if (body.status !== undefined && VISA_WORKFLOW_STATUSES.includes(body.status)) {
+            wf.status = body.status;
+        }
+        if (body.visaReference !== undefined) {
+            wf.visaReference = String(body.visaReference || '').slice(0, 100);
+        }
+        for (const key of [
+            'appointmentDate',
+            'submittedAt',
+            'decisionAt',
+            'visaIssuedAt',
+            'visaExpiry',
+        ]) {
+            if (body[key] !== undefined) {
+                wf[key] = body[key] ? new Date(body[key]) : null;
+            }
+        }
+        if (body.embassy && typeof body.embassy === 'object') {
+            wf.embassy = {
+                country: String(body.embassy.country || '').toUpperCase().slice(0, 3),
+                city: String(body.embassy.city || '').slice(0, 100),
+                address: String(body.embassy.address || '').slice(0, 300),
+                website: String(body.embassy.website || '').slice(0, 300),
+                contactEmail: String(body.embassy.contactEmail || '').slice(0, 200),
+            };
+        }
+        await wf.save();
+
+        const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+            .populate('scholarship', 'title provider country');
+        res.json({ workflow: serializeVisaWorkflow(wf, app) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Admin: update a single milestone.
+app.patch(
+    '/api/auth/admin/visa-workflows/:id/milestones/:key',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+                return res.status(400).json({ message: 'Invalid workflow id.' });
+            }
+            const wf = await VisaWorkflow.findById(req.params.id);
+            if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+            const m = wf.milestones.find((ms) => ms.key === req.params.key);
+            if (!m) return res.status(404).json({ message: 'Milestone not found.' });
+
+            const body = req.body || {};
+            if (body.status !== undefined && MILESTONE_STATUSES.includes(body.status)) {
+                m.status = body.status;
+                m.completedAt = body.status === 'done' ? new Date() : null;
+            }
+            if (body.dueDate !== undefined) {
+                m.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+            }
+            if (body.note !== undefined) {
+                m.note = String(body.note || '').slice(0, 500);
+            }
+            await wf.save();
+
+            const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+                .populate('scholarship', 'title provider country');
+            res.json({ workflow: serializeVisaWorkflow(wf, app) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
 // Admin: add a timeline note on any workflow.
 app.post(
     '/api/auth/admin/visa-workflows/:id/notes',
     requireAdminSession,
     async (req, res, next) => {
         try {
+            if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+                return res.status(400).json({ message: 'Invalid workflow id.' });
+            }
             const wf = await VisaWorkflow.findById(req.params.id);
             if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
 
@@ -1875,7 +2147,9 @@ app.post(
             });
             await wf.save();
 
-            res.status(201).json({ ok: true });
+            const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+                .populate('scholarship', 'title provider country');
+            res.status(201).json({ workflow: serializeVisaWorkflow(wf, app) });
         } catch (err) {
             next(err);
         }

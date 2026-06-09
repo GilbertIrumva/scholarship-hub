@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import AdminDashboard from "./AdminDashboard";
+import AdminVisaSnapshot from "./AdminVisaSnapshot";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
 
@@ -48,6 +49,9 @@ const AdminDashboardPage = () => {
         onOpenSettings={handleOpenSettings}
         onRefresh={refreshAdminDashboard}
       />
+      <div className="mt-6">
+        <AdminVisaSnapshot sessionToken={sessionToken} />
+      </div>
     </DashboardLayout>
   );
 };
