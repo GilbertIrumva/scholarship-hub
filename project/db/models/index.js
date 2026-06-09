@@ -6,4 +6,5 @@ module.exports = {
     ScholarshipApplication: require('./ScholarshipApplication'),
     ContactMessage: require('./ContactMessage'),
     AcademicCredential: require('./AcademicCredential'),
+    TravelDocument: require('./TravelDocument'),
 };

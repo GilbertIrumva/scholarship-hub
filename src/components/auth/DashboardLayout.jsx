@@ -19,6 +19,7 @@ import {
   Compass,
   FileText,
   FolderArchive,
+  Plane,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -39,6 +40,7 @@ const SCHOLAR_NAV = [
   { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass },
   { to: "/scholar/applications", label: "My applications", icon: FileText },
   { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive },
+  { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane },
 ];
 
 const ROLE_CONFIG = {

@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Mail,
   Pencil,
+  Plane,
   Sparkles,
   TrendingUp,
   UserRound,
@@ -300,6 +301,12 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
                 description: "Add certificates, transcripts, and ID documents to speed up applications.",
                 href: "/scholar/credentials",
                 icon: FolderArchive,
+              },
+              {
+                title: "Travel documents",
+                description: "Securely store your passport and visa for when a scholarship is approved.",
+                href: "/scholar/travel-docs",
+                icon: Plane,
               },
             ].map((item) => (
               <button

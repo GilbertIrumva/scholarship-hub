@@ -8,7 +8,7 @@ const cors = require('cors');
 const multer = require('multer');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument } = require('./db/models');
 const { sendEmail } = require('./mailer');
 
 const app = express();
@@ -57,6 +57,85 @@ const uploadCredential = multer({
         cb(null, true);
     },
 });
+
+// ---------------------------------------------------------------------------
+// Travel-document storage + AES-256-GCM encryption (Phase 6)
+// ---------------------------------------------------------------------------
+const TRAVEL_DOCS_ROOT = path.join(UPLOADS_ROOT, 'travel');
+if (!fs.existsSync(TRAVEL_DOCS_ROOT)) {
+    fs.mkdirSync(TRAVEL_DOCS_ROOT, { recursive: true });
+}
+
+const travelStorage = multer.diskStorage({
+    destination: (req, _file, cb) => {
+        const scholarId = req.scholar && String(req.scholar._id);
+        if (!scholarId) return cb(new Error('No scholar bound to request.'));
+        const dir = path.join(TRAVEL_DOCS_ROOT, scholarId);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+        const safeExt = path.extname(file.originalname).toLowerCase().slice(0, 8);
+        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${safeExt}`;
+        cb(null, unique);
+    },
+});
+
+const uploadTravelDoc = multer({
+    storage: travelStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (!CREDENTIAL_ALLOWED_MIME.has(file.mimetype)) {
+            return cb(new Error('Only PDF or image files (jpg, png, webp, heic) are allowed.'));
+        }
+        cb(null, true);
+    },
+});
+
+// Derive a 32-byte AES key from the TRAVEL_DOC_SECRET env var.
+// In production this MUST be set to a long random string.
+const TRAVEL_DOC_SECRET = process.env.TRAVEL_DOC_SECRET
+    || 'dev-only-travel-doc-secret-please-set-TRAVEL_DOC_SECRET-in-prod';
+if (TRAVEL_DOC_SECRET.startsWith('dev-only')) {
+    console.warn('[api] TRAVEL_DOC_SECRET not set — using insecure dev fallback. Set it in production.');
+}
+const TRAVEL_DOC_KEY = crypto.createHash('sha256').update(TRAVEL_DOC_SECRET).digest();
+
+const encryptDocNumber = (plaintext) => {
+    if (plaintext == null || plaintext === '') {
+        return { ciphertext: '', iv: '', authTag: '' };
+    }
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', TRAVEL_DOC_KEY, iv);
+    const encrypted = Buffer.concat([
+        cipher.update(String(plaintext), 'utf8'),
+        cipher.final(),
+    ]);
+    return {
+        ciphertext: encrypted.toString('base64'),
+        iv: iv.toString('base64'),
+        authTag: cipher.getAuthTag().toString('base64'),
+    };
+};
+
+const decryptDocNumber = (record) => {
+    if (!record || !record.ciphertext || !record.iv || !record.authTag) return '';
+    try {
+        const iv = Buffer.from(record.iv, 'base64');
+        const authTag = Buffer.from(record.authTag, 'base64');
+        const ciphertext = Buffer.from(record.ciphertext, 'base64');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', TRAVEL_DOC_KEY, iv);
+        decipher.setAuthTag(authTag);
+        const decrypted = Buffer.concat([
+            decipher.update(ciphertext),
+            decipher.final(),
+        ]);
+        return decrypted.toString('utf8');
+    } catch (err) {
+        console.warn('[api] Failed to decrypt travel-doc number:', err.message);
+        return '';
+    }
+};
 
 // ---------------------------------------------------------------------------
 // In-memory auth state (challenges & session tokens). Persisted state lives
@@ -1159,6 +1238,306 @@ app.patch('/api/auth/admin/credentials/:id', requireAdminSession, async (req, re
         next(err);
     }
 });
+
+// ----- Scholar: travel documents (Phase 6) --------------------------------
+const TRAVEL_DOC_TYPES = ['passport', 'visa', 'travel-insurance', 'vaccination', 'other-travel'];
+
+const serializeTravelDoc = (entry, { revealNumber = false } = {}) => {
+    const out = {
+        id: String(entry._id),
+        type: entry.type,
+        title: entry.title,
+        country: entry.country || '',
+        documentNumberLast4: entry.documentNumberLast4 || '',
+        documentNumber: revealNumber ? decryptDocNumber(entry.documentNumberEncrypted) : null,
+        issuedDate: entry.issuedDate,
+        expiryDate: entry.expiryDate,
+        originalName: entry.originalName,
+        mimeType: entry.mimeType,
+        sizeBytes: entry.sizeBytes,
+        verificationStatus: entry.verificationStatus,
+        verificationNote: entry.verificationNote || '',
+        verifiedAt: entry.verifiedAt,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+    };
+    return out;
+};
+
+const parseDateOrNull = (value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+};
+
+app.get('/api/auth/student/travel-docs', requireScholarSession, async (req, res, next) => {
+    try {
+        const entries = await TravelDocument.find({ scholar: req.scholar._id })
+            .sort({ createdAt: -1 });
+        // Scholars always see their own document numbers in full.
+        res.json({
+            documents: entries.map((e) => ({
+                ...serializeTravelDoc(e, { revealNumber: true }),
+                downloadUrl: `/api/auth/student/travel-docs/${e._id}/download`,
+            })),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post(
+    '/api/auth/student/travel-docs',
+    requireScholarSession,
+    uploadTravelDoc.single('file'),
+    async (req, res, next) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'A file is required.' });
+            }
+            const { type, title, country, documentNumber, issuedDate, expiryDate } = req.body || {};
+            if (!TRAVEL_DOC_TYPES.includes(type)) {
+                fs.unlink(req.file.path, () => {});
+                return res.status(400).json({ message: 'Unknown travel-document type.' });
+            }
+            const trimmedTitle = String(title || '').trim();
+            if (!trimmedTitle) {
+                fs.unlink(req.file.path, () => {});
+                return res.status(400).json({ message: 'A title is required.' });
+            }
+
+            const issued = parseDateOrNull(issuedDate);
+            const expiry = parseDateOrNull(expiryDate);
+
+            const plainNumber = String(documentNumber || '').trim();
+            const encrypted = encryptDocNumber(plainNumber);
+            const last4 = plainNumber.length >= 4
+                ? plainNumber.slice(-4)
+                : plainNumber;
+
+            const created = await TravelDocument.create({
+                scholar: req.scholar._id,
+                type,
+                title: trimmedTitle.slice(0, 200),
+                country: String(country || '').trim().toUpperCase().slice(0, 3),
+                documentNumberEncrypted: encrypted,
+                documentNumberLast4: last4,
+                issuedDate: issued,
+                expiryDate: expiry,
+                originalName: req.file.originalname.slice(0, 300),
+                storagePath: req.file.path,
+                mimeType: req.file.mimetype,
+                sizeBytes: req.file.size,
+            });
+            return res.status(201).json({
+                document: {
+                    ...serializeTravelDoc(created, { revealNumber: true }),
+                    downloadUrl: `/api/auth/student/travel-docs/${created._id}/download`,
+                },
+            });
+        } catch (err) {
+            if (req.file) fs.unlink(req.file.path, () => {});
+            next(err);
+        }
+    }
+);
+
+app.get(
+    '/api/auth/student/travel-docs/:id/download',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const entry = await TravelDocument.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
+            if (!fs.existsSync(entry.storagePath)) {
+                return res.status(410).json({ message: 'File is no longer available.' });
+            }
+            res.setHeader('Content-Type', entry.mimeType);
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
+            );
+            fs.createReadStream(entry.storagePath).pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.delete(
+    '/api/auth/student/travel-docs/:id',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const entry = await TravelDocument.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
+            const filePath = entry.storagePath;
+            await entry.deleteOne();
+            fs.unlink(filePath, () => {});
+            return res.json({ ok: true });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// ----- Admin: travel documents --------------------------------------------
+// Visibility rule: admins can ONLY see travel docs for scholars who have at
+// least one ScholarshipApplication with status 'approved'. This protects
+// sensitive identity data from being browsed casually.
+
+const scholarHasApprovedApplication = async (scholarId) => {
+    const count = await ScholarshipApplication.countDocuments({
+        scholar: scholarId,
+        status: 'approved',
+    });
+    return count > 0;
+};
+
+const serializeTravelDocForAdmin = (entry, scholar) => ({
+    ...serializeTravelDoc(entry, { revealNumber: true }),
+    downloadUrl: `/api/auth/admin/travel-docs/${entry._id}/download`,
+    scholar: scholar
+        ? {
+            id: pickId(scholar),
+            name: scholar.name,
+            email: scholar.email,
+        }
+        : null,
+    verifiedBy: entry.verifiedBy ? String(entry.verifiedBy) : null,
+});
+
+app.get('/api/auth/admin/travel-docs', requireAdminSession, async (req, res, next) => {
+    try {
+        const { scholar: scholarId, type, status } = req.query || {};
+
+        // Always require a scholar filter for the admin list — we never let
+        // admins page through every scholar's identity documents in one shot.
+        if (!scholarId || !/^[0-9a-fA-F]{24}$/.test(String(scholarId))) {
+            return res.status(400).json({
+                message: 'A scholar id is required to view travel documents.',
+            });
+        }
+
+        const allowed = await scholarHasApprovedApplication(scholarId);
+        if (!allowed) {
+            return res.status(403).json({
+                message: 'Travel documents are only visible after at least one scholarship has been approved for this scholar.',
+            });
+        }
+
+        const filter = { scholar: scholarId };
+        if (type && TRAVEL_DOC_TYPES.includes(String(type))) filter.type = String(type);
+        if (status && CREDENTIAL_REVIEW_STATUSES.includes(String(status))) {
+            filter.verificationStatus = String(status);
+        }
+
+        const entries = await TravelDocument.find(filter)
+            .populate('scholar', 'name email legacyId')
+            .sort({ createdAt: -1 });
+
+        res.json({
+            documents: entries.map((e) => serializeTravelDocForAdmin(e, e.scholar)),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.get(
+    '/api/auth/admin/travel-docs/:id/download',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const entry = await TravelDocument.findById(req.params.id);
+            if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
+
+            const allowed = await scholarHasApprovedApplication(entry.scholar);
+            if (!allowed) {
+                return res.status(403).json({
+                    message: 'Travel documents are only visible after at least one scholarship has been approved.',
+                });
+            }
+
+            if (!fs.existsSync(entry.storagePath)) {
+                return res.status(410).json({ message: 'File is no longer available.' });
+            }
+            res.setHeader('Content-Type', entry.mimeType);
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
+            );
+            fs.createReadStream(entry.storagePath).pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.patch('/api/auth/admin/travel-docs/:id', requireAdminSession, async (req, res, next) => {
+    try {
+        const { verificationStatus, verificationNote } = req.body || {};
+        if (!CREDENTIAL_REVIEW_STATUSES.includes(String(verificationStatus))) {
+            return res.status(400).json({
+                message: `verificationStatus must be one of: ${CREDENTIAL_REVIEW_STATUSES.join(', ')}.`,
+            });
+        }
+        const entry = await TravelDocument.findById(req.params.id);
+        if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
+
+        const allowed = await scholarHasApprovedApplication(entry.scholar);
+        if (!allowed) {
+            return res.status(403).json({
+                message: 'Travel documents are only reviewable after at least one scholarship has been approved.',
+            });
+        }
+
+        entry.verificationStatus = verificationStatus;
+        entry.verificationNote = String(verificationNote || '').slice(0, 1000);
+        if (verificationStatus === 'verified' || verificationStatus === 'rejected') {
+            entry.verifiedBy = req.admin._id;
+            entry.verifiedAt = new Date();
+        } else {
+            entry.verifiedBy = null;
+            entry.verifiedAt = null;
+        }
+        await entry.save();
+
+        const populated = await entry.populate('scholar', 'name email legacyId');
+        res.json({ document: serializeTravelDocForAdmin(populated, populated.scholar) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Helper for the admin UI: check whether a scholar is eligible (has an
+// approved application) WITHOUT returning the documents themselves.
+app.get(
+    '/api/auth/admin/travel-docs/eligibility/:scholarId',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const { scholarId } = req.params;
+            if (!/^[0-9a-fA-F]{24}$/.test(scholarId)) {
+                return res.status(400).json({ message: 'Invalid scholar id.' });
+            }
+            const allowed = await scholarHasApprovedApplication(scholarId);
+            const approvedCount = await ScholarshipApplication.countDocuments({
+                scholar: scholarId,
+                status: 'approved',
+            });
+            res.json({ eligible: allowed, approvedCount });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
 
 // ----- Admin: applicants --------------------------------------------------
 app.get('/api/auth/admin/applicants', requireAdminSession, async (req, res, next) => {

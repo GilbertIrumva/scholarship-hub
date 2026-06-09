@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { getAdminApplicant } from "../../services/adminAuth";
+import AdminTravelDocsSection from "./AdminTravelDocsSection";
 
 const STATUS_STYLES = {
   pending: "bg-amber-100 text-amber-800",
@@ -214,6 +215,13 @@ const AdminApplicantDetailPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {applicant.scholarAccountId && (
+              <AdminTravelDocsSection
+                sessionToken={sessionToken}
+                scholarId={applicant.scholarAccountId}
+              />
+            )}
           </div>
         </div>
       )}
