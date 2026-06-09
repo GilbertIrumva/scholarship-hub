@@ -5,6 +5,7 @@ import { Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import AuthShell from "./shared/AuthShell";
 import { Seo } from "../seo/Seo";
+import { PasswordStrengthMeter } from "../ui/password-strength";
 import { resetPassword } from "../../services/scholarAccount";
 
 const ResetPasswordPage = () => {
@@ -16,11 +17,18 @@ const ResetPasswordPage = () => {
   const [show, setShow] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [passwordScore, setPasswordScore] = useState(0);
+  const [passwordBreached, setPasswordBreached] = useState(false);
 
   const validate = () => {
     const next = {};
     if (!token) next.token = "This reset link is missing a token. Request a new one from the forgot-password page.";
     if (!form.password || form.password.length < 8) next.password = "New password must be at least 8 characters.";
+    else if (passwordBreached)
+      next.password =
+        "This password appeared in a known data breach. Please choose a different one.";
+    else if (passwordScore < 2)
+      next.password = "Please choose a stronger password.";
     if (form.password !== form.confirm) next.confirm = "Passwords do not match.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -90,6 +98,13 @@ const ResetPasswordPage = () => {
             </button>
           </div>
           {errors.password && <p className="text-xs font-medium text-rose-600">{errors.password}</p>}
+          <PasswordStrengthMeter
+            password={form.password}
+            onEvaluate={({ score, breached }) => {
+              setPasswordScore(score);
+              setPasswordBreached(breached);
+            }}
+          />
         </div>
 
         <div className="space-y-1.5">

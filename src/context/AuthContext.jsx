@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   deleteAdminScholar,
   getAdminApplicant,
@@ -14,6 +14,7 @@ import {
 } from "../services/adminAuth";
 import { getScholarProfile, signInScholar, signUpScholar, updateScholarProfile } from "../services/scholarAuth";
 import { AuthContext } from "./authContextValue";
+import { bootstrapSession, installAxiosAuthInterceptor, logoutServer } from "../lib/authClient";
 
 const idleStatus = () => ({ type: "idle", message: "" });
 
@@ -31,6 +32,14 @@ export const AuthProvider = ({ children }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState(idleStatus());
   const [settingsStatus, setSettingsStatus] = useState(idleStatus());
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  // Keep a ref of the current session token so the axios interceptor (which
+  // is installed once) can read the latest value without re-registering.
+  const sessionTokenRef = useRef("");
+  useEffect(() => {
+    sessionTokenRef.current = sessionToken;
+  }, [sessionToken]);
 
   const resetAll = useCallback(() => {
     setPendingChallenge(null);
@@ -77,6 +86,26 @@ export const AuthProvider = ({ children }) => {
       return {
         ok: false,
         message: error.response?.data?.message || "Unable to create scholar account.",
+      };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
+
+  // Hydrates a scholar session from an externally-supplied token (e.g. after
+  // a Google OAuth callback redirect drops `?token=...` into the URL).
+  const completeScholarOAuth = useCallback(async (token) => {
+    if (!token) return { ok: false, message: "Missing session token." };
+    try {
+      setIsSubmitting(true);
+      const profile = await getScholarProfile(token);
+      setSessionToken(token);
+      setScholarProfile(profile);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error.response?.data?.message || "Unable to complete Google sign-in.",
       };
     } finally {
       setIsSubmitting(false);
@@ -227,8 +256,56 @@ export const AuthProvider = ({ children }) => {
   }, [sessionToken]);
 
   const signOut = useCallback(() => {
+    // Best-effort server-side revoke; clears sz_rt cookie too.
+    logoutServer();
     resetAll();
   }, [resetAll]);
+
+  // Install the axios refresh interceptor exactly once and bootstrap a
+  // session from the httpOnly refresh cookie on mount. This is what lets a
+  // user stay signed in across a hard page reload.
+  useEffect(() => {
+    installAxiosAuthInterceptor({
+      getToken: () => sessionTokenRef.current,
+      setToken: (token) => setSessionToken(token),
+      onLogout: () => resetAll(),
+    });
+
+    let cancelled = false;
+    (async () => {
+      const payload = await bootstrapSession();
+      if (cancelled) return;
+      if (!payload?.sessionToken) {
+        setIsBootstrapping(false);
+        return;
+      }
+      const token = payload.sessionToken;
+      try {
+        if (payload.kind === "admin") {
+          const dashboard = await getAdminDashboard(token);
+          if (cancelled) return;
+          setSessionToken(token);
+          setAdminDashboard(dashboard);
+        } else if (payload.kind === "scholar") {
+          const profile = await getScholarProfile(token);
+          if (cancelled) return;
+          setSessionToken(token);
+          setScholarProfile(profile);
+        }
+      } catch {
+        // Profile/dashboard fetch failed even though refresh succeeded —
+        // treat as a soft logout and let the user sign in again.
+        if (!cancelled) resetAll();
+      } finally {
+        if (!cancelled) setIsBootstrapping(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadScholars = useCallback(async () => {
     if (!sessionToken) return { ok: false };
@@ -332,6 +409,7 @@ export const AuthProvider = ({ children }) => {
     () => ({
       sessionToken,
       isSubmitting,
+      isBootstrapping,
       pendingChallenge,
       adminDashboard,
       scholarProfile,
@@ -345,6 +423,7 @@ export const AuthProvider = ({ children }) => {
       settingsStatus,
       signInAsScholar,
       signUpAsScholar,
+      completeScholarOAuth,
       startAdminSignIn,
       signInAdminDirect,
       signUpAsAdmin,
@@ -363,6 +442,7 @@ export const AuthProvider = ({ children }) => {
     [
       sessionToken,
       isSubmitting,
+      isBootstrapping,
       pendingChallenge,
       adminDashboard,
       scholarProfile,
@@ -376,6 +456,7 @@ export const AuthProvider = ({ children }) => {
       settingsStatus,
       signInAsScholar,
       signUpAsScholar,
+      completeScholarOAuth,
       startAdminSignIn,
       signInAdminDirect,
       signUpAsAdmin,

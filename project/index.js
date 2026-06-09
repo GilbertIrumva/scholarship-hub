@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const pino = require('pino');
@@ -18,6 +19,7 @@ const { validate } = require('./lib/validate');
 const { audit } = require('./lib/audit');
 const { notify, notifyAdmins } = require('./lib/notify');
 const { rankScholarships, scoreScholarship } = require('./lib/matching');
+const { preferredBackend, backendFor } = require('./lib/storage');
 const {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -102,6 +104,7 @@ app.use(pinoHttp({
 }));
 
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 
 // ---------------------------------------------------------------------------
 // Rate limiters — protect auth + write endpoints from brute force / abuse.
@@ -137,28 +140,19 @@ const apiLimiter = IS_TEST ? noopLimiter : rateLimit({
 app.use('/api/', apiLimiter);
 
 // ---------------------------------------------------------------------------
-// File-upload setup (Phase 4: AcademicCredential vault)
+// ---------------------------------------------------------------------------
+// File-upload setup (multer keeps the file in RAM; the storage abstraction
+// in lib/storage.js then writes it to disk OR S3 based on STORAGE_BACKEND).
 // ---------------------------------------------------------------------------
 const UPLOADS_ROOT = path.resolve(__dirname, 'uploads');
+// The local backend still writes under uploads/credentials and uploads/travel,
+// so we keep these directories around for backwards compatibility with any
+// records created before the storage abstraction landed. Once everything is
+// on S3 the folders simply stay empty.
 const CREDENTIALS_ROOT = path.join(UPLOADS_ROOT, 'credentials');
 if (!fs.existsSync(CREDENTIALS_ROOT)) {
     fs.mkdirSync(CREDENTIALS_ROOT, { recursive: true });
 }
-
-const credentialStorage = multer.diskStorage({
-    destination: (req, _file, cb) => {
-        const scholarId = req.scholar && String(req.scholar._id);
-        if (!scholarId) return cb(new Error('No scholar bound to request.'));
-        const dir = path.join(CREDENTIALS_ROOT, scholarId);
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (_req, file, cb) => {
-        const safeExt = path.extname(file.originalname).toLowerCase().slice(0, 8);
-        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${safeExt}`;
-        cb(null, unique);
-    },
-});
 
 const CREDENTIAL_ALLOWED_MIME = new Set([
     'application/pdf',
@@ -169,7 +163,7 @@ const CREDENTIAL_ALLOWED_MIME = new Set([
 ]);
 
 const uploadCredential = multer({
-    storage: credentialStorage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
     fileFilter: (_req, file, cb) => {
         if (!CREDENTIAL_ALLOWED_MIME.has(file.mimetype)) {
@@ -187,23 +181,8 @@ if (!fs.existsSync(TRAVEL_DOCS_ROOT)) {
     fs.mkdirSync(TRAVEL_DOCS_ROOT, { recursive: true });
 }
 
-const travelStorage = multer.diskStorage({
-    destination: (req, _file, cb) => {
-        const scholarId = req.scholar && String(req.scholar._id);
-        if (!scholarId) return cb(new Error('No scholar bound to request.'));
-        const dir = path.join(TRAVEL_DOCS_ROOT, scholarId);
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (_req, file, cb) => {
-        const safeExt = path.extname(file.originalname).toLowerCase().slice(0, 8);
-        const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${safeExt}`;
-        cb(null, unique);
-    },
-});
-
 const uploadTravelDoc = multer({
-    storage: travelStorage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         if (!CREDENTIAL_ALLOWED_MIME.has(file.mimetype)) {
@@ -212,6 +191,38 @@ const uploadTravelDoc = multer({
         cb(null, true);
     },
 });
+
+// Helper: stream a stored file to the response, using a 302 redirect to a
+// presigned URL when the backend supports it (S3) or a direct pipe otherwise
+// (local disk). `entry` is any document with storagePath/storageBackend/mimeType.
+const serveStoredFile = async (entry, res) => {
+    const backend = backendFor(entry.storageBackend);
+    const filenameHeader = String(entry.originalName || '').replace(/"/g, '');
+
+    if (typeof backend.signedReadUrl === 'function') {
+        const signed = await backend.signedReadUrl(entry.storagePath, {
+            expiresInSec: 15 * 60,
+            filename: filenameHeader,
+            inline: true,
+        });
+        if (signed) {
+            return res.redirect(302, signed);
+        }
+    }
+
+    const stream = await backend.getReadStream(entry.storagePath);
+    if (!stream) {
+        return res.status(410).json({ message: 'File is no longer available.' });
+    }
+    res.setHeader('Content-Type', entry.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${filenameHeader}"`);
+    stream.on('error', () => {
+        if (!res.headersSent) res.status(500).end();
+        else res.end();
+    });
+    stream.pipe(res);
+    return undefined;
+};
 
 // Derive a 32-byte AES key from the TRAVEL_DOC_SECRET env var.
 // In production this MUST be set to a long random string.
@@ -266,9 +277,45 @@ const decryptDocNumber = (record) => {
 // Auth state — persisted in MongoDB via the Session model so tokens survive
 // process restarts and so the API can be horizontally scaled. Each Session
 // document has a TTL index on `expiresAt`, so Mongo purges them automatically.
+//
+// Sliding-session design (T3.3):
+//   - Access token: short-lived bearer (15 min), sent as `Authorization: Bearer`.
+//   - Refresh token: long-lived opaque value (30 days), delivered ONLY via the
+//     httpOnly `sz_rt` cookie. Hashed at rest. Rotated on every /refresh call.
+//   - On refresh: the just-rotated hash is kept in `previousRefreshHash`; any
+//     subsequent presentation of that hash triggers reuse detection (the
+//     session is destroyed and the event is audited).
 // ---------------------------------------------------------------------------
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
-const SESSION_TTL_MS = 60 * 60 * 1000;
+const ACCESS_TTL_MS = 15 * 60 * 1000;             // 15 min
+const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;  // 30 days
+
+const REFRESH_COOKIE_NAME = 'sz_rt';
+const REFRESH_COOKIE_PATH = '/api/auth';
+
+const refreshCookieOptions = (maxAgeMs) => ({
+    httpOnly: true,
+    secure: IS_PROD,
+    // In production the SPA and the API typically live on different subdomains
+    // so we need SameSite=None + Secure for the cookie to ride along on
+    // cross-site fetches. In dev we use 'lax' so localhost works without TLS.
+    sameSite: IS_PROD ? 'none' : 'lax',
+    path: REFRESH_COOKIE_PATH,
+    maxAge: maxAgeMs,
+});
+
+const hashRefreshToken = (token) =>
+    crypto.createHash('sha256').update(String(token)).digest('hex');
+
+const setRefreshCookie = (res, token, maxAgeMs = REFRESH_TTL_MS) => {
+    if (!res || typeof res.cookie !== 'function') return;
+    res.cookie(REFRESH_COOKIE_NAME, token, refreshCookieOptions(maxAgeMs));
+};
+
+const clearRefreshCookie = (res) => {
+    if (!res || typeof res.clearCookie !== 'function') return;
+    res.clearCookie(REFRESH_COOKIE_NAME, { ...refreshCookieOptions(0), maxAge: undefined });
+};
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
@@ -294,30 +341,70 @@ const safeEqual = (left, right) => {
 };
 
 const verifyPassword = (password, record) => {
+    // Accounts created via OAuth may have no password set at all.
+    if (!record?.passwordSalt || !record?.passwordHash) return false;
     const candidate = hashPassword(password, record.passwordSalt);
     return safeEqual(candidate, record.passwordHash);
 };
 
-const issueSession = async ({ kind, principalId, ttlMs, req }) => {
+/**
+ * issueSession — create a new Session document.
+ *
+ * For 'admin-challenge' sessions only an access token is issued (the
+ * challenge is short-lived and single-use, so a refresh token would be
+ * pointless). For 'scholar' and 'admin' sessions BOTH tokens are issued
+ * and the refresh token is dropped into the httpOnly `sz_rt` cookie.
+ *
+ * @returns {Promise<{token: string, expiresAt: Date, refreshToken?: string, refreshExpiresAt?: Date}>}
+ */
+const issueSession = async ({ kind, principalId, ttlMs, req, res }) => {
     const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + ttlMs);
+    const now = Date.now();
+    const accessTtl = ttlMs || ACCESS_TTL_MS;
+    const accessExpiresAt = new Date(now + accessTtl);
+
+    const isAuthSession = kind === 'scholar' || kind === 'admin';
+    const refreshToken = isAuthSession ? crypto.randomUUID() + crypto.randomBytes(16).toString('hex') : undefined;
+    const refreshExpiresAt = isAuthSession ? new Date(now + REFRESH_TTL_MS) : undefined;
+
     await Session.create({
         token,
         kind,
         principalId,
-        expiresAt,
+        // `expiresAt` always holds the LATER of access/refresh expiry so the
+        // Mongo TTL index keeps the row alive for the full refresh window.
+        expiresAt: refreshExpiresAt || accessExpiresAt,
+        accessExpiresAt,
+        refreshTokenHash: refreshToken ? hashRefreshToken(refreshToken) : undefined,
+        refreshExpiresAt,
+        lastActiveAt: new Date(now),
         ip: req?.ip,
         userAgent: req?.headers?.['user-agent'],
     });
-    return { token, expiresAt };
+
+    if (refreshToken && res) {
+        setRefreshCookie(res, refreshToken);
+    }
+
+    return {
+        token,
+        expiresAt: accessExpiresAt,
+        refreshToken,
+        refreshExpiresAt,
+    };
 };
 
 const findActiveSession = async (token, kind) => {
     if (!token) return null;
     const doc = await Session.findOne({ token, kind });
     if (!doc) return null;
-    if (doc.expiresAt.getTime() <= Date.now()) {
-        await Session.deleteOne({ _id: doc._id }).catch(() => {});
+    // Prefer the new `accessExpiresAt` field; fall back to `expiresAt` for
+    // legacy rows created before T3.3 landed.
+    const accessExpiry = doc.accessExpiresAt || doc.expiresAt;
+    if (accessExpiry.getTime() <= Date.now()) {
+        // Don't delete here — the refresh token may still be valid, in which
+        // case POST /api/auth/refresh will rotate the access token. The TTL
+        // index handles cleanup when the refresh expires too.
         return null;
     }
     return doc;
@@ -326,6 +413,132 @@ const findActiveSession = async (token, kind) => {
 const revokeSession = async (token) => {
     if (!token) return;
     await Session.deleteOne({ token }).catch(() => {});
+};
+
+// Touch lastActiveAt at most once every 5 minutes per session. Avoids
+// hammering Mongo with a write on every authenticated request while still
+// giving the device-management UI fresh data.
+const LAST_ACTIVE_THROTTLE_MS = 5 * 60 * 1000;
+const touchLastActive = async (session) => {
+    if (!session) return;
+    const last = session.lastActiveAt ? session.lastActiveAt.getTime() : 0;
+    if (Date.now() - last < LAST_ACTIVE_THROTTLE_MS) return;
+    await Session.updateOne(
+        { _id: session._id },
+        { $set: { lastActiveAt: new Date() } },
+    ).catch(() => {});
+};
+
+// ---------------------------------------------------------------------------
+// Google OAuth 2.0 — sign-in / sign-up via Google.
+// Stateless: the `state` parameter is an HMAC-signed JSON envelope so we do
+// not need an extra collection or express-session middleware.
+// ---------------------------------------------------------------------------
+const GOOGLE_OAUTH_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
+
+const googleOAuthConfig = () => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || '';
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || '';
+    const stateSecret = process.env.OAUTH_STATE_SECRET || '';
+    const configured = Boolean(clientId && clientSecret && redirectUri && stateSecret);
+    return { clientId, clientSecret, redirectUri, stateSecret, configured };
+};
+
+const base64UrlEncode = (input) =>
+    Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const base64UrlDecode = (input) => {
+    const pad = input.length % 4 === 0 ? '' : '='.repeat(4 - (input.length % 4));
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/') + pad;
+    return Buffer.from(normalized, 'base64').toString('utf8');
+};
+
+const signOAuthState = (payload, secret) => {
+    const body = base64UrlEncode(JSON.stringify(payload));
+    const sig = crypto.createHmac('sha256', secret).update(body).digest();
+    return `${body}.${base64UrlEncode(sig)}`;
+};
+
+const verifyOAuthState = (state, secret) => {
+    if (typeof state !== 'string' || !state.includes('.')) return null;
+    const [body, providedSig] = state.split('.', 2);
+    if (!body || !providedSig) return null;
+    const expectedSig = crypto.createHmac('sha256', secret).update(body).digest();
+    let providedBuf;
+    try {
+        providedBuf = Buffer.from(
+            providedSig.replace(/-/g, '+').replace(/_/g, '/') +
+                (providedSig.length % 4 === 0 ? '' : '='.repeat(4 - (providedSig.length % 4))),
+            'base64',
+        );
+    } catch {
+        return null;
+    }
+    if (providedBuf.length !== expectedSig.length) return null;
+    if (!crypto.timingSafeEqual(providedBuf, expectedSig)) return null;
+    let payload;
+    try {
+        payload = JSON.parse(base64UrlDecode(body));
+    } catch {
+        return null;
+    }
+    if (!payload || typeof payload !== 'object') return null;
+    if (typeof payload.ts !== 'number') return null;
+    if (Date.now() - payload.ts > GOOGLE_OAUTH_STATE_TTL_MS) return null;
+    return payload;
+};
+
+// Only allow same-origin relative paths so the callback cannot be tricked
+// into redirecting to an attacker-controlled site (open-redirect protection).
+const sanitizeReturnTo = (raw) => {
+    if (typeof raw !== 'string' || !raw) return '/scholar';
+    if (!raw.startsWith('/') || raw.startsWith('//')) return '/scholar';
+    // Disallow newlines / control chars in case the value is logged.
+    if (/[\r\n\t\0]/.test(raw)) return '/scholar';
+    return raw.slice(0, 200);
+};
+
+const exchangeGoogleCode = async ({ code, clientId, clientSecret, redirectUri }) => {
+    const body = new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+    });
+    const response = await globalThis.fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`google-token-exchange-failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+    return response.json();
+};
+
+const fetchGoogleProfile = async (accessToken) => {
+    const response = await globalThis.fetch(GOOGLE_USERINFO_URL, {
+        headers: { authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`google-userinfo-failed: ${response.status} ${text.slice(0, 200)}`);
+    }
+    return response.json();
+};
+
+const buildOAuthRedirect = (params) => {
+    const url = new URL(`${APP_BASE_URL}/auth/google`);
+    for (const [k, v] of Object.entries(params)) {
+        if (v != null) url.searchParams.set(k, String(v));
+    }
+    return url.toString();
 };
 
 // ---------------------------------------------------------------------------
@@ -539,6 +752,7 @@ const requireAdminSession = async (req, res, next) => {
         }
         req.admin = admin;
         req.sessionToken = token;
+        touchLastActive(session);
         return next();
     } catch (err) {
         return next(err);
@@ -562,6 +776,7 @@ const requireScholarSession = async (req, res, next) => {
         }
         req.scholar = scholar;
         req.sessionToken = token;
+        touchLastActive(session);
         return next();
     } catch (err) {
         return next(err);
@@ -572,6 +787,111 @@ const requireScholarSession = async (req, res, next) => {
 // Routes
 // ---------------------------------------------------------------------------
 app.get('/', (req, res) => res.send('ScholarshipZone API is running!'));
+
+// ----- Sliding-session refresh + logout (T3.3) ----------------------------
+//
+// POST /api/auth/refresh
+//   Reads the httpOnly `sz_rt` cookie. Validates it against the stored hash
+//   (per-session), rotates the access AND refresh tokens, and returns the
+//   new `{token, expiresAt, kind}` plus a fresh cookie. If the presented
+//   token matches a *previously rotated* hash, treat it as token reuse:
+//   revoke the entire session and audit the event.
+app.post('/api/auth/refresh', async (req, res, next) => {
+    try {
+        const presented = req.cookies?.[REFRESH_COOKIE_NAME];
+        if (!presented) {
+            return res.status(401).json({ message: 'Refresh token is required.' });
+        }
+        const incomingHash = hashRefreshToken(presented);
+
+        const session = await Session.findOne({ refreshTokenHash: incomingHash });
+        if (!session) {
+            // Reuse detection: did we just rotate this very token away?
+            const replayed = await Session.findOne({ previousRefreshHash: incomingHash });
+            if (replayed) {
+                const principalKind = replayed.kind === 'admin' ? 'admin' : 'scholar';
+                await Session.deleteOne({ _id: replayed._id }).catch(() => {});
+                audit(req, {
+                    action: `${principalKind}.session.reuse_detected`,
+                    outcome: 'failure',
+                    actor: { kind: principalKind, id: replayed.principalId },
+                    metadata: { sessionId: String(replayed._id) },
+                });
+            }
+            clearRefreshCookie(res);
+            return res.status(401).json({ message: 'Refresh token is invalid.' });
+        }
+
+        if (!session.refreshExpiresAt || session.refreshExpiresAt.getTime() <= Date.now()) {
+            await Session.deleteOne({ _id: session._id }).catch(() => {});
+            clearRefreshCookie(res);
+            return res.status(401).json({ message: 'Refresh token has expired. Please sign in again.' });
+        }
+
+        if (session.kind !== 'admin' && session.kind !== 'scholar') {
+            // Should never happen — admin-challenge sessions don't have a
+            // refresh token — but be defensive.
+            clearRefreshCookie(res);
+            return res.status(401).json({ message: 'Refresh token is invalid for this session.' });
+        }
+
+        // Rotate.
+        const now = Date.now();
+        const newAccessToken = crypto.randomUUID();
+        const newRefreshToken = crypto.randomUUID() + crypto.randomBytes(16).toString('hex');
+        const newAccessExpiresAt = new Date(now + ACCESS_TTL_MS);
+        const newRefreshExpiresAt = new Date(now + REFRESH_TTL_MS);
+
+        await Session.updateOne(
+            { _id: session._id },
+            {
+                $set: {
+                    token: newAccessToken,
+                    accessExpiresAt: newAccessExpiresAt,
+                    refreshTokenHash: hashRefreshToken(newRefreshToken),
+                    refreshExpiresAt: newRefreshExpiresAt,
+                    previousRefreshHash: session.refreshTokenHash,
+                    expiresAt: newRefreshExpiresAt,
+                    lastActiveAt: new Date(now),
+                    ip: req.ip,
+                    userAgent: req.headers?.['user-agent'],
+                },
+                $inc: { rotationCount: 1 },
+            },
+        );
+
+        setRefreshCookie(res, newRefreshToken);
+        return res.json({
+            sessionToken: newAccessToken,
+            expiresAt: newAccessExpiresAt.toISOString(),
+            kind: session.kind,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/logout
+//   Revokes the current session (matched by EITHER the Authorization bearer
+//   OR the refresh cookie — whichever is present) and clears the cookie.
+//   Always responds 200 so the client can call it without first checking
+//   whether it actually has a live session.
+app.post('/api/auth/logout', async (req, res, next) => {
+    try {
+        const [scheme, bearer] = (req.headers.authorization || '').split(' ');
+        if (scheme === 'Bearer' && bearer) {
+            await Session.deleteOne({ token: bearer }).catch(() => {});
+        }
+        const presented = req.cookies?.[REFRESH_COOKIE_NAME];
+        if (presented) {
+            await Session.deleteOne({ refreshTokenHash: hashRefreshToken(presented) }).catch(() => {});
+        }
+        clearRefreshCookie(res);
+        return res.json({ ok: true });
+    } catch (err) {
+        next(err);
+    }
+});
 
 // ----- Health probes (used by load balancers / orchestrators) ------------
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
@@ -608,7 +928,21 @@ app.get('/api/public/stats', async (req, res, next) => {
 
 app.get('/api/public/scholarships', async (req, res, next) => {
     try {
-        const { country, grade, field, q, limit } = req.query;
+        const {
+            country,
+            grade,
+            field,
+            q,
+            limit,
+            offset,
+            minAmount,
+            maxAmount,
+            deadlineBefore,
+            deadlineAfter,
+            openOnly,
+            sort,
+        } = req.query;
+
         const filter = { active: true };
         if (country) filter.countries = { $in: [country] };
         if (grade) filter.grades = { $in: [grade] };
@@ -617,9 +951,54 @@ app.get('/api/public/scholarships', async (req, res, next) => {
             const rx = new RegExp(String(q).trim(), 'i');
             filter.$or = [{ title: rx }, { description: rx }, { provider: rx }];
         }
+
+        // Amount range filters (skip invalid numbers silently).
+        const min = Number(minAmount);
+        const max = Number(maxAmount);
+        if (Number.isFinite(min) && min > 0) filter.amount = { ...(filter.amount || {}), $gte: min };
+        if (Number.isFinite(max) && max > 0) filter.amount = { ...(filter.amount || {}), $lte: max };
+
+        // Deadline window filters.
+        const before = deadlineBefore ? new Date(deadlineBefore) : null;
+        const after = deadlineAfter ? new Date(deadlineAfter) : null;
+        if (before instanceof Date && !Number.isNaN(before.getTime())) {
+            filter.deadline = { ...(filter.deadline || {}), $lte: before };
+        }
+        if (after instanceof Date && !Number.isNaN(after.getTime())) {
+            filter.deadline = { ...(filter.deadline || {}), $gte: after };
+        }
+        // openOnly = exclude scholarships whose deadline has already passed.
+        if (String(openOnly) === 'true' || openOnly === true) {
+            const now = new Date();
+            // Either no deadline set (rolling) OR deadline in the future.
+            filter.$and = [
+                ...(filter.$and || []),
+                { $or: [{ deadline: null }, { deadline: { $gte: now } }] },
+            ];
+        }
+
+        // Sort mapping. Default = soonest deadline first (with rolling/no-deadline
+        // at the end via secondary createdAt sort).
+        const sortMap = {
+            'deadline-asc': { deadline: 1, createdAt: -1 },
+            'deadline-desc': { deadline: -1, createdAt: -1 },
+            'amount-desc': { amount: -1, deadline: 1 },
+            'amount-asc': { amount: 1, deadline: 1 },
+            newest: { createdAt: -1 },
+            oldest: { createdAt: 1 },
+            'title-asc': { title: 1 },
+            'title-desc': { title: -1 },
+        };
+        const sortSpec = sortMap[sort] || sortMap['deadline-asc'];
+
         const cap = Math.min(Number(limit) || 12, 50);
-        const items = await Scholarship.find(filter).sort({ deadline: 1 }).limit(cap);
-        res.json({ count: items.length, items });
+        const skip = Math.max(Number(offset) || 0, 0);
+
+        const [items, total] = await Promise.all([
+            Scholarship.find(filter).sort(sortSpec).skip(skip).limit(cap),
+            Scholarship.countDocuments(filter),
+        ]);
+        res.json({ count: items.length, total, offset: skip, limit: cap, items });
     } catch (err) {
         next(err);
     }
@@ -872,8 +1251,8 @@ app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), asy
         const { token: sessionToken } = await issueSession({
             kind: 'admin',
             principalId: admin._id,
-            ttlMs: SESSION_TTL_MS,
             req,
+            res,
         });
         audit(req, {
             action: 'admin.sign-in',
@@ -1085,8 +1464,8 @@ app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema)
         const { token: sessionToken } = await issueSession({
             kind: 'scholar',
             principalId: scholar._id,
-            ttlMs: SESSION_TTL_MS,
             req,
+            res,
         });
         audit(req, {
             action: 'scholar.sign-in',
@@ -1101,6 +1480,180 @@ app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema)
         next(err);
     }
 });
+
+// ----- Google OAuth (scholar sign-in / sign-up) ---------------------------
+app.get('/api/auth/google/start', authLimiter, (req, res, next) => {
+    try {
+        const { clientId, redirectUri, stateSecret, configured } = googleOAuthConfig();
+        if (!configured) {
+            return res.status(503).json({
+                message:
+                    'Google sign-in is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI and OAUTH_STATE_SECRET.',
+            });
+        }
+        const returnTo = sanitizeReturnTo(req.query.returnTo);
+        const nonce = crypto.randomBytes(16).toString('hex');
+        const state = signOAuthState({ nonce, ts: Date.now(), returnTo }, stateSecret);
+        const authorizeUrl = new URL(GOOGLE_AUTH_URL);
+        authorizeUrl.searchParams.set('client_id', clientId);
+        authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+        authorizeUrl.searchParams.set('response_type', 'code');
+        authorizeUrl.searchParams.set('scope', 'openid email profile');
+        authorizeUrl.searchParams.set('state', state);
+        authorizeUrl.searchParams.set('prompt', 'select_account');
+        authorizeUrl.searchParams.set('access_type', 'online');
+        authorizeUrl.searchParams.set('include_granted_scopes', 'true');
+        return res.redirect(302, authorizeUrl.toString());
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.get('/api/auth/google/callback', authLimiter, async (req, res, next) => {
+    try {
+        const config = googleOAuthConfig();
+        if (!config.configured) {
+            return res.status(503).json({ message: 'Google sign-in is not configured.' });
+        }
+
+        const { code, state, error: providerError } = req.query;
+
+        if (providerError) {
+            audit(req, {
+                action: 'scholar.oauth.google',
+                outcome: 'failure',
+                actor: { kind: 'anonymous' },
+                metadata: { reason: 'provider-error', error: String(providerError).slice(0, 120) },
+            });
+            return res.redirect(302, buildOAuthRedirect({ error: 'google_denied' }));
+        }
+
+        const payload = verifyOAuthState(state, config.stateSecret);
+        if (!payload) {
+            audit(req, {
+                action: 'scholar.oauth.google',
+                outcome: 'failure',
+                actor: { kind: 'anonymous' },
+                metadata: { reason: 'invalid-state' },
+            });
+            return res.redirect(302, buildOAuthRedirect({ error: 'invalid_state' }));
+        }
+        const returnTo = sanitizeReturnTo(payload.returnTo);
+
+        if (typeof code !== 'string' || !code) {
+            return res.redirect(302, buildOAuthRedirect({ error: 'missing_code', returnTo }));
+        }
+
+        let tokens;
+        try {
+            tokens = await exchangeGoogleCode({
+                code,
+                clientId: config.clientId,
+                clientSecret: config.clientSecret,
+                redirectUri: config.redirectUri,
+            });
+        } catch (err) {
+            (req.log || console).warn?.({ err: err.message }, '[oauth] google token exchange failed');
+            return res.redirect(302, buildOAuthRedirect({ error: 'token_exchange_failed', returnTo }));
+        }
+
+        let profile;
+        try {
+            profile = await fetchGoogleProfile(tokens.access_token);
+        } catch (err) {
+            (req.log || console).warn?.({ err: err.message }, '[oauth] google userinfo failed');
+            return res.redirect(302, buildOAuthRedirect({ error: 'userinfo_failed', returnTo }));
+        }
+
+        const googleId = String(profile.sub || '').trim();
+        const email = normalizeEmail(profile.email || '');
+        const emailVerifiedByGoogle = Boolean(profile.email_verified);
+        const name = String(profile.name || profile.given_name || email.split('@')[0] || 'Scholar').trim();
+        const avatarUrl = typeof profile.picture === 'string' ? profile.picture : '';
+
+        if (!googleId || !email || !emailVerifiedByGoogle) {
+            audit(req, {
+                action: 'scholar.oauth.google',
+                outcome: 'failure',
+                actor: { kind: 'anonymous', email },
+                metadata: { reason: 'unverified-or-missing-profile' },
+            });
+            return res.redirect(302, buildOAuthRedirect({ error: 'unverified_google_email', returnTo }));
+        }
+
+        // 1) Match by googleId (returning user).
+        // 2) Else match by email (link existing password account to Google).
+        // 3) Else create a new scholar.
+        let scholar = await Scholar.findOne({ googleId });
+        let createdNewAccount = false;
+        if (!scholar) {
+            scholar = await Scholar.findOne({ email });
+        }
+
+        if (scholar) {
+            const updates = {};
+            if (!scholar.googleId) updates.googleId = googleId;
+            if (!scholar.emailVerified) {
+                updates.emailVerified = true;
+                updates.emailVerifiedAt = new Date();
+            }
+            if (avatarUrl && !scholar.avatarUrl) updates.avatarUrl = avatarUrl;
+            if (Object.keys(updates).length > 0) {
+                Object.assign(scholar, updates);
+                await scholar.save();
+            }
+        } else {
+            try {
+                scholar = await Scholar.create({
+                    name,
+                    email,
+                    role: 'student',
+                    application: null,
+                    googleId,
+                    avatarUrl,
+                    emailVerified: true,
+                    emailVerifiedAt: new Date(),
+                });
+                createdNewAccount = true;
+            } catch (err) {
+                // Race: someone else just signed up with the same email/googleId.
+                if (err && err.code === 11000) {
+                    scholar = (await Scholar.findOne({ googleId })) || (await Scholar.findOne({ email }));
+                    if (!scholar) {
+                        return res.redirect(302, buildOAuthRedirect({ error: 'account_conflict', returnTo }));
+                    }
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        const { token: sessionToken } = await issueSession({
+            kind: 'scholar',
+            principalId: scholar._id,
+            req,
+            res,
+        });
+
+        audit(req, {
+            action: createdNewAccount ? 'scholar.oauth.google.signup' : 'scholar.oauth.google.signin',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            target: { kind: 'Scholar', id: scholar._id, label: scholar.email },
+        });
+
+        return res.redirect(
+            302,
+            buildOAuthRedirect({
+                token: sessionToken,
+                returnTo,
+                created: createdNewAccount ? '1' : undefined,
+            }),
+        );
+    } catch (err) {
+        next(err);
+    }
+});
+
 
 app.get('/api/auth/student/profile', requireScholarSession, async (req, res, next) => {
     try {
@@ -1152,6 +1705,60 @@ app.put('/api/auth/student/profile', requireScholarSession, async (req, res, nex
 
 // ----- Scholar: scholarship applications ----------------------------------
 const APPLICATION_MOTIVATION_MAX = 2000;
+const APPLICATION_FREETEXT_MAX = 500;
+
+// Sanitize a free-text field to a trimmed, length-capped string.
+const cleanText = (value, max = APPLICATION_FREETEXT_MAX) => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim().slice(0, max);
+};
+
+const sanitizePersonalInfo = (raw = {}) => ({
+    fullName: cleanText(raw.fullName, 200),
+    phone: cleanText(raw.phone, 60),
+    dateOfBirth: cleanText(raw.dateOfBirth, 40),
+    nationality: cleanText(raw.nationality, 120),
+    country: cleanText(raw.country, 120),
+    address: cleanText(raw.address, 500),
+});
+
+const sanitizeAcademicInfo = (raw = {}) => ({
+    currentLevel: cleanText(raw.currentLevel, 120),
+    institution: cleanText(raw.institution, 200),
+    fieldOfStudy: cleanText(raw.fieldOfStudy, 200),
+    gradePoint: cleanText(raw.gradePoint, 60),
+    expectedCompletion: cleanText(raw.expectedCompletion, 60),
+});
+
+const sanitizeDocumentRefs = (raw = []) => {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const doc of raw.slice(0, 20)) {
+        if (!doc || !doc.credentialId) continue;
+        const id = String(doc.credentialId);
+        if (!/^[0-9a-fA-F]{24}$/.test(id) || seen.has(id)) continue;
+        seen.add(id);
+        out.push({
+            credentialId: id,
+            title: cleanText(doc.title, 200),
+            type: cleanText(doc.type, 60),
+        });
+    }
+    return out;
+};
+
+// Ensure the wizard payload is internally consistent and safe.
+const buildApplicationPayload = (body = {}) => {
+    const motivation = cleanText(body.motivation, APPLICATION_MOTIVATION_MAX);
+    return {
+        motivation,
+        personalInfo: sanitizePersonalInfo(body.personalInfo || {}),
+        academicInfo: sanitizeAcademicInfo(body.academicInfo || {}),
+        documents: sanitizeDocumentRefs(body.documents || []),
+        lastStep: Math.max(0, Math.min(Number(body.lastStep) || 0, 10)),
+    };
+};
 
 const serializeScholarshipApplication = (entry) => {
     const scholarship = entry.scholarship && typeof entry.scholarship === 'object' && entry.scholarship.title
@@ -1169,10 +1776,21 @@ const serializeScholarshipApplication = (entry) => {
         scholarshipId: scholarship ? scholarship.id : String(entry.scholarship),
         scholarship,
         motivation: entry.motivation || '',
+        personalInfo: entry.personalInfo ? entry.personalInfo.toObject?.() || entry.personalInfo : {},
+        academicInfo: entry.academicInfo ? entry.academicInfo.toObject?.() || entry.academicInfo : {},
+        documents: Array.isArray(entry.documents)
+            ? entry.documents.map((d) => ({
+                  credentialId: d.credentialId ? String(d.credentialId) : null,
+                  title: d.title || '',
+                  type: d.type || '',
+              }))
+            : [],
+        lastStep: typeof entry.lastStep === 'number' ? entry.lastStep : 0,
         status: entry.status,
         decisionNote: entry.decisionNote || '',
         decidedAt: entry.decidedAt,
-        submittedAt: entry.createdAt,
+        submittedAt: entry.submittedAt || (entry.status !== 'draft' ? entry.createdAt : null),
+        createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
     };
 };
@@ -1187,6 +1805,185 @@ app.get('/api/auth/student/applications', requireScholarSession, async (req, res
         next(err);
     }
 });
+
+// Load the current draft (or submitted application) for a single scholarship.
+// Used by the wizard to resume where the scholar left off.
+app.get(
+    '/api/auth/student/applications/draft/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!/^[0-9a-fA-F]{24}$/.test(scholarshipId)) {
+                return res.status(400).json({ message: 'A valid scholarship id is required.' });
+            }
+            const entry = await ScholarshipApplication.findOne({
+                scholar: req.scholar._id,
+                scholarship: scholarshipId,
+            }).populate('scholarship');
+            if (!entry) {
+                return res.json({ application: null });
+            }
+            res.json({ application: serializeScholarshipApplication(entry) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// Upsert a draft for a single scholarship. Idempotent — called repeatedly by
+// the wizard's auto-save. Will not overwrite an already-submitted application:
+// if `status !== 'draft'` the request is rejected with 409.
+app.put(
+    '/api/auth/student/applications/draft/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!/^[0-9a-fA-F]{24}$/.test(scholarshipId)) {
+                return res.status(400).json({ message: 'A valid scholarship id is required.' });
+            }
+
+            const scholarship = await Scholarship.findOne({ _id: scholarshipId, active: true });
+            if (!scholarship) {
+                return res.status(404).json({ message: 'Scholarship not found or no longer active.' });
+            }
+
+            const existing = await ScholarshipApplication.findOne({
+                scholar: req.scholar._id,
+                scholarship: scholarship._id,
+            });
+            if (existing && existing.status !== 'draft') {
+                return res.status(409).json({
+                    message: 'This application has already been submitted and can no longer be edited.',
+                    application: serializeScholarshipApplication(existing),
+                });
+            }
+
+            const payload = buildApplicationPayload(req.body || {});
+            const update = {
+                ...payload,
+                scholar: req.scholar._id,
+                scholarship: scholarship._id,
+                status: 'draft',
+            };
+
+            const saved = await ScholarshipApplication.findOneAndUpdate(
+                { scholar: req.scholar._id, scholarship: scholarship._id },
+                { $set: update },
+                { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
+            ).populate('scholarship');
+
+            res.json({ application: serializeScholarshipApplication(saved) });
+        } catch (err) {
+            if (err && err.code === 11000) {
+                // Race on the unique index — return the canonical record.
+                const existing = await ScholarshipApplication.findOne({
+                    scholar: req.scholar._id,
+                    scholarship: req.params.scholarshipId,
+                }).populate('scholarship');
+                return res.json({ application: serializeScholarshipApplication(existing) });
+            }
+            next(err);
+        }
+    }
+);
+
+// Discard a draft entirely. Only allowed when the application has not yet
+// been submitted.
+app.delete(
+    '/api/auth/student/applications/draft/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!/^[0-9a-fA-F]{24}$/.test(scholarshipId)) {
+                return res.status(400).json({ message: 'A valid scholarship id is required.' });
+            }
+            const existing = await ScholarshipApplication.findOne({
+                scholar: req.scholar._id,
+                scholarship: scholarshipId,
+            });
+            if (!existing) return res.json({ deleted: false });
+            if (existing.status !== 'draft') {
+                return res.status(409).json({
+                    message: 'Submitted applications cannot be deleted from here.',
+                });
+            }
+            await existing.deleteOne();
+            res.json({ deleted: true });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// Promote a draft to a fully submitted application. Accepts the final payload
+// (the wizard sends the latest local form values so we don't rely on a
+// possibly stale draft) and applies the same validation as the legacy POST.
+app.post(
+    '/api/auth/student/applications/submit/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!/^[0-9a-fA-F]{24}$/.test(scholarshipId)) {
+                return res.status(400).json({ message: 'A valid scholarship id is required.' });
+            }
+
+            const scholarship = await Scholarship.findOne({ _id: scholarshipId, active: true });
+            if (!scholarship) {
+                return res.status(404).json({ message: 'Scholarship not found or no longer active.' });
+            }
+            if (scholarship.deadline && new Date(scholarship.deadline) < new Date()) {
+                return res.status(400).json({ message: 'This scholarship has closed.' });
+            }
+
+            const existing = await ScholarshipApplication.findOne({
+                scholar: req.scholar._id,
+                scholarship: scholarship._id,
+            });
+            if (existing && existing.status !== 'draft') {
+                return res.status(409).json({
+                    message: 'You have already applied to this scholarship.',
+                    application: serializeScholarshipApplication(existing),
+                });
+            }
+
+            const payload = buildApplicationPayload(req.body || {});
+
+            // Soft validation: require the bare minimum to call this a real
+            // application. Everything else is optional so the wizard can stay
+            // friendly.
+            if (!payload.personalInfo.fullName) {
+                return res.status(400).json({ message: 'Please provide your full name.' });
+            }
+
+            const update = {
+                ...payload,
+                scholar: req.scholar._id,
+                scholarship: scholarship._id,
+                status: 'submitted',
+                submittedAt: new Date(),
+            };
+
+            const saved = await ScholarshipApplication.findOneAndUpdate(
+                { scholar: req.scholar._id, scholarship: scholarship._id },
+                { $set: update },
+                { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
+            ).populate('scholarship');
+
+            res.status(existing ? 200 : 201).json({
+                application: serializeScholarshipApplication(saved),
+            });
+        } catch (err) {
+            if (err && err.code === 11000) {
+                return res.status(409).json({ message: 'You have already applied to this scholarship.' });
+            }
+            next(err);
+        }
+    }
+);
 
 app.post('/api/auth/student/applications', requireScholarSession, async (req, res, next) => {
     try {
@@ -1212,20 +2009,32 @@ app.post('/api/auth/student/applications', requireScholarSession, async (req, re
             scholar: req.scholar._id,
             scholarship: scholarship._id,
         });
-        if (existing) {
+        if (existing && existing.status !== 'draft') {
             return res.status(409).json({
                 message: 'You have already applied to this scholarship.',
                 application: serializeScholarshipApplication(existing),
             });
         }
 
-        const created = await ScholarshipApplication.create({
-            scholar: req.scholar._id,
-            scholarship: scholarship._id,
-            motivation: trimmedMotivation,
+        let saved;
+        if (existing) {
+            existing.motivation = trimmedMotivation;
+            existing.status = 'submitted';
+            existing.submittedAt = new Date();
+            saved = await existing.save();
+        } else {
+            saved = await ScholarshipApplication.create({
+                scholar: req.scholar._id,
+                scholarship: scholarship._id,
+                motivation: trimmedMotivation,
+                status: 'submitted',
+                submittedAt: new Date(),
+            });
+        }
+        const populated = await saved.populate('scholarship');
+        return res.status(existing ? 200 : 201).json({
+            application: serializeScholarshipApplication(populated),
         });
-        const populated = await created.populate('scholarship');
-        return res.status(201).json({ application: serializeScholarshipApplication(populated) });
     } catch (err) {
         if (err && err.code === 11000) {
             return res.status(409).json({ message: 'You have already applied to this scholarship.' });
@@ -1317,37 +2126,50 @@ app.post(
             }
             const { type, title, country, issuingBody, issuedYear, gradeConversion } = req.body || {};
             if (!CREDENTIAL_TYPES.includes(type)) {
-                fs.unlink(req.file.path, () => {});
                 return res.status(400).json({ message: 'Unknown credential type.' });
             }
             const trimmedTitle = String(title || '').trim();
             if (!trimmedTitle) {
-                fs.unlink(req.file.path, () => {});
                 return res.status(400).json({ message: 'A title is required.' });
             }
 
             const yearNum = issuedYear ? Number(issuedYear) : null;
             if (issuedYear && (!Number.isFinite(yearNum) || yearNum < 1950 || yearNum > 2100)) {
-                fs.unlink(req.file.path, () => {});
                 return res.status(400).json({ message: 'Issued year must be between 1950 and 2100.' });
             }
 
-            const created = await AcademicCredential.create({
-                scholar: req.scholar._id,
-                type,
-                title: trimmedTitle.slice(0, 200),
-                country: String(country || '').trim().toUpperCase().slice(0, 3),
-                issuingBody: String(issuingBody || '').trim().slice(0, 200),
-                issuedYear: yearNum,
-                originalName: req.file.originalname.slice(0, 300),
-                storagePath: req.file.path,
-                mimeType: req.file.mimetype,
-                sizeBytes: req.file.size,
-                gradeConversion: parseGradeConversionField(gradeConversion) || undefined,
+            const backend = preferredBackend();
+            const stored = await backend.put({
+                buffer: req.file.buffer,
+                contentType: req.file.mimetype,
+                prefix: `credentials/${String(req.scholar._id)}`,
+                originalName: req.file.originalname,
             });
+
+            let created;
+            try {
+                created = await AcademicCredential.create({
+                    scholar: req.scholar._id,
+                    type,
+                    title: trimmedTitle.slice(0, 200),
+                    country: String(country || '').trim().toUpperCase().slice(0, 3),
+                    issuingBody: String(issuingBody || '').trim().slice(0, 200),
+                    issuedYear: yearNum,
+                    originalName: req.file.originalname.slice(0, 300),
+                    storagePath: stored.key,
+                    storageBackend: backend.name,
+                    mimeType: req.file.mimetype,
+                    sizeBytes: req.file.size,
+                    gradeConversion: parseGradeConversionField(gradeConversion) || undefined,
+                });
+            } catch (err) {
+                // If the DB write fails, clean up the orphaned file we just wrote
+                // so we do not leak bytes in the bucket / on disk.
+                await backend.delete(stored.key).catch(() => {});
+                throw err;
+            }
             return res.status(201).json({ credential: serializeCredential(created) });
         } catch (err) {
-            if (req.file) fs.unlink(req.file.path, () => {});
             next(err);
         }
     }
@@ -1363,15 +2185,7 @@ app.get(
                 scholar: req.scholar._id,
             });
             if (!entry) return res.status(404).json({ message: 'Credential not found.' });
-            if (!fs.existsSync(entry.storagePath)) {
-                return res.status(410).json({ message: 'File is no longer available.' });
-            }
-            res.setHeader('Content-Type', entry.mimeType);
-            res.setHeader(
-                'Content-Disposition',
-                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
-            );
-            fs.createReadStream(entry.storagePath).pipe(res);
+            await serveStoredFile(entry, res);
         } catch (err) {
             next(err);
         }
@@ -1388,9 +2202,9 @@ app.delete(
                 scholar: req.scholar._id,
             });
             if (!entry) return res.status(404).json({ message: 'Credential not found.' });
-            const filePath = entry.storagePath;
+            const { storagePath, storageBackend } = entry;
             await entry.deleteOne();
-            fs.unlink(filePath, () => {});
+            await backendFor(storageBackend).delete(storagePath).catch(() => {});
             return res.json({ ok: true });
         } catch (err) {
             next(err);
@@ -1461,15 +2275,7 @@ app.get(
         try {
             const entry = await AcademicCredential.findById(req.params.id);
             if (!entry) return res.status(404).json({ message: 'Credential not found.' });
-            if (!fs.existsSync(entry.storagePath)) {
-                return res.status(410).json({ message: 'File is no longer available.' });
-            }
-            res.setHeader('Content-Type', entry.mimeType);
-            res.setHeader(
-                'Content-Disposition',
-                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
-            );
-            fs.createReadStream(entry.storagePath).pipe(res);
+            await serveStoredFile(entry, res);
         } catch (err) {
             next(err);
         }
@@ -1563,12 +2369,10 @@ app.post(
             }
             const { type, title, country, documentNumber, issuedDate, expiryDate } = req.body || {};
             if (!TRAVEL_DOC_TYPES.includes(type)) {
-                fs.unlink(req.file.path, () => {});
                 return res.status(400).json({ message: 'Unknown travel-document type.' });
             }
             const trimmedTitle = String(title || '').trim();
             if (!trimmedTitle) {
-                fs.unlink(req.file.path, () => {});
                 return res.status(400).json({ message: 'A title is required.' });
             }
 
@@ -1581,20 +2385,35 @@ app.post(
                 ? plainNumber.slice(-4)
                 : plainNumber;
 
-            const created = await TravelDocument.create({
-                scholar: req.scholar._id,
-                type,
-                title: trimmedTitle.slice(0, 200),
-                country: String(country || '').trim().toUpperCase().slice(0, 3),
-                documentNumberEncrypted: encrypted,
-                documentNumberLast4: last4,
-                issuedDate: issued,
-                expiryDate: expiry,
-                originalName: req.file.originalname.slice(0, 300),
-                storagePath: req.file.path,
-                mimeType: req.file.mimetype,
-                sizeBytes: req.file.size,
+            const backend = preferredBackend();
+            const stored = await backend.put({
+                buffer: req.file.buffer,
+                contentType: req.file.mimetype,
+                prefix: `travel/${String(req.scholar._id)}`,
+                originalName: req.file.originalname,
             });
+
+            let created;
+            try {
+                created = await TravelDocument.create({
+                    scholar: req.scholar._id,
+                    type,
+                    title: trimmedTitle.slice(0, 200),
+                    country: String(country || '').trim().toUpperCase().slice(0, 3),
+                    documentNumberEncrypted: encrypted,
+                    documentNumberLast4: last4,
+                    issuedDate: issued,
+                    expiryDate: expiry,
+                    originalName: req.file.originalname.slice(0, 300),
+                    storagePath: stored.key,
+                    storageBackend: backend.name,
+                    mimeType: req.file.mimetype,
+                    sizeBytes: req.file.size,
+                });
+            } catch (err) {
+                await backend.delete(stored.key).catch(() => {});
+                throw err;
+            }
             return res.status(201).json({
                 document: {
                     ...serializeTravelDoc(created, { revealNumber: true }),
@@ -1602,7 +2421,6 @@ app.post(
                 },
             });
         } catch (err) {
-            if (req.file) fs.unlink(req.file.path, () => {});
             next(err);
         }
     }
@@ -1618,15 +2436,7 @@ app.get(
                 scholar: req.scholar._id,
             });
             if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
-            if (!fs.existsSync(entry.storagePath)) {
-                return res.status(410).json({ message: 'File is no longer available.' });
-            }
-            res.setHeader('Content-Type', entry.mimeType);
-            res.setHeader(
-                'Content-Disposition',
-                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
-            );
-            fs.createReadStream(entry.storagePath).pipe(res);
+            await serveStoredFile(entry, res);
         } catch (err) {
             next(err);
         }
@@ -1643,9 +2453,9 @@ app.delete(
                 scholar: req.scholar._id,
             });
             if (!entry) return res.status(404).json({ message: 'Travel document not found.' });
-            const filePath = entry.storagePath;
+            const { storagePath, storageBackend } = entry;
             await entry.deleteOne();
-            fs.unlink(filePath, () => {});
+            await backendFor(storageBackend).delete(storagePath).catch(() => {});
             return res.json({ ok: true });
         } catch (err) {
             next(err);
@@ -1731,15 +2541,7 @@ app.get(
                 });
             }
 
-            if (!fs.existsSync(entry.storagePath)) {
-                return res.status(410).json({ message: 'File is no longer available.' });
-            }
-            res.setHeader('Content-Type', entry.mimeType);
-            res.setHeader(
-                'Content-Disposition',
-                `inline; filename="${entry.originalName.replace(/"/g, '')}"`
-            );
-            fs.createReadStream(entry.storagePath).pipe(res);
+            await serveStoredFile(entry, res);
         } catch (err) {
             next(err);
         }
@@ -2484,8 +3286,8 @@ app.post('/api/auth/student/sign-up', authLimiter, validate(ScholarSignUpSchema)
         const { token: sessionToken } = await issueSession({
             kind: 'scholar',
             principalId: newScholar._id,
-            ttlMs: SESSION_TTL_MS,
             req,
+            res,
         });
 
         // Fire-and-forget verification email so the response is not delayed by SMTP.
@@ -2771,6 +3573,90 @@ app.get(
             }
 
             return res.json({ items: ranked, personalised: Boolean(application) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// ----- Saved / watchlist scholarships -------------------------------------
+// Scholars can bookmark scholarships they're interested in. Stored as an array
+// of Scholarship ObjectIds on the Scholar document. Toggling is idempotent:
+// POST adds, DELETE removes, GET returns the populated list.
+
+const mongoose = require('mongoose');
+
+app.get(
+    '/api/auth/student/saved',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const scholar = await Scholar.findById(req.scholar._id)
+                .populate({
+                    path: 'savedScholarships',
+                    match: { active: true },
+                })
+                .lean();
+            const items = Array.isArray(scholar?.savedScholarships)
+                ? scholar.savedScholarships.filter(Boolean)
+                : [];
+            return res.json({ items, ids: items.map((s) => String(s._id)) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.post(
+    '/api/auth/student/saved/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!mongoose.Types.ObjectId.isValid(scholarshipId)) {
+                return res.status(400).json({ message: 'Invalid scholarship id.' });
+            }
+            const exists = await Scholarship.exists({ _id: scholarshipId, active: true });
+            if (!exists) {
+                return res.status(404).json({ message: 'Scholarship not found.' });
+            }
+            await Scholar.updateOne(
+                { _id: req.scholar._id },
+                { $addToSet: { savedScholarships: scholarshipId } }
+            );
+            const updated = await Scholar.findById(req.scholar._id)
+                .select('savedScholarships')
+                .lean();
+            return res.json({
+                saved: true,
+                ids: (updated?.savedScholarships || []).map((id) => String(id)),
+            });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.delete(
+    '/api/auth/student/saved/:scholarshipId',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const { scholarshipId } = req.params;
+            if (!mongoose.Types.ObjectId.isValid(scholarshipId)) {
+                return res.status(400).json({ message: 'Invalid scholarship id.' });
+            }
+            await Scholar.updateOne(
+                { _id: req.scholar._id },
+                { $pull: { savedScholarships: scholarshipId } }
+            );
+            const updated = await Scholar.findById(req.scholar._id)
+                .select('savedScholarships')
+                .lean();
+            return res.json({
+                saved: false,
+                ids: (updated?.savedScholarships || []).map((id) => String(id)),
+            });
         } catch (err) {
             next(err);
         }

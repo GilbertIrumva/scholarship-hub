@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, Navigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -8,16 +8,31 @@ import {
   Tag,
   Calendar,
   DollarSign,
-  Loader2,
   Compass,
   X,
+  SlidersHorizontal,
+  ArrowDownUp,
+  ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
+import { SaveButton } from "./SaveButton";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { EmptyState } from "../ui/empty-state";
+import { SkeletonCard } from "../ui/skeleton";
+import { Badge } from "../ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import {
   searchPublicScholarships,
   getPublicFilters,
@@ -129,11 +144,18 @@ const ScholarshipCard = ({ scholarship }) => {
         )}
 
         <div className="mt-auto pt-5">
-          <Button asChild className="w-full">
-            <Link to={`/scholar/scholarships/${scholarship._id || scholarship.id}`}>
-              View details
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild className="flex-1">
+              <Link to={`/scholar/scholarships/${scholarship._id || scholarship.id}`}>
+                View details
+              </Link>
+            </Button>
+            <SaveButton
+              scholarshipId={scholarship._id || scholarship.id}
+              scholarshipTitle={scholarship.title}
+              size="md"
+            />
+          </div>
         </div>
       </div>
     </motion.article>
@@ -156,7 +178,7 @@ const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
             "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
             !value
               ? "bg-primary text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
           ].join(" ")}
         >
           All
@@ -170,7 +192,7 @@ const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
               "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
               value === opt
                 ? "bg-primary text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
             ].join(" ")}
           >
             {opt}
@@ -181,31 +203,105 @@ const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
   );
 };
 
+const SORT_OPTIONS = [
+  { value: "deadline-asc", label: "Deadline (soonest)" },
+  { value: "deadline-desc", label: "Deadline (latest)" },
+  { value: "amount-desc", label: "Award (highest)" },
+  { value: "amount-asc", label: "Award (lowest)" },
+  { value: "newest", label: "Recently added" },
+  { value: "title-asc", label: "Title (A–Z)" },
+];
+
+const DEADLINE_WINDOWS = [
+  { value: "", label: "Any time" },
+  { value: "7", label: "Next 7 days" },
+  { value: "30", label: "Next 30 days" },
+  { value: "90", label: "Next 90 days" },
+  { value: "180", label: "Next 6 months" },
+];
+
+const DEFAULT_SORT = "deadline-asc";
+
+// Helpers to read params from URLSearchParams with safe defaults.
+const readParam = (params, key, fallback = "") => params.get(key) || fallback;
+
 const ScholarshipsPage = () => {
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Pull filter state from URL search params (single source of truth).
+  const query = readParam(searchParams, "q");
+  const country = readParam(searchParams, "country");
+  const grade = readParam(searchParams, "grade");
+  const field = readParam(searchParams, "field");
+  const minAmount = readParam(searchParams, "minAmount");
+  const maxAmount = readParam(searchParams, "maxAmount");
+  const deadlineWithin = readParam(searchParams, "deadlineWithin");
+  const openOnly = readParam(searchParams, "openOnly") === "true";
+  const sort = readParam(searchParams, "sort", DEFAULT_SORT);
+
+  // Local-only mirror so the search input stays snappy while we debounce
+  // pushing the URL update.
+  const [queryDraft, setQueryDraft] = useState(query);
+  const [minDraft, setMinDraft] = useState(minAmount);
+  const [maxDraft, setMaxDraft] = useState(maxAmount);
+
+  // Resync drafts if URL changes externally (e.g. back/forward).
+  useEffect(() => setQueryDraft(query), [query]);
+  useEffect(() => setMinDraft(minAmount), [minAmount]);
+  useEffect(() => setMaxDraft(maxAmount), [maxAmount]);
 
   const [items, setItems] = useState([]);
-  const [filters, setFilters] = useState({ countries: [], grades: [], fields: [] });
+  const [total, setTotal] = useState(0);
+  const [filterOptions, setFilterOptions] = useState({
+    countries: [],
+    grades: [],
+    fields: [],
+  });
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [country, setCountry] = useState("");
-  const [grade, setGrade] = useState("");
-  const [field, setField] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  // debounce search input
+  // Patch the URLSearchParams without losing other keys.
+  const patchParams = (patches) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patches).forEach(([key, value]) => {
+      if (value === "" || value === null || value === undefined) {
+        next.delete(key);
+      } else {
+        next.set(key, String(value));
+      }
+    });
+    setSearchParams(next, { replace: true });
+  };
+
+  const setParam = (key, value) => patchParams({ [key]: value });
+
+  // Debounced search-query → URL sync.
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedQuery(query), 250);
+    if (queryDraft === query) return;
+    const id = setTimeout(() => setParam("q", queryDraft.trim()), 300);
     return () => clearTimeout(id);
-  }, [query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryDraft]);
 
-  // load filters once
+  // Debounced amount range → URL sync (commits when user pauses typing).
+  useEffect(() => {
+    if (minDraft === minAmount && maxDraft === maxAmount) return;
+    const id = setTimeout(() => {
+      patchParams({ minAmount: minDraft.trim(), maxAmount: maxDraft.trim() });
+    }, 400);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minDraft, maxDraft]);
+
+  // Load facet options once.
   useEffect(() => {
     let cancelled = false;
     getPublicFilters()
       .then((data) => {
-        if (!cancelled) setFilters(data || { countries: [], grades: [], fields: [] });
+        if (!cancelled) {
+          setFilterOptions(data || { countries: [], grades: [], fields: [] });
+        }
       })
       .catch(() => {});
     return () => {
@@ -213,41 +309,90 @@ const ScholarshipsPage = () => {
     };
   }, []);
 
-  // fetch scholarships whenever query/filters change
+  // Fetch scholarships whenever any committed URL param changes.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const params = {};
-    if (debouncedQuery) params.q = debouncedQuery;
+
+    const params = { limit: 50, sort: sort || DEFAULT_SORT };
+    if (query) params.q = query;
     if (country) params.country = country;
     if (grade) params.grade = grade;
     if (field) params.field = field;
-    params.limit = 50;
+    if (minAmount) params.minAmount = minAmount;
+    if (maxAmount) params.maxAmount = maxAmount;
+    if (openOnly) params.openOnly = "true";
+    if (deadlineWithin) {
+      const days = Number(deadlineWithin);
+      if (Number.isFinite(days) && days > 0) {
+        const before = new Date();
+        before.setDate(before.getDate() + days);
+        params.deadlineBefore = before.toISOString();
+      }
+    }
 
     searchPublicScholarships(params)
       .then((data) => {
-        if (!cancelled) setItems(Array.isArray(data?.items) ? data.items : []);
+        if (cancelled) return;
+        setItems(Array.isArray(data?.items) ? data.items : []);
+        setTotal(typeof data?.total === "number" ? data.total : data?.items?.length || 0);
       })
       .catch((err) => {
         if (!cancelled) {
           toast.error(err?.response?.data?.message || "Failed to load scholarships.");
           setItems([]);
+          setTotal(0);
         }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, country, grade, field]);
+  }, [query, country, grade, field, minAmount, maxAmount, deadlineWithin, openOnly, sort]);
+
+  // Compose a list of "active filter" pills shown above the results.
+  const activeChips = useMemo(() => {
+    const chips = [];
+    if (country) chips.push({ key: "country", label: country, icon: MapPin });
+    if (grade) chips.push({ key: "grade", label: grade, icon: GraduationCap });
+    if (field) chips.push({ key: "field", label: field, icon: Tag });
+    if (minAmount || maxAmount) {
+      const lo = minAmount ? `$${Number(minAmount).toLocaleString()}` : "$0";
+      const hi = maxAmount ? `$${Number(maxAmount).toLocaleString()}` : "any";
+      chips.push({
+        key: "amount-range",
+        label: `${lo} – ${hi}`,
+        icon: DollarSign,
+        onRemove: () => patchParams({ minAmount: "", maxAmount: "" }),
+      });
+    }
+    if (deadlineWithin) {
+      const opt = DEADLINE_WINDOWS.find((d) => d.value === deadlineWithin);
+      chips.push({
+        key: "deadlineWithin",
+        label: opt?.label || `Within ${deadlineWithin} days`,
+        icon: Calendar,
+      });
+    }
+    if (openOnly) {
+      chips.push({ key: "openOnly", label: "Open only", icon: Calendar });
+    }
+    return chips;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [country, grade, field, minAmount, maxAmount, deadlineWithin, openOnly]);
 
   if (!sessionToken || !scholarProfile) {
     return <Navigate to="/login?role=scholar" replace />;
   }
 
   const scholar = scholarProfile.scholar;
-  const hasActiveFilters = Boolean(query || country || grade || field);
+  const hasActiveFilters =
+    Boolean(query) ||
+    activeChips.length > 0 ||
+    (sort && sort !== DEFAULT_SORT);
 
   const handleSignOut = () => {
     signOut();
@@ -255,11 +400,22 @@ const ScholarshipsPage = () => {
   };
 
   const clearAll = () => {
-    setQuery("");
-    setCountry("");
-    setGrade("");
-    setField("");
+    setQueryDraft("");
+    setMinDraft("");
+    setMaxDraft("");
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
+
+  const removeChip = (chip) => {
+    if (chip.onRemove) {
+      chip.onRemove();
+      return;
+    }
+    setParam(chip.key, "");
+  };
+
+  const sortLabel =
+    SORT_OPTIONS.find((s) => s.value === (sort || DEFAULT_SORT))?.label || "Sort";
 
   return (
     <DashboardLayout
@@ -270,82 +426,251 @@ const ScholarshipsPage = () => {
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
-        {/* Search + clear */}
+        {/* Search bar + sort + more filters */}
         <Card>
           <CardContent className="p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value={queryDraft}
+                  onChange={(e) => setQueryDraft(e.target.value)}
                   placeholder="Search by title, provider, or keyword..."
                   className="pl-9"
+                  aria-label="Search scholarships"
                 />
+                {queryDraft && (
+                  <button
+                    type="button"
+                    onClick={() => setQueryDraft("")}
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearAll} className="gap-1.5">
-                  <X className="h-3.5 w-3.5" /> Clear filters
-                </Button>
-              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <ArrowDownUp className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{sortLabel}</span>
+                      <span className="sm:hidden">Sort</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[14rem]">
+                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioGroup
+                      value={sort || DEFAULT_SORT}
+                      onValueChange={(v) =>
+                        setParam("sort", v === DEFAULT_SORT ? "" : v)
+                      }
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* More filters dropdown (amount + deadline + open-only) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      More filters
+                      {(minAmount || maxAmount || deadlineWithin || openOnly) && (
+                        <Badge variant="default" className="ml-1 h-4 px-1.5 text-[10px]">
+                          {[
+                            minAmount || maxAmount,
+                            deadlineWithin,
+                            openOnly,
+                          ].filter(Boolean).length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-[20rem] p-4"
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <DropdownMenuLabel className="px-0 pb-2">
+                      Award amount
+                    </DropdownMenuLabel>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        placeholder="Min"
+                        value={minDraft}
+                        onChange={(e) => setMinDraft(e.target.value)}
+                        aria-label="Minimum award amount"
+                      />
+                      <span className="text-xs text-muted">to</span>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        placeholder="Max"
+                        value={maxDraft}
+                        onChange={(e) => setMaxDraft(e.target.value)}
+                        aria-label="Maximum award amount"
+                      />
+                    </div>
+
+                    <DropdownMenuSeparator className="my-3" />
+
+                    <DropdownMenuLabel className="px-0 pb-2">
+                      Deadline window
+                    </DropdownMenuLabel>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DEADLINE_WINDOWS.map((opt) => {
+                        const active = (deadlineWithin || "") === opt.value;
+                        return (
+                          <button
+                            key={opt.value || "any"}
+                            type="button"
+                            onClick={() => setParam("deadlineWithin", opt.value)}
+                            className={[
+                              "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                              active
+                                ? "bg-primary text-white"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
+                            ].join(" ")}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <DropdownMenuSeparator className="my-3" />
+
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={openOnly}
+                        onChange={(e) =>
+                          setParam("openOnly", e.target.checked ? "true" : "")
+                        }
+                        className="h-4 w-4 rounded border-border accent-primary"
+                      />
+                      Only show open scholarships
+                    </label>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAll}
+                    className="gap-1.5"
+                  >
+                    <X className="h-3.5 w-3.5" /> Clear all
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Filter chips */}
+        {/* Facet chips */}
         <Card>
           <CardContent className="p-5">
             <div className="grid gap-5 md:grid-cols-3">
               <FilterChips
                 label="Country"
                 icon={MapPin}
-                options={filters.countries}
+                options={filterOptions.countries}
                 value={country}
-                onChange={setCountry}
+                onChange={(v) => setParam("country", v)}
               />
               <FilterChips
                 label="Grade"
                 icon={GraduationCap}
-                options={filters.grades}
+                options={filterOptions.grades}
                 value={grade}
-                onChange={setGrade}
+                onChange={(v) => setParam("grade", v)}
               />
               <FilterChips
                 label="Field"
                 icon={Tag}
-                options={filters.fields}
+                options={filterOptions.fields}
                 value={field}
-                onChange={setField}
+                onChange={(v) => setParam("field", v)}
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Results */}
+        {/* Active filter chips strip */}
+        {activeChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Active:
+            </span>
+            {activeChips.map((chip) => {
+              const Icon = chip.icon;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => removeChip(chip)}
+                  className="group inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+                >
+                  {Icon && <Icon className="h-3 w-3" />}
+                  <span>{chip.label}</span>
+                  <X className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Results header + grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
           </div>
         ) : items.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-              <Compass className="h-12 w-12 text-muted/40" />
-              <h3 className="mt-4 text-lg font-bold text-ink">No scholarships found</h3>
-              <p className="mt-1 max-w-sm text-sm text-muted">
-                Try adjusting your search or clearing the filters to see more results.
-              </p>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearAll} className="mt-4">
+          <EmptyState
+            icon={Compass}
+            title="No scholarships found"
+            description="Try adjusting your search or clearing the filters to see more results."
+            action={
+              hasActiveFilters ? (
+                <Button variant="outline" size="sm" onClick={clearAll}>
                   Clear filters
                 </Button>
-              )}
-            </CardContent>
-          </Card>
+              ) : undefined
+            }
+          />
         ) : (
           <>
-            <p className="text-sm font-semibold text-muted">
-              {items.length} {items.length === 1 ? "scholarship" : "scholarships"} found
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-muted">
+                Showing <span className="text-ink">{items.length}</span>
+                {total > items.length ? <> of {total}</> : null}{" "}
+                {total === 1 ? "scholarship" : "scholarships"}
+              </p>
+              {sort && sort !== DEFAULT_SORT && (
+                <p className="text-xs text-muted">
+                  Sorted by <span className="font-semibold text-ink">{sortLabel}</span>
+                </p>
+              )}
+            </div>
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {items.map((s) => (
                 <ScholarshipCard key={s._id || s.id} scholarship={s} />

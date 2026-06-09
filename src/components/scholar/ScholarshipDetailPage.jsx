@@ -15,16 +15,13 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
+import { SaveButton } from "./SaveButton";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
-import { Label } from "../ui/label";
 import { getPublicScholarshipById } from "../../services/publicApi";
-import { submitApplication, listMyApplications } from "../../services/applications";
-
-const MOTIVATION_MAX = 2000;
+import { listMyApplications } from "../../services/applications";
 
 const formatAmount = (amount, currency = "USD") => {
   if (!amount) return "Amount on request";
@@ -79,9 +76,6 @@ const ScholarshipDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [existingApp, setExistingApp] = useState(null);
-  const [motivation, setMotivation] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
 
   // Load scholarship
   useEffect(() => {
@@ -105,7 +99,7 @@ const ScholarshipDetailPage = () => {
     };
   }, [id]);
 
-  // Check if scholar already applied
+  // Check if scholar already applied (also picks up active drafts).
   useEffect(() => {
     let cancelled = false;
     if (!sessionToken || !id) return;
@@ -127,27 +121,6 @@ const ScholarshipDetailPage = () => {
     signOut();
     navigate("/");
   }, [signOut, navigate]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (submitting || existingApp || submitted) return;
-    setSubmitting(true);
-    try {
-      const data = await submitApplication(sessionToken, {
-        scholarshipId: id,
-        motivation,
-      });
-      setExistingApp(data?.application || null);
-      setSubmitted(true);
-      toast.success("Application submitted successfully.");
-    } catch (err) {
-      toast.error(
-        err?.response?.data?.message || "Could not submit application."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (!sessionToken || !scholarProfile) return <Navigate to="/login?role=scholar" replace />;
   const scholar = scholarProfile.scholar;
@@ -194,7 +167,6 @@ const ScholarshipDetailPage = () => {
 
   const days = daysUntil(scholarship.deadline);
   const isClosed = days !== null && days < 0;
-  const canApply = !existingApp && !submitted && !isClosed;
 
   return (
     <DashboardLayout
@@ -242,6 +214,12 @@ const ScholarshipDetailPage = () => {
                     {days === 0 ? "Closes today" : `${days} days left`}
                   </span>
                 ) : null}
+                <SaveButton
+                  scholarshipId={scholarship._id || scholarship.id}
+                  scholarshipTitle={scholarship.title}
+                  variant="pill"
+                  size="md"
+                />
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -321,11 +299,15 @@ const ScholarshipDetailPage = () => {
             <Card className="lg:sticky lg:top-6">
               <CardHeader>
                 <CardTitle className="text-lg">
-                  {existingApp || submitted ? "Application submitted" : "Apply now"}
+                  {existingApp && existingApp.status !== "draft"
+                    ? "Application submitted"
+                    : existingApp && existingApp.status === "draft"
+                      ? "Draft in progress"
+                      : "Apply now"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {existingApp || submitted ? (
+                {existingApp && existingApp.status !== "draft" ? (
                   <div className="flex flex-col items-center text-center">
                     <span className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
                       <CheckCircle2 className="h-7 w-7" />
@@ -353,45 +335,30 @@ const ScholarshipDetailPage = () => {
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <Label htmlFor="motivation">
-                        Why are you a great fit?{" "}
-                        <span className="font-normal text-muted">(optional)</span>
-                      </Label>
-                      <textarea
-                        id="motivation"
-                        rows={6}
-                        maxLength={MOTIVATION_MAX}
-                        value={motivation}
-                        onChange={(e) => setMotivation(e.target.value)}
-                        placeholder="Share a brief statement about your goals, achievements, and why this scholarship matters to you..."
-                        className="mt-1.5 block w-full resize-none rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink shadow-sm transition-colors placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                      <p className="mt-1 text-right text-[11px] text-muted">
-                        {motivation.length} / {MOTIVATION_MAX}
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      size="lg"
-                      disabled={!canApply || submitting}
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" /> Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="h-4 w-4" /> Submit application
-                        </>
-                      )}
+                  <div className="space-y-4">
+                    {existingApp?.status === "draft" && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
+                        You have an unfinished draft for this scholarship.
+                        Pick up where you left off.
+                      </div>
+                    )}
+                    <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                      Apply in 4 quick steps — personal info, academic
+                      background, motivation, and a final review. Your progress
+                      is auto-saved as you go.
+                    </p>
+                    <Button asChild className="w-full" size="lg">
+                      <Link to={`/scholar/scholarships/${id}/apply`}>
+                        <ShieldCheck className="h-4 w-4" />
+                        {existingApp?.status === "draft"
+                          ? "Continue application"
+                          : "Start application"}
+                      </Link>
                     </Button>
                     <p className="text-center text-[11px] leading-relaxed text-muted">
                       Your profile information will be shared with the reviewer.
                     </p>
-                  </form>
+                  </div>
                 )}
               </CardContent>
             </Card>

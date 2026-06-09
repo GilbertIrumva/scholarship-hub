@@ -23,6 +23,7 @@ import {
   Plane,
   ClipboardCheck,
   ScrollText,
+  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -54,6 +55,7 @@ const ADMIN_NAV = [
 const SCHOLAR_NAV = [
   { to: "/scholar", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass },
+  { to: "/scholar/saved", label: "Saved", icon: Heart },
   { to: "/scholar/applications", label: "My applications", icon: FileText },
   { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive },
   { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane },

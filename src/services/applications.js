@@ -20,7 +20,49 @@ export const submitApplication = async (sessionToken, { scholarshipId, motivatio
   return data;
 };
 
+// ---------------------------------------------------------------------------
+// Multi-step wizard helpers (T2.3)
+// ---------------------------------------------------------------------------
+
+export const getApplicationDraft = async (sessionToken, scholarshipId) => {
+  const { data } = await axios.get(
+    `${BASE_URL}/draft/${scholarshipId}`,
+    buildAuthConfig(sessionToken)
+  );
+  return data;
+};
+
+export const saveApplicationDraft = async (sessionToken, scholarshipId, payload) => {
+  const { data } = await axios.put(
+    `${BASE_URL}/draft/${scholarshipId}`,
+    payload,
+    buildAuthConfig(sessionToken)
+  );
+  return data;
+};
+
+export const discardApplicationDraft = async (sessionToken, scholarshipId) => {
+  const { data } = await axios.delete(
+    `${BASE_URL}/draft/${scholarshipId}`,
+    buildAuthConfig(sessionToken)
+  );
+  return data;
+};
+
+export const submitApplicationWizard = async (sessionToken, scholarshipId, payload) => {
+  const { data } = await axios.post(
+    `${BASE_URL}/submit/${scholarshipId}`,
+    payload,
+    buildAuthConfig(sessionToken)
+  );
+  return data;
+};
+
 export default {
   listMyApplications,
   submitApplication,
+  getApplicationDraft,
+  saveApplicationDraft,
+  discardApplicationDraft,
+  submitApplicationWizard,
 };

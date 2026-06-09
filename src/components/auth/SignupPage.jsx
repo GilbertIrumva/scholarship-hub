@@ -19,6 +19,8 @@ import {
 import { useAuth } from "../../context/useAuth";
 import AuthShell from "./shared/AuthShell";
 import AccountTypeModal from "./shared/AccountTypeModal";
+import GoogleButton from "./shared/GoogleButton";
+import { PasswordStrengthMeter } from "../ui/password-strength";
 import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
@@ -142,6 +144,8 @@ const StudentForm = ({ onDone, isSubmitting, signUp }) => {
     confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
+  const [passwordScore, setPasswordScore] = useState(0);
+  const [passwordBreached, setPasswordBreached] = useState(false);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -161,6 +165,11 @@ const StudentForm = ({ onDone, isSubmitting, signUp }) => {
     if (!form.password) next.password = "Password is required.";
     else if (form.password.length < 8)
       next.password = "Use at least 8 characters.";
+    else if (passwordBreached)
+      next.password =
+        "This password appeared in a known data breach. Please choose a different one.";
+    else if (passwordScore < 2)
+      next.password = "Please choose a stronger password.";
     if (form.confirmPassword !== form.password)
       next.confirmPassword = "Passwords do not match.";
     setErrors(next);
@@ -188,7 +197,18 @@ const StudentForm = ({ onDone, isSubmitting, signUp }) => {
   };
 
   return (
-    <form className="mt-6 space-y-5" onSubmit={handleSubmit} noValidate>
+    <>
+      <div className="mt-6 space-y-4">
+        <GoogleButton label="Sign up with Google" returnTo="/scholar" />
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-slate-200" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            or
+          </span>
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+      </div>
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit} noValidate>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field
           id="stu-first"
@@ -240,18 +260,28 @@ const StudentForm = ({ onDone, isSubmitting, signUp }) => {
       />
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field
-          id="stu-pw"
-          name="password"
-          label="Password"
-          icon={Lock}
-          showToggle
-          placeholder="Min. 8 chars"
-          autoComplete="new-password"
-          value={form.password}
-          onChange={onChange}
-          error={errors.password}
-        />
+        <div>
+          <Field
+            id="stu-pw"
+            name="password"
+            label="Password"
+            icon={Lock}
+            showToggle
+            placeholder="Min. 8 chars"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={onChange}
+            error={errors.password}
+          />
+          <PasswordStrengthMeter
+            password={form.password}
+            userInputs={[form.email, form.firstName, form.lastName, form.username]}
+            onEvaluate={({ score, breached }) => {
+              setPasswordScore(score);
+              setPasswordBreached(breached);
+            }}
+          />
+        </div>
         <Field
           id="stu-pw2"
           name="confirmPassword"
@@ -268,6 +298,7 @@ const StudentForm = ({ onDone, isSubmitting, signUp }) => {
 
       <SubmitButton isSubmitting={isSubmitting} label="Create Account" />
     </form>
+    </>
   );
 };
 
@@ -285,6 +316,8 @@ const AdminForm = ({ onDone, isSubmitting, signUp }) => {
     inviteCode: "",
   });
   const [errors, setErrors] = useState({});
+  const [passwordScore, setPasswordScore] = useState(0);
+  const [passwordBreached, setPasswordBreached] = useState(false);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -307,6 +340,11 @@ const AdminForm = ({ onDone, isSubmitting, signUp }) => {
     if (!form.password) next.password = "Password is required.";
     else if (form.password.length < 8)
       next.password = "Use at least 8 characters.";
+    else if (passwordBreached)
+      next.password =
+        "This password appeared in a known data breach. Please choose a different one.";
+    else if (passwordScore < 2)
+      next.password = "Please choose a stronger password.";
     if (form.confirmPassword !== form.password)
       next.confirmPassword = "Passwords do not match.";
     if (!form.inviteCode.trim())
@@ -401,18 +439,28 @@ const AdminForm = ({ onDone, isSubmitting, signUp }) => {
       />
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field
-          id="adm-pw"
-          name="password"
-          label="Password"
-          icon={Lock}
-          showToggle
-          placeholder="Min. 8 chars"
-          autoComplete="new-password"
-          value={form.password}
-          onChange={onChange}
-          error={errors.password}
-        />
+        <div>
+          <Field
+            id="adm-pw"
+            name="password"
+            label="Password"
+            icon={Lock}
+            showToggle
+            placeholder="Min. 8 chars"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={onChange}
+            error={errors.password}
+          />
+          <PasswordStrengthMeter
+            password={form.password}
+            userInputs={[form.email, form.fullName, form.username, form.organization]}
+            onEvaluate={({ score, breached }) => {
+              setPasswordScore(score);
+              setPasswordBreached(breached);
+            }}
+          />
+        </div>
         <Field
           id="adm-pw2"
           name="confirmPassword"

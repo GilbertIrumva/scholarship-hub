@@ -5,6 +5,7 @@ import {
   FileText,
   FolderArchive,
   GraduationCap,
+  Heart,
   Home,
   Inbox,
   KeyRound,
@@ -50,6 +51,7 @@ const NAV_GROUPS = {
   scholar: [
     { to: "/scholar", label: "Overview", icon: LayoutDashboard, keywords: "home dashboard" },
     { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass, keywords: "search find opportunities" },
+    { to: "/scholar/saved", label: "Saved scholarships", icon: Heart, keywords: "watchlist bookmarks favorites" },
     { to: "/scholar/applications", label: "My applications", icon: FileText, keywords: "submissions" },
     { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive, keywords: "transcripts documents" },
     { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane, keywords: "passport visa" },

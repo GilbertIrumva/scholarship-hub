@@ -48,7 +48,10 @@ const travelDocumentSchema = new Schema(
 
         // ----- File metadata (binary lives on disk) -------------------------
         originalName: { type: String, required: true, maxlength: 300 },
+        // For backend='local' this is a path under project/uploads.
+        // For backend='s3' this is the object key inside S3_BUCKET.
         storagePath: { type: String, required: true, maxlength: 500 },
+        storageBackend: { type: String, enum: ['local', 's3'], default: 'local', index: true },
         mimeType: { type: String, required: true, maxlength: 120 },
         sizeBytes: { type: Number, required: true, min: 0 },
 

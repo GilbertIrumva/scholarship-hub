@@ -27,9 +27,49 @@ export const fetchRecommendations = async (sessionToken, { limit = 6 } = {}) => 
   return response.data;
 };
 
+// Saved / watchlist scholarships. The backend stores ObjectIds on the Scholar
+// document; the list endpoint returns populated scholarship objects.
+
+export const listSavedScholarships = async (sessionToken) => {
+  const response = await axios.get("/api/auth/student/saved", {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+  return response.data; // { items, ids }
+};
+
+export const saveScholarship = async (sessionToken, scholarshipId) => {
+  const response = await axios.post(
+    `/api/auth/student/saved/${scholarshipId}`,
+    null,
+    { headers: { Authorization: `Bearer ${sessionToken}` } }
+  );
+  return response.data; // { saved: true, ids }
+};
+
+export const unsaveScholarship = async (sessionToken, scholarshipId) => {
+  const response = await axios.delete(
+    `/api/auth/student/saved/${scholarshipId}`,
+    { headers: { Authorization: `Bearer ${sessionToken}` } }
+  );
+  return response.data; // { saved: false, ids }
+};
+
+export const toggleSavedScholarship = async (
+  sessionToken,
+  scholarshipId,
+  currentlySaved
+) =>
+  currentlySaved
+    ? unsaveScholarship(sessionToken, scholarshipId)
+    : saveScholarship(sessionToken, scholarshipId);
+
 export default {
   getAllScholarships,
   getScholarshipById,
   createScholarship,
   fetchRecommendations,
+  listSavedScholarships,
+  saveScholarship,
+  unsaveScholarship,
+  toggleSavedScholarship,
 };

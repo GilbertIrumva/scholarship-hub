@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SaveButton } from "../scholar/SaveButton";
 import { fetchRecommendations } from "../../services/scholarship";
 
 const formatDeadline = (deadline) => {
@@ -116,11 +117,22 @@ const RecommendedRail = ({ sessionToken }) => {
               const s = entry.scholarship || {};
               const id = s._id || s.id;
               return (
-                <Link
+                <div
                   key={id || s.title}
-                  to={id ? `/scholar/scholarships/${id}` : "/scholar/scholarships"}
-                  className="group flex flex-col gap-2 rounded-xl border border-border bg-white p-4 transition-shadow hover:shadow-md"
+                  className="group relative rounded-xl border border-border bg-white transition-shadow hover:shadow-md"
                 >
+                  {id && (
+                    <SaveButton
+                      scholarshipId={id}
+                      scholarshipTitle={s.title}
+                      size="sm"
+                      className="absolute right-2 top-2 z-10"
+                    />
+                  )}
+                  <Link
+                    to={id ? `/scholar/scholarships/${id}` : "/scholar/scholarships"}
+                    className="flex flex-col gap-2 p-4 pr-12"
+                  >
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="text-sm font-bold text-ink leading-snug line-clamp-2">
                       {s.title || "Untitled scholarship"}
@@ -158,7 +170,8 @@ const RecommendedRail = ({ sessionToken }) => {
                   <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary group-hover:gap-2 transition-all">
                     {t("recommendations.viewDetails")} <ArrowRight className="h-3 w-3" />
                   </span>
-                </Link>
+                  </Link>
+                </div>
               );
             })}
           </div>

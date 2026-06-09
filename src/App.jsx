@@ -14,6 +14,7 @@ const SignupPage = lazy(() => import("./components/auth/SignupPage"));
 const VerifyEmailPage = lazy(() => import("./components/auth/VerifyEmailPage"));
 const ForgotPasswordPage = lazy(() => import("./components/auth/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./components/auth/ResetPasswordPage"));
+const OAuthCallbackPage = lazy(() => import("./components/auth/OAuthCallbackPage"));
 
 // Admin
 const AdminDashboardPage = lazy(() => import("./components/auth/AdminDashboardPage"));
@@ -29,6 +30,8 @@ const AdminVisaTrackerPage = lazy(() => import("./components/auth/AdminVisaTrack
 const ScholarDashboardPage = lazy(() => import("./components/auth/ScholarDashboardPage"));
 const ScholarshipsPage = lazy(() => import("./components/scholar/ScholarshipsPage"));
 const ScholarshipDetailPage = lazy(() => import("./components/scholar/ScholarshipDetailPage"));
+const ApplicationWizardPage = lazy(() => import("./components/scholar/ApplicationWizardPage"));
+const SavedScholarshipsPage = lazy(() => import("./components/scholar/SavedScholarshipsPage"));
 const MyApplicationsPage = lazy(() => import("./components/scholar/MyApplicationsPage"));
 const CredentialsPage = lazy(() => import("./components/scholar/CredentialsPage"));
 const TravelDocsPage = lazy(() => import("./components/scholar/TravelDocsPage"));
@@ -61,6 +64,7 @@ const App = () => {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/auth/google" element={<OAuthCallbackPage />} />
 
         {/* Backward-compatible redirects to the unified pages */}
         <Route path="/login/scholar" element={<Navigate to="/login" replace />} />
@@ -72,6 +76,8 @@ const App = () => {
         <Route path="/scholar" element={<ScholarDashboardPage />} />
         <Route path="/scholar/scholarships" element={<ScholarshipsPage />} />
         <Route path="/scholar/scholarships/:id" element={<ScholarshipDetailPage />} />
+        <Route path="/scholar/scholarships/:id/apply" element={<ApplicationWizardPage />} />
+        <Route path="/scholar/saved" element={<SavedScholarshipsPage />} />
         <Route path="/scholar/applications" element={<MyApplicationsPage />} />
         <Route path="/scholar/credentials" element={<CredentialsPage />} />
         <Route path="/scholar/travel-docs" element={<TravelDocsPage />} />

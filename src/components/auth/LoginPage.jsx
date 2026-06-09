@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../../context/useAuth";
 import AuthShell from "./shared/AuthShell";
 import AccountTypeModal from "./shared/AccountTypeModal";
+import GoogleButton from "./shared/GoogleButton";
 import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
@@ -234,6 +235,19 @@ const LoginPage = () => {
               role={role}
               onChange={() => setModalOpen(true)}
             />
+
+            {role === "scholar" && (
+              <div className="mt-6 space-y-4">
+                <GoogleButton label="Sign in with Google" returnTo="/scholar" />
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    or
+                  </span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+              </div>
+            )}
 
             <form className="mt-6 space-y-5" onSubmit={handleSubmit} noValidate>
               <Field

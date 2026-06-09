@@ -13,8 +13,19 @@ const scholarSchema = new Schema(
         },
         role: { type: String, default: 'student' },
         application: { type: Types.ObjectId, ref: 'Application', default: null },
-        passwordSalt: { type: String, required: true },
-        passwordHash: { type: String, required: true },
+        savedScholarships: [
+            { type: Types.ObjectId, ref: 'Scholarship', default: [] },
+        ],
+        // Password is optional for accounts created via OAuth providers.
+        passwordSalt: { type: String, default: '' },
+        passwordHash: { type: String, default: '' },
+        // OAuth identity providers. Sparse unique index so multiple accounts
+        // without a googleId do not collide. We deliberately do NOT set a
+        // `default` here — sparse indexes only skip docs where the field is
+        // truly absent (undefined). A `default: null` would store `null` and
+        // trigger E11000 on the second password-only signup.
+        googleId: { type: String, index: { unique: true, sparse: true } },
+        avatarUrl: { type: String, default: '' },
         emailVerified: { type: Boolean, default: false, index: true },
         emailVerifiedAt: { type: Date, default: null },
     },
