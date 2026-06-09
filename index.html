@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ScholarshipZone | Verified Scholarships for Underserved Students</title>
     <meta
@@ -10,19 +11,68 @@
       content="ScholarshipZone helps underserved students discover verified scholarships, track applications, and connect with opportunity pathways built for real-world access."
     />
     <meta name="application-name" content="ScholarshipZone" />
-    <meta name="theme-color" content="#166534" />
+    <meta name="apple-mobile-web-app-title" content="ScholarZone" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#059669" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)" />
+    <meta name="msapplication-TileColor" content="#059669" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <!-- Open Graph defaults — per-route <Seo> components override these on client navigation. -->
+    <meta property="og:site_name" content="ScholarshipZone" />
     <meta property="og:title" content="ScholarshipZone | Verified Scholarships for Underserved Students" />
     <meta
       property="og:description"
       content="Discover verified scholarships, low-bandwidth application workflows, and trusted support for underserved students."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="ScholarshipZone | Verified Scholarships for Underserved Students" />
     <meta
       name="twitter:description"
       content="Verified scholarships, scholar-first support, and opportunity discovery designed for real-world access."
     />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <!-- Preconnect to fonts to shave RTT off first paint. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Theme pre-paint — runs before React mounts so the page never
+      flashes the wrong theme. Mirrors the logic in
+      src/context/ThemeContext.jsx. Safe to ship inline.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('sz-theme');
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var resolved =
+            stored === 'dark' || stored === 'light'
+              ? stored
+              : prefersDark
+              ? 'dark'
+              : 'light';
+          if (resolved === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+          document.documentElement.style.colorScheme = resolved;
+        } catch (_) {
+          /* ignore — falls back to light theme */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

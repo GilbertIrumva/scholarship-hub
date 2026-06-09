@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -33,6 +34,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import LanguageSwitcher from "../common/LanguageSwitcher";
+import { ThemeToggle } from "../ui/theme-toggle";
+import { Seo } from "../seo/Seo";
+import {
+  EducationalOrganizationSchema,
+  FAQSchema,
+  WebSiteSchema,
+} from "../seo/structured-data";
 import heroImage from "../../assets/landing/hero.webp";
 import impactImage from "../../assets/landing/impact.webp";
 const impactPublicImage = "/pexels-mikhail-nilov-9158761.jpg";
@@ -128,6 +137,30 @@ const WHY_US = [
   { num: "04", title: "Free for scholars, forever", copy: "No application fees. No premium tier. Funding is for students, not platforms." },
   { num: "05", title: "Local context first", copy: "Built with — not for — communities in Eastern Africa and beyond. Real stories shape every feature." },
   { num: "06", title: "Always learning", copy: "We treat every applicant's feedback as a roadmap, and ship improvements every single week." },
+];
+
+// FAQ surfaced both visually and as JSON-LD for rich results.
+const LANDING_FAQ = [
+  {
+    q: "Who can apply for scholarships on ScholarshipZone?",
+    a: "Any student in our supported regions (currently Eastern Africa, with more on the way) can create a free profile and apply. We focus on underserved scholars but the platform is open to all.",
+  },
+  {
+    q: "Does ScholarshipZone charge fees?",
+    a: "No. The platform is free for scholars — there are no application fees and no premium tier. Funders and partner institutions support our work.",
+  },
+  {
+    q: "How do you verify scholarships?",
+    a: "Every listing is reviewed by a human before it goes live. We confirm the funder, the application deadline, eligibility, and award amount with primary sources.",
+  },
+  {
+    q: "What if I have a slow internet connection?",
+    a: "The whole platform is built mobile-first and tuned for low bandwidth. Application drafts auto-save, images are optimised, and pages work on basic Android devices.",
+  },
+  {
+    q: "How is my personal data handled?",
+    a: "We collect only what is needed to support your applications. We never sell scholar data and follow strict privacy and security practices — see our Privacy page for details.",
+  },
 ];
 
 // =============================================================================
@@ -270,6 +303,7 @@ const SectionHeader = ({ eyebrow, title, subtitle, align = "center" }) => (
 // MAIN COMPONENT
 // =============================================================================
 const LandingPage = () => {
+  const { t } = useTranslation();
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [filters, setFilters] = useState(FALLBACK_FILTERS);
   const [selection, setSelection] = useState({ country: "", grade: "", field: "" });
@@ -355,6 +389,16 @@ const LandingPage = () => {
 
   return (
     <main className="min-h-screen bg-background">
+      <Seo
+        title="Verified Scholarships for Underserved Students"
+        description="Discover verified scholarships matched to your country, grade, and field. Low-bandwidth application workflows, deadline tracking, and trusted support — built for real-world access."
+        path="/"
+        keywords="scholarships, africa scholarships, underserved students, undergraduate scholarships, scholarship search, scholarship deadlines"
+      />
+      <EducationalOrganizationSchema />
+      <WebSiteSchema />
+      <FAQSchema items={LANDING_FAQ} />
+
       {/* ===================== NAV ===================== */}
       <nav className="sticky top-3 z-50 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
         <Link to="/" className="flex shrink-0 items-center font-extrabold text-ink">
@@ -389,8 +433,10 @@ const LandingPage = () => {
           <Link to="/login/admin" className="hidden md:block text-sm font-semibold text-muted hover:text-ink transition-colors px-2">
             Admin
           </Link>
+          <LanguageSwitcher variant="compact" className="hidden md:inline-flex" />
+          <ThemeToggle variant="icon" className="hidden md:inline-flex" />
           <Button asChild size="sm">
-            <Link to="/login/scholar">Sign in</Link>
+            <Link to="/login/scholar">{t('common.signIn')}</Link>
           </Button>
           <button
             type="button"

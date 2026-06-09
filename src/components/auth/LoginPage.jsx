@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../../context/useAuth";
 import AuthShell from "./shared/AuthShell";
 import AccountTypeModal from "./shared/AccountTypeModal";
+import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
 // Hero copy per role
@@ -203,6 +204,11 @@ const LoginPage = () => {
 
   return (
     <>
+      <Seo
+        title="Sign in"
+        description="Sign in to ScholarshipZone to continue your application, track deadlines, and manage your scholar profile."
+        path="/login"
+      />
       <AuthShell
         headline={hero.headline}
         subtitle={hero.subtitle}
@@ -283,16 +289,21 @@ const LoginPage = () => {
                   />
                   Remember Me
                 </label>
-                <a
-                  href={
-                    role === "admin"
-                      ? "mailto:security@schooladmin.com?subject=Admin%20Access%20Recovery"
-                      : "mailto:support@scholarshipzone.org?subject=Password%20Reset"
-                  }
-                  className="font-semibold text-[#059669] hover:text-[#047857]"
-                >
-                  Forgot?
-                </a>
+                {role === "admin" ? (
+                  <a
+                    href="mailto:security@schooladmin.com?subject=Admin%20Access%20Recovery"
+                    className="font-semibold text-[#059669] hover:text-[#047857]"
+                  >
+                    Forgot?
+                  </a>
+                ) : (
+                  <Link
+                    to="/forgot-password"
+                    className="font-semibold text-[#059669] hover:text-[#047857]"
+                  >
+                    Forgot?
+                  </Link>
+                )}
               </div>
 
               <motion.button

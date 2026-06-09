@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Seo } from "./seo/Seo";
 
 const LEGAL_CONTENT = {
   privacy: {
@@ -71,9 +72,20 @@ const LEGAL_CONTENT = {
 
 const LegalPage = ({ variant }) => {
   const content = LEGAL_CONTENT[variant] || LEGAL_CONTENT.privacy;
+  const legalPath =
+    variant === "terms"
+      ? "/terms"
+      : variant === "accessibility"
+      ? "/accessibility"
+      : "/privacy";
 
   return (
     <main className="landing">
+      <Seo
+        title={content.title}
+        description={content.intro}
+        path={legalPath}
+      />
       <div className="landing__container">
         <section className="landing__section" aria-labelledby="legal-heading">
           <header className="landing__section-head">

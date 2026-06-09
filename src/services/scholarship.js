@@ -17,8 +17,19 @@ export const createScholarship = async (newEntry) => {
   return response.data;
 };
 
+// Personalised recommendations for the signed-in scholar. Returns
+// { items: [{ scholarship, score, matchPercent, reasons }], personalised }.
+export const fetchRecommendations = async (sessionToken, { limit = 6 } = {}) => {
+  const response = await axios.get("/api/auth/student/recommendations", {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+    params: { limit },
+  });
+  return response.data;
+};
+
 export default {
   getAllScholarships,
   getScholarshipById,
   createScholarship,
+  fetchRecommendations,
 };

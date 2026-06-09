@@ -38,6 +38,7 @@ const ScholarDashboardPage = () => {
         onSaveProfile={updateScholarProfileDetails}
         isSubmitting={isSubmitting}
         profileStatus={profileStatus}
+        sessionToken={sessionToken}
       />
     </DashboardLayout>
   );

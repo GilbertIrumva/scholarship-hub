@@ -12,9 +12,12 @@ const pinoHttp = require('pino-http');
 const multer = require('multer');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session, VerificationToken, AuditLog, Notification } = require('./db/models');
 const { sendEmail } = require('./mailer');
 const { validate } = require('./lib/validate');
+const { audit } = require('./lib/audit');
+const { notify, notifyAdmins } = require('./lib/notify');
+const { rankScholarships, scoreScholarship } = require('./lib/matching');
 const {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -22,6 +25,13 @@ const {
     ScholarSignInSchema,
     ScholarSignUpSchema,
     ContactMessageSchema,
+    ForgotPasswordSchema,
+    ResetPasswordSchema,
+    VerifyEmailSchema,
+    ResendVerificationSchema,
+    AuditLogQuerySchema,
+    RecommendationsQuerySchema,
+    NotificationListQuerySchema,
 } = require('./lib/schemas');
 
 // ---------------------------------------------------------------------------
@@ -95,8 +105,13 @@ app.use(express.json({ limit: '10mb' }));
 
 // ---------------------------------------------------------------------------
 // Rate limiters — protect auth + write endpoints from brute force / abuse.
+// In NODE_ENV=test we disable rate limiting entirely so the test suite can
+// fire dozens of auth requests without tripping the limiter.
 // ---------------------------------------------------------------------------
-const authLimiter = rateLimit({
+const IS_TEST = process.env.NODE_ENV === 'test';
+const noopLimiter = (_req, _res, next) => next();
+
+const authLimiter = IS_TEST ? noopLimiter : rateLimit({
     windowMs: 15 * 60 * 1000,     // 15 minutes
     max: 10,                      // 10 auth attempts per IP per window
     standardHeaders: true,
@@ -104,7 +119,7 @@ const authLimiter = rateLimit({
     message: { message: 'Too many authentication attempts. Please try again later.' },
 });
 
-const contactLimiter = rateLimit({
+const contactLimiter = IS_TEST ? noopLimiter : rateLimit({
     windowMs: 60 * 60 * 1000,     // 1 hour
     max: 5,                       // 5 contact-form submissions per IP per hour
     standardHeaders: true,
@@ -112,7 +127,7 @@ const contactLimiter = rateLimit({
     message: { message: 'Too many messages from this address. Please try again later.' },
 });
 
-const apiLimiter = rateLimit({
+const apiLimiter = IS_TEST ? noopLimiter : rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 600,                     // 600 general API calls per IP per window (~40/min)
     standardHeaders: true,
@@ -314,6 +329,72 @@ const revokeSession = async (token) => {
 };
 
 // ---------------------------------------------------------------------------
+// Verification tokens — short-lived single-use tokens for email-verify and
+// password-reset flows. Mongo TTL purges them automatically.
+// ---------------------------------------------------------------------------
+const APP_BASE_URL = (process.env.APP_BASE_URL || 'http://localhost:5173').replace(/\/+$/, '');
+const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;     // 1h
+
+const issueVerificationToken = async ({ kind, principalKind, principalId, ttlMs, req }) => {
+    // Invalidate any outstanding token of the same kind for this principal so
+    // the latest link is always the only one that works.
+    await VerificationToken.deleteMany({ kind, principalKind, principalId }).catch(() => {});
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + ttlMs);
+    await VerificationToken.create({
+        token,
+        kind,
+        principalKind,
+        principalId,
+        expiresAt,
+        ip: req?.ip,
+        userAgent: req?.headers?.['user-agent'],
+    });
+    return { token, expiresAt };
+};
+
+const consumeVerificationToken = async (token, kind) => {
+    if (!token) return null;
+    const doc = await VerificationToken.findOne({ token, kind });
+    if (!doc) return null;
+    if (doc.expiresAt.getTime() <= Date.now()) {
+        await VerificationToken.deleteOne({ _id: doc._id }).catch(() => {});
+        return null;
+    }
+    // Single-use: delete on success so the same link cannot replay.
+    await VerificationToken.deleteOne({ _id: doc._id }).catch(() => {});
+    return doc;
+};
+
+const sendVerificationEmail = async (scholar, token) => {
+    const link = `${APP_BASE_URL}/verify-email?token=${encodeURIComponent(token)}`;
+    return sendEmail({
+        to: scholar.email,
+        subject: 'Verify your ScholarshipZone email',
+        text:
+            `Hi ${scholar.name || 'there'},\n\n` +
+            `Welcome to ScholarshipZone! Please confirm your email address by opening the link below within 24 hours:\n\n` +
+            `${link}\n\n` +
+            `If you did not create this account you can safely ignore this message.\n`,
+    });
+};
+
+const sendPasswordResetEmail = async (scholar, token) => {
+    const link = `${APP_BASE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    return sendEmail({
+        to: scholar.email,
+        subject: 'Reset your ScholarshipZone password',
+        text:
+            `Hi ${scholar.name || 'there'},\n\n` +
+            `Someone requested a password reset for your ScholarshipZone account. ` +
+            `Open the link below within 1 hour to choose a new password:\n\n` +
+            `${link}\n\n` +
+            `If this was not you, ignore this email — your current password will remain unchanged.\n`,
+    });
+};
+
+// ---------------------------------------------------------------------------
 // Public DTO helpers — keep response shape identical to the legacy JSON server
 // so the React frontend works without changes. We use `legacyId` if present,
 // otherwise fall back to the Mongo ObjectId string.
@@ -339,6 +420,7 @@ const toPublicScholar = (scholar) => ({
     name: scholar.name,
     email: scholar.email,
     role: scholar.role,
+    emailVerified: Boolean(scholar.emailVerified),
 });
 
 const toEditableScholar = (scholar) => ({
@@ -589,6 +671,17 @@ app.post('/api/public/contact', contactLimiter, validate(ContactMessageSchema), 
             userAgent: (req.headers['user-agent'] || '').toString().slice(0, 500),
         });
         console.log('[contact] New message stored', { id: doc._id.toString(), email });
+
+        // Fan-out in-app notification to every admin so they see a new message
+        // without polling the inbox. Fire-and-forget — failures never block the response.
+        notifyAdmins({
+            kind: 'admin.message.new',
+            title: `New message from ${name}`,
+            body: topic && topic !== 'general' ? `[${topic}] ${message.slice(0, 140)}` : message.slice(0, 140),
+            url: '/admin/messages',
+            data: { contactMessageId: String(doc._id), email },
+        });
+
         return res.status(201).json({ message: 'Message received. We will reply soon.' });
     } catch (err) {
         return next(err);
@@ -637,6 +730,11 @@ app.delete('/api/auth/admin/messages/:id', requireAdminSession, async (req, res,
     try {
         const doc = await ContactMessage.findByIdAndDelete(req.params.id).lean();
         if (!doc) return res.status(404).json({ message: 'Message not found.' });
+        audit(req, {
+            action: 'admin.message.delete',
+            actor: { kind: 'admin', id: req.admin._id, email: req.admin.email },
+            target: { kind: 'ContactMessage', id: doc._id, label: doc.email },
+        });
         res.json({ message: 'Deleted.' });
     } catch (err) {
         next(err);
@@ -679,6 +777,24 @@ app.post('/api/auth/admin/messages/:id/reply', requireAdminSession, async (req, 
         doc.repliedAt = new Date();
         await doc.save();
 
+        // If the original sender has a scholar account, drop an in-app
+        // notification so they see the reply on their dashboard.
+        Scholar.findOne({ email: doc.email })
+            .then((scholar) => {
+                if (!scholar) return null;
+                return notify(
+                    { kind: 'scholar', id: scholar._id },
+                    {
+                        kind: 'message.reply',
+                        title: `Reply from ${fromName}`,
+                        body: body.slice(0, 200),
+                        url: '/scholar',
+                        data: { contactMessageId: String(doc._id) },
+                    }
+                );
+            })
+            .catch(() => {});
+
         return res.json({
             message: delivery.ok
                 ? delivery.mode === 'log'
@@ -699,6 +815,12 @@ app.post('/api/auth/admin/sign-in', authLimiter, validate(AdminSignInSchema), as
         const { email, password } = req.body;
         const admin = await Admin.findOne({ email });
         if (!admin || !verifyPassword(password, admin)) {
+            audit(req, {
+                action: 'admin.sign-in',
+                outcome: 'failure',
+                actor: { kind: 'anonymous', email },
+                metadata: { reason: admin ? 'bad-password' : 'unknown-email' },
+            });
             return res.status(401).json({ message: 'Invalid admin email or password.' });
         }
         const { token: challengeId, expiresAt } = await issueSession({
@@ -706,6 +828,10 @@ app.post('/api/auth/admin/sign-in', authLimiter, validate(AdminSignInSchema), as
             principalId: admin._id,
             ttlMs: CHALLENGE_TTL_MS,
             req,
+        });
+        audit(req, {
+            action: 'admin.sign-in.challenge-issued',
+            actor: { kind: 'admin', id: admin._id, email: admin.email },
         });
         return res.json({
             challengeId,
@@ -734,6 +860,12 @@ app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), asy
         const validCode =
             normalizedCode === admin.departmentCode || normalizedCode === admin.twoFactorCode;
         if (!validCode) {
+            audit(req, {
+                action: 'admin.sign-in.verify',
+                outcome: 'failure',
+                actor: { kind: 'admin', id: admin._id, email: admin.email },
+                metadata: { reason: 'bad-code' },
+            });
             return res.status(401).json({ message: 'Invalid department or 2FA code.' });
         }
         await revokeSession(challengeId);
@@ -742,6 +874,10 @@ app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), asy
             principalId: admin._id,
             ttlMs: SESSION_TTL_MS,
             req,
+        });
+        audit(req, {
+            action: 'admin.sign-in',
+            actor: { kind: 'admin', id: admin._id, email: admin.email },
         });
         return res.json({
             message: 'Admin verification complete.',
@@ -938,6 +1074,12 @@ app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema)
         const { email, password } = req.body;
         const scholar = await Scholar.findOne({ email });
         if (!scholar || !verifyPassword(password, scholar)) {
+            audit(req, {
+                action: 'scholar.sign-in',
+                outcome: 'failure',
+                actor: { kind: 'anonymous', email },
+                metadata: { reason: scholar ? 'bad-password' : 'unknown-email' },
+            });
             return res.status(401).json({ message: 'Invalid scholar email or password.' });
         }
         const { token: sessionToken } = await issueSession({
@@ -945,6 +1087,10 @@ app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema)
             principalId: scholar._id,
             ttlMs: SESSION_TTL_MS,
             req,
+        });
+        audit(req, {
+            action: 'scholar.sign-in',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
         });
         return res.json({
             message: 'Scholar sign-in complete.',
@@ -2342,8 +2488,25 @@ app.post('/api/auth/student/sign-up', authLimiter, validate(ScholarSignUpSchema)
             req,
         });
 
+        // Fire-and-forget verification email so the response is not delayed by SMTP.
+        issueVerificationToken({
+            kind: 'email-verify',
+            principalKind: 'scholar',
+            principalId: newScholar._id,
+            ttlMs: EMAIL_VERIFY_TTL_MS,
+            req,
+        })
+            .then(({ token }) => sendVerificationEmail(newScholar, token))
+            .catch((err) => (req.log || console).warn?.({ err: err.message }, '[verify-email] dispatch failed'));
+
+        audit(req, {
+            action: 'scholar.sign-up',
+            actor: { kind: 'scholar', id: newScholar._id, email: newScholar.email },
+            target: { kind: 'Scholar', id: newScholar._id, label: newScholar.email },
+        });
+
         return res.status(201).json({
-            message: 'Scholar account created.',
+            message: 'Scholar account created. Check your email to verify the address.',
             sessionToken,
             scholar: toPublicScholar(newScholar),
         });
@@ -2391,6 +2554,156 @@ app.post('/api/auth/admin/sign-up', authLimiter, validate(AdminSignUpSchema), as
     }
 });
 
+// ----- Email verification + password reset (scholar) ---------------------
+// All four endpoints respond with a generic success message even when the
+// email is unknown, so attackers cannot enumerate registered accounts.
+
+app.post('/api/auth/student/verify-email', authLimiter, validate(VerifyEmailSchema), async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        const record = await consumeVerificationToken(token, 'email-verify');
+        if (!record || record.principalKind !== 'scholar') {
+            audit(req, { action: 'scholar.email-verify', outcome: 'failure', metadata: { reason: 'invalid-token' } });
+            return res.status(410).json({ message: 'Verification link is invalid or has expired.' });
+        }
+        const scholar = await Scholar.findById(record.principalId);
+        if (!scholar) {
+            return res.status(404).json({ message: 'Scholar account no longer exists.' });
+        }
+        if (!scholar.emailVerified) {
+            scholar.emailVerified = true;
+            scholar.emailVerifiedAt = new Date();
+            await scholar.save();
+        }
+        audit(req, {
+            action: 'scholar.email-verify',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            target: { kind: 'Scholar', id: scholar._id, label: scholar.email },
+        });
+        return res.json({
+            message: 'Email verified.',
+            scholar: toPublicScholar(scholar),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post('/api/auth/student/resend-verification', authLimiter, validate(ResendVerificationSchema), async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        const scholar = await Scholar.findOne({ email });
+        // Always 202 — never leak which addresses exist.
+        if (!scholar) {
+            return res.status(202).json({ message: 'If the account exists and is unverified, a new email has been sent.' });
+        }
+        if (scholar.emailVerified) {
+            return res.status(202).json({ message: 'If the account exists and is unverified, a new email has been sent.' });
+        }
+        const { token } = await issueVerificationToken({
+            kind: 'email-verify',
+            principalKind: 'scholar',
+            principalId: scholar._id,
+            ttlMs: EMAIL_VERIFY_TTL_MS,
+            req,
+        });
+        await sendVerificationEmail(scholar, token);
+        audit(req, {
+            action: 'scholar.email-verify.resend',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            target: { kind: 'Scholar', id: scholar._id, label: scholar.email },
+        });
+        return res.status(202).json({ message: 'If the account exists and is unverified, a new email has been sent.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post('/api/auth/student/forgot-password', authLimiter, validate(ForgotPasswordSchema), async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        const scholar = await Scholar.findOne({ email });
+        // Always 202 — never leak which addresses exist.
+        if (!scholar) {
+            audit(req, { action: 'scholar.password-reset.request', outcome: 'failure', metadata: { reason: 'unknown-email', email } });
+            return res.status(202).json({ message: 'If the account exists, a password reset email has been sent.' });
+        }
+        const { token } = await issueVerificationToken({
+            kind: 'password-reset',
+            principalKind: 'scholar',
+            principalId: scholar._id,
+            ttlMs: PASSWORD_RESET_TTL_MS,
+            req,
+        });
+        await sendPasswordResetEmail(scholar, token);
+        audit(req, {
+            action: 'scholar.password-reset.request',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            target: { kind: 'Scholar', id: scholar._id, label: scholar.email },
+        });
+        return res.status(202).json({ message: 'If the account exists, a password reset email has been sent.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post('/api/auth/student/reset-password', authLimiter, validate(ResetPasswordSchema), async (req, res, next) => {
+    try {
+        const { token, password } = req.body;
+        const record = await consumeVerificationToken(token, 'password-reset');
+        if (!record || record.principalKind !== 'scholar') {
+            audit(req, { action: 'scholar.password-reset.complete', outcome: 'failure', metadata: { reason: 'invalid-token' } });
+            return res.status(410).json({ message: 'Reset link is invalid or has expired.' });
+        }
+        const scholar = await Scholar.findById(record.principalId);
+        if (!scholar) {
+            return res.status(404).json({ message: 'Scholar account no longer exists.' });
+        }
+        Object.assign(scholar, createPasswordRecord(password));
+        await scholar.save();
+        // Force-logout every other session — the credential changed.
+        await Session.deleteMany({ kind: 'scholar', principalId: scholar._id }).catch(() => {});
+        audit(req, {
+            action: 'scholar.password-reset.complete',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            target: { kind: 'Scholar', id: scholar._id, label: scholar.email },
+        });
+        return res.json({ message: 'Password updated. Sign in with your new password.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ----- Admin audit log viewer --------------------------------------------
+app.get('/api/auth/admin/audit-log', requireAdminSession, validate(AuditLogQuerySchema, 'query'), async (req, res, next) => {
+    try {
+        const { action, actorEmail, outcome, limit, cursor } = req.query;
+        const filter = {};
+        if (action) filter.action = action;
+        if (actorEmail) filter['actor.email'] = actorEmail;
+        if (outcome) filter.outcome = outcome;
+        if (cursor) {
+            const cursorDate = new Date(cursor);
+            if (!Number.isNaN(cursorDate.getTime())) {
+                filter.createdAt = { $lt: cursorDate };
+            }
+        }
+        const entries = await AuditLog
+            .find(filter)
+            .sort({ createdAt: -1 })
+            .limit(limit + 1)
+            .lean();
+        const hasMore = entries.length > limit;
+        const items = hasMore ? entries.slice(0, limit) : entries;
+        const nextCursor = hasMore && items.length
+            ? items[items.length - 1].createdAt.toISOString()
+            : null;
+        return res.json({ items, nextCursor });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ----- Public scholarship endpoints --------------------------------------
 // Legacy: /api/scholarships returned the *applicants* list. We keep that
 // shape for backward compatibility, and expose the new scholarships catalog
@@ -2414,9 +2727,227 @@ app.get('/api/scholarships/catalog', async (req, res, next) => {
     }
 });
 
+// Personalised recommendations for the signed-in scholar. Ranks active,
+// not-yet-closed scholarships against the scholar's linked Application
+// (nationality / education level / bio interests). Returns a small array of
+// `{ scholarship, score, matchPercent, reasons }` entries — never throws on
+// missing profile data, just falls back to a generic recent list.
+app.get(
+    '/api/auth/student/recommendations',
+    requireScholarSession,
+    validate(RecommendationsQuerySchema, 'query'),
+    async (req, res, next) => {
+        try {
+            const application = req.scholar.application
+                ? await Application.findById(req.scholar.application)
+                : null;
+            const profile = {
+                nationality: application ? application.nationality : '',
+                education: application ? application.education : '',
+                bio: application ? application.bio : '',
+            };
+
+            const candidates = await Scholarship.find({
+                active: true,
+                $or: [{ deadline: null }, { deadline: { $gte: new Date() } }],
+            })
+                .sort({ deadline: 1 })
+                .limit(200)
+                .lean();
+
+            const ranked = rankScholarships(candidates, profile, req.query.limit);
+
+            // If nothing scored above zero (e.g. brand-new scholar with no
+            // profile data yet) fall back to the soonest upcoming items so the
+            // UI never renders an empty rail.
+            if (ranked.length === 0 && candidates.length) {
+                const fallback = candidates.slice(0, req.query.limit).map((s) => ({
+                    scholarship: s,
+                    score: 0,
+                    matchPercent: 0,
+                    reasons: ['Recently added'],
+                }));
+                return res.json({ items: fallback, personalised: false });
+            }
+
+            return res.json({ items: ranked, personalised: Boolean(application) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// ----- Notifications (shared scholar + admin) ------------------------------
+
+// Reusable list handler — caller passes the recipient descriptor derived from
+// either requireScholarSession (req.scholar) or requireAdminSession (req.admin).
+const listNotifications = async (recipient, query) => {
+    const filter = { 'recipient.kind': recipient.kind, 'recipient.id': recipient.id };
+    if (query.unreadOnly) filter.readAt = null;
+    const items = await Notification.find(filter)
+        .sort({ createdAt: -1 })
+        .limit(query.limit)
+        .lean();
+    const unread = await Notification.countDocuments({
+        'recipient.kind': recipient.kind,
+        'recipient.id': recipient.id,
+        readAt: null,
+    });
+    return { items, unread };
+};
+
+app.get(
+    '/api/auth/student/notifications',
+    requireScholarSession,
+    validate(NotificationListQuerySchema, 'query'),
+    async (req, res, next) => {
+        try {
+            const payload = await listNotifications(
+                { kind: 'scholar', id: req.scholar._id },
+                req.query
+            );
+            res.json(payload);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.post(
+    '/api/auth/student/notifications/:id/read',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const updated = await Notification.findOneAndUpdate(
+                {
+                    _id: req.params.id,
+                    'recipient.kind': 'scholar',
+                    'recipient.id': req.scholar._id,
+                },
+                { $set: { readAt: new Date() } },
+                { returnDocument: 'after' }
+            );
+            if (!updated) return res.status(404).json({ message: 'Notification not found.' });
+            res.json({ notification: updated });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.post(
+    '/api/auth/student/notifications/read-all',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const result = await Notification.updateMany(
+                { 'recipient.kind': 'scholar', 'recipient.id': req.scholar._id, readAt: null },
+                { $set: { readAt: new Date() } }
+            );
+            res.json({ modified: result.modifiedCount || 0 });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.get(
+    '/api/auth/admin/notifications',
+    requireAdminSession,
+    validate(NotificationListQuerySchema, 'query'),
+    async (req, res, next) => {
+        try {
+            const payload = await listNotifications(
+                { kind: 'admin', id: req.admin._id },
+                req.query
+            );
+            res.json(payload);
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.post(
+    '/api/auth/admin/notifications/:id/read',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const updated = await Notification.findOneAndUpdate(
+                {
+                    _id: req.params.id,
+                    'recipient.kind': 'admin',
+                    'recipient.id': req.admin._id,
+                },
+                { $set: { readAt: new Date() } },
+                { returnDocument: 'after' }
+            );
+            if (!updated) return res.status(404).json({ message: 'Notification not found.' });
+            res.json({ notification: updated });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+app.post(
+    '/api/auth/admin/notifications/read-all',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const result = await Notification.updateMany(
+                { 'recipient.kind': 'admin', 'recipient.id': req.admin._id, readAt: null },
+                { $set: { readAt: new Date() } }
+            );
+            res.json({ modified: result.modifiedCount || 0 });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
 app.post('/api/scholarships/catalog', requireAdminSession, async (req, res, next) => {
     try {
         const created = await Scholarship.create(req.body || {});
+
+        // Fan-out: notify up to 100 scholars whose profile scores above zero
+        // against the new scholarship. Async + best-effort; we never block the
+        // admin's response on this.
+        (async () => {
+            try {
+                const scholarsWithProfiles = await Scholar.find({ application: { $ne: null } })
+                    .populate('application')
+                    .limit(500)
+                    .lean();
+                let sent = 0;
+                for (const s of scholarsWithProfiles) {
+                    if (sent >= 100) break;
+                    const app = s.application;
+                    if (!app) continue;
+                    const { score, reasons } = scoreScholarship(created, {
+                        nationality: app.nationality,
+                        education: app.education,
+                        bio: app.bio,
+                    });
+                    if (score < 25) continue; // only ping clearly relevant matches
+                    sent += 1;
+                    await notify(
+                        { kind: 'scholar', id: s._id },
+                        {
+                            kind: 'scholarship.new',
+                            title: `New scholarship matches your profile: ${created.title}`,
+                            body: reasons.slice(0, 2).join(' • '),
+                            url: `/scholar/scholarships/${created._id}`,
+                            data: { scholarshipId: String(created._id), score },
+                        }
+                    );
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.warn('[scholarship.new] fan-out failed:', err && err.message);
+            }
+        })();
+
         res.status(201).json(created);
     } catch (err) {
         next(err);

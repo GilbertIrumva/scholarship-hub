@@ -15,6 +15,8 @@ const scholarSchema = new Schema(
         application: { type: Types.ObjectId, ref: 'Application', default: null },
         passwordSalt: { type: String, required: true },
         passwordHash: { type: String, required: true },
+        emailVerified: { type: Boolean, default: false, index: true },
+        emailVerifiedAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

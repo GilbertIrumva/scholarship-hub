@@ -9,6 +9,7 @@ import {
   Users,
   Sparkles,
 } from "lucide-react";
+import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
 // Role definitions
@@ -254,6 +255,11 @@ const RoleLandingPage = () => {
 
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
+      <Seo
+        title="Get started"
+        description="Choose your role on ScholarshipZone — applicant, partner organisation, or administrator — and start your journey."
+        path="/get-started"
+      />
       {/* ============================ LEFT: HERO ============================ */}
       <section className="relative flex w-full flex-col overflow-hidden bg-[#059669] text-white lg:w-[55%]">
         {/* Decorative shapes */}

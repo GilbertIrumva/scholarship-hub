@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import ScholarProfileCard from "./ScholarProfileCard";
 import ScholarProfileForm from "./ScholarProfileForm";
+import RecommendedRail from "./RecommendedRail";
 
 // -----------------------------------------------------------------------------
 // Stat card
@@ -77,7 +78,7 @@ const calculateCompleteness = (application) => {
 // =============================================================================
 // MAIN
 // =============================================================================
-const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus }) => {
+const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus, sessionToken }) => {
   const application = profile.application;
   const scholar = profile.scholar;
   const [isEditing, setIsEditing] = useState(false);
@@ -165,6 +166,9 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
           <StatCard key={card.label} {...card} />
         ))}
       </div>
+
+      {/* Recommended scholarships rail */}
+      {sessionToken && <RecommendedRail sessionToken={sessionToken} />}
 
       {/* Two-column row: profile (left), journey + tips (right) */}
       <div className="grid gap-6 lg:grid-cols-3">

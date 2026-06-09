@@ -19,6 +19,7 @@ import {
 import { useAuth } from "../../context/useAuth";
 import AuthShell from "./shared/AuthShell";
 import AccountTypeModal from "./shared/AccountTypeModal";
+import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
 // Hero copy
@@ -498,6 +499,11 @@ const SignupPage = () => {
 
   return (
     <>
+      <Seo
+        title="Create your account"
+        description="Create a free ScholarshipZone account to discover verified scholarships, apply with one profile, and never miss a deadline."
+        path="/signup"
+      />
       <AuthShell
         headline={hero.headline}
         subtitle={hero.subtitle}

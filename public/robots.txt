@@ -1,0 +1,14 @@
+# ScholarshipZone — robots policy
+# Allow crawling of public marketing + scholarship discovery pages.
+# Block authenticated / private application areas.
+
+User-agent: *
+Allow: /
+Disallow: /scholar/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+
+Sitemap: https://scholarshipzone.app/sitemap.xml

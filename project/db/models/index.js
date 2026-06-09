@@ -9,4 +9,7 @@ module.exports = {
     TravelDocument: require('./TravelDocument'),
     VisaWorkflow: require('./VisaWorkflow'),
     Session: require('./Session'),
+    VerificationToken: require('./VerificationToken'),
+    AuditLog: require('./AuditLog'),
+    Notification: require('./Notification'),
 };

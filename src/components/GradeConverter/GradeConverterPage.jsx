@@ -20,6 +20,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { listSystems, convertGrade } from "../../lib/gradeConversion";
+import { Seo } from "../seo/Seo";
 
 // ---------------------------------------------------------------------------
 // Country lookup (covers all systems registered in Phase 1; expand in P3)
@@ -335,6 +336,12 @@ const GradeConverterPage = () => {
 
   return (
     <main className="min-h-screen bg-background">
+      <Seo
+        title="Grade Converter"
+        description="Convert academic grades between international grading systems — GPA, percentage, ECTS, and more. Free and instant."
+        path="/grade-converter"
+        keywords="grade converter, gpa converter, ects converter, international grading scales"
+      />
       {/* ====== Top bar ====== */}
       <header className="sticky top-3 z-40 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
         <Link to="/" className="flex shrink-0 items-center">

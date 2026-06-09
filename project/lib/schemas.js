@@ -66,6 +66,51 @@ const ContactMessageSchema = z.object({
     message: z.string().trim().min(1, 'Message is required.').max(CONTACT_MAX_LEN, 'Message is too long.'),
 });
 
+// ----- Email verification + password reset (scholar) -------------------------
+
+const ForgotPasswordSchema = z.object({
+    email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
+});
+
+const ResetPasswordSchema = z.object({
+    token: z.string().min(1, 'Reset token is required.'),
+    password: z.string().min(8, 'New password must be at least 8 characters.'),
+});
+
+const VerifyEmailSchema = z.object({
+    token: z.string().min(1, 'Verification token is required.'),
+});
+
+const ResendVerificationSchema = z.object({
+    email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
+});
+
+// ----- Admin audit log query -------------------------------------------------
+
+const AuditLogQuerySchema = z.object({
+    action: z.string().trim().min(1).optional(),
+    actorEmail: z.string().trim().toLowerCase().optional(),
+    outcome: z.enum(['success', 'failure']).optional(),
+    limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+    cursor: z.string().optional(), // ISO timestamp of the last seen createdAt
+});
+
+// ----- Scholar recommendations query -----------------------------------------
+
+const RecommendationsQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+});
+
+// ----- Notifications ---------------------------------------------------------
+
+const NotificationListQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+    unreadOnly: z
+        .union([z.literal('true'), z.literal('false'), z.boolean()])
+        .optional()
+        .transform((v) => v === true || v === 'true'),
+});
+
 module.exports = {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -73,5 +118,12 @@ module.exports = {
     ScholarSignInSchema,
     ScholarSignUpSchema,
     ContactMessageSchema,
+    ForgotPasswordSchema,
+    ResetPasswordSchema,
+    VerifyEmailSchema,
+    ResendVerificationSchema,
+    AuditLogQuerySchema,
+    RecommendationsQuerySchema,
+    NotificationListQuerySchema,
     CONTACT_MAX_LEN,
 };

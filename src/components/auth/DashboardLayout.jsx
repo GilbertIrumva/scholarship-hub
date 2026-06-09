@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -21,12 +22,24 @@ import {
   FolderArchive,
   Plane,
   ClipboardCheck,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/useAuth";
-import { listAdminMessages } from "../../services/adminAuth";
+import {
+  listScholarNotifications,
+  markScholarNotificationRead,
+  markAllScholarNotificationsRead,
+  listAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+} from "../../services/notifications";
+import LanguageSwitcher from "../common/LanguageSwitcher";
+import { ThemeToggle } from "../ui/theme-toggle";
+import { Seo } from "../seo/Seo";
+import CommandPalette from "./CommandPalette";
 
 const ADMIN_NAV = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
@@ -34,6 +47,7 @@ const ADMIN_NAV = [
   { to: "/admin/credentials", label: "Credentials", icon: FolderArchive },
   { to: "/admin/visa-tracker", label: "Visa tracker", icon: Plane },
   { to: "/admin/messages", label: "Messages", icon: Mail },
+  { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },
   { to: "/admin/settings", label: "Settings", icon: KeyRound },
 ];
 
@@ -87,25 +101,28 @@ const DashboardLayout = ({
   children,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { sessionToken } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
+  const [unread, setUnread] = useState(0);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef(null);
   const cfg = ROLE_CONFIG[role];
   const Icon = cfg.icon;
 
-  // Poll new messages for the admin notification bell
+  // Poll the unified notification feed for both scholars and admins.
   useEffect(() => {
-    if (role !== "admin" || !sessionToken) return;
+    if (!sessionToken) return;
     let cancelled = false;
+    const fetcher = role === "admin" ? listAdminNotifications : listScholarNotifications;
     const fetchNotifs = async () => {
       try {
-        const data = await listAdminMessages(sessionToken, { status: "new" });
+        const data = await fetcher(sessionToken, { limit: 10 });
         if (cancelled) return;
-        const list = Array.isArray(data?.messages) ? data.messages : [];
-        setNotifs(list);
+        setNotifs(Array.isArray(data?.items) ? data.items : []);
+        setUnread(Number(data?.unread) || 0);
       } catch {
         /* silent */
       }
@@ -136,12 +153,13 @@ const DashboardLayout = ({
   }, [notifOpen]);
 
   const handleNotifLoad = async () => {
-    if (role !== "admin" || !sessionToken) return;
+    if (!sessionToken) return;
     setNotifLoading(true);
     try {
-      const data = await listAdminMessages(sessionToken, { status: "new" });
-      const list = Array.isArray(data?.messages) ? data.messages : [];
-      setNotifs(list);
+      const fetcher = role === "admin" ? listAdminNotifications : listScholarNotifications;
+      const data = await fetcher(sessionToken, { limit: 10 });
+      setNotifs(Array.isArray(data?.items) ? data.items : []);
+      setUnread(Number(data?.unread) || 0);
     } catch {
       /* silent */
     } finally {
@@ -149,7 +167,34 @@ const DashboardLayout = ({
     }
   };
 
-  const notifCount = notifs.length;
+  const handleNotifClick = async (notif) => {
+    setNotifOpen(false);
+    if (!notif?.readAt && sessionToken) {
+      try {
+        const marker = role === "admin" ? markAdminNotificationRead : markScholarNotificationRead;
+        await marker(sessionToken, notif._id || notif.id);
+        setUnread((u) => Math.max(0, u - 1));
+      } catch {
+        /* silent */
+      }
+    }
+    if (notif?.url) navigate(notif.url);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!sessionToken) return;
+    try {
+      const marker =
+        role === "admin" ? markAllAdminNotificationsRead : markAllScholarNotificationsRead;
+      await marker(sessionToken);
+      setUnread(0);
+      setNotifs((prev) => prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() })));
+    } catch {
+      /* silent */
+    }
+  };
+
+  const notifCount = unread;
 
   const initials = (user?.name || "User")
     .split(" ")
@@ -258,6 +303,11 @@ const DashboardLayout = ({
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo
+        title={role === "admin" ? "Admin console" : "Scholar dashboard"}
+        noindex
+      />
+      <CommandPalette role={role} />
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 z-30">
         {Sidebar}
@@ -308,7 +358,27 @@ const DashboardLayout = ({
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            {/* Command palette trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                // Dispatch ⌘K to open the palette without coupling to its internal state.
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true, ctrlKey: true, bubbles: true })
+                );
+              }}
+              className="hidden md:inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              aria-label="Open command palette"
+            >
+              <Search className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Quick actions…</span>
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
             {actions}
+            <LanguageSwitcher variant="compact" className="hidden sm:inline-flex" />
+            <ThemeToggle variant="icon" className="hidden sm:inline-flex" />
             <div className="relative" ref={notifRef}>
               <button
                 type="button"
@@ -338,66 +408,61 @@ const DashboardLayout = ({
                   >
                     <div className="flex items-center justify-between border-b border-border px-4 py-3">
                       <div>
-                        <p className="text-sm font-bold text-ink">Notifications</p>
+                        <p className="text-sm font-bold text-ink">{t("notifications.title")}</p>
                         <p className="text-xs text-muted">
-                          {role === "admin"
-                            ? `${notifCount} new message${notifCount === 1 ? "" : "s"}`
-                            : "You're all caught up."}
+                          {notifCount > 0
+                            ? t("notifications.unreadCount", { count: notifCount })
+                            : t("notifications.allCaughtUp")}
                         </p>
                       </div>
-                      {role === "admin" && notifCount > 0 && (
+                      {notifCount > 0 && (
                         <button
-                          onClick={() => {
-                            setNotifOpen(false);
-                            navigate("/admin/messages");
-                          }}
+                          onClick={handleMarkAllRead}
                           className="text-xs font-semibold text-primary hover:text-primary-dark"
                         >
-                          View all
+                          {t("notifications.markAllRead")}
                         </button>
                       )}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
-                      {role !== "admin" ? (
-                        <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-                          <Inbox className="h-10 w-10 text-muted/40" />
-                          <p className="mt-3 text-sm font-semibold text-ink">No notifications yet</p>
-                          <p className="mt-1 text-xs text-muted">
-                            We'll let you know when something needs your attention.
-                          </p>
-                        </div>
-                      ) : notifLoading && notifs.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-xs text-muted">Loading…</div>
+                      {notifLoading && notifs.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-xs text-muted">{t("common.loading")}</div>
                       ) : notifs.length === 0 ? (
                         <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
                           <Inbox className="h-10 w-10 text-muted/40" />
-                          <p className="mt-3 text-sm font-semibold text-ink">All clear</p>
-                          <p className="mt-1 text-xs text-muted">No new messages right now.</p>
+                          <p className="mt-3 text-sm font-semibold text-ink">{t("notifications.noneYet")}</p>
+                          <p className="mt-1 text-xs text-muted">
+                            {t("notifications.nonePrompt")}
+                          </p>
                         </div>
                       ) : (
                         <ul className="divide-y divide-border">
-                          {notifs.slice(0, 6).map((msg) => (
-                            <li key={msg._id || msg.id}>
+                          {notifs.slice(0, 8).map((n) => (
+                            <li key={n._id || n.id}>
                               <button
-                                onClick={() => {
-                                  setNotifOpen(false);
-                                  navigate("/admin/messages");
-                                }}
-                                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                                onClick={() => handleNotifClick(n)}
+                                className={cn(
+                                  "w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors",
+                                  !n.readAt && "bg-emerald-50/40"
+                                )}
                               >
                                 <div className="flex items-start gap-3">
-                                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                                  <div
+                                    className={cn(
+                                      "mt-1 h-2 w-2 shrink-0 rounded-full",
+                                      n.readAt ? "bg-slate-300" : "bg-primary"
+                                    )}
+                                  />
                                   <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-bold text-ink">
-                                      {msg.name || msg.email || "Anonymous"}
+                                      {n.title}
                                     </p>
-                                    <p className="truncate text-xs text-muted">
-                                      {msg.topic && msg.topic !== "general" ? `[${msg.topic}] · ` : ""}
-                                      {msg.message}
-                                    </p>
-                                    {msg.createdAt && (
+                                    {n.body && (
+                                      <p className="line-clamp-2 text-xs text-muted">{n.body}</p>
+                                    )}
+                                    {n.createdAt && (
                                       <p className="mt-0.5 text-[10px] text-muted">
-                                        {new Date(msg.createdAt).toLocaleString(undefined, {
+                                        {new Date(n.createdAt).toLocaleString(undefined, {
                                           month: "short",
                                           day: "numeric",
                                           hour: "2-digit",
