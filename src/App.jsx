@@ -15,6 +15,7 @@ import ScholarshipDetailPage from "./components/scholar/ScholarshipDetailPage";
 import MyApplicationsPage from "./components/scholar/MyApplicationsPage";
 import CredentialsPage from "./components/scholar/CredentialsPage";
 import TravelDocsPage from "./components/scholar/TravelDocsPage";
+import VisaTrackerPage from "./components/scholar/VisaTrackerPage";
 import GradeConverterPage from "./components/GradeConverter/GradeConverterPage";
 import LegalPage from "./components/LegalPage";
 
@@ -42,6 +43,7 @@ const App = () => {
       <Route path="/scholar/applications" element={<MyApplicationsPage />} />
       <Route path="/scholar/credentials" element={<CredentialsPage />} />
       <Route path="/scholar/travel-docs" element={<TravelDocsPage />} />
+      <Route path="/scholar/visa-tracker" element={<VisaTrackerPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/admin/applicants" element={<AdminApplicantsPage />} />
       <Route path="/admin/applicants/:id" element={<AdminApplicantDetailPage />} />

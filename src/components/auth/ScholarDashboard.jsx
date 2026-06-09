@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   FolderArchive,
   GraduationCap,
@@ -307,6 +308,12 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus 
                 description: "Securely store your passport and visa for when a scholarship is approved.",
                 href: "/scholar/travel-docs",
                 icon: Plane,
+              },
+              {
+                title: "Track your visa",
+                description: "Follow embassy steps, milestones, and notes for each approved scholarship.",
+                href: "/scholar/visa-tracker",
+                icon: ClipboardCheck,
               },
             ].map((item) => (
               <button

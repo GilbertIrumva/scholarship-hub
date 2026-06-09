@@ -8,7 +8,7 @@ const cors = require('cors');
 const multer = require('multer');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow } = require('./db/models');
 const { sendEmail } = require('./mailer');
 
 const app = express();
@@ -1533,6 +1533,349 @@ app.get(
                 status: 'approved',
             });
             res.json({ eligible: allowed, approvedCount });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// ----- Visa workflows (Phase 7) -------------------------------------------
+const VISA_WORKFLOW_STATUSES = [
+    'not-started', 'in-progress', 'submitted', 'approved',
+    'rejected', 'completed', 'on-hold',
+];
+const VISA_TYPES = ['student', 'exchange', 'research', 'training', 'other'];
+const MILESTONE_STATUSES = ['pending', 'in-progress', 'done', 'blocked', 'skipped'];
+
+const serializeVisaWorkflow = (entry, scholarshipApp) => ({
+    id: String(entry._id),
+    scholarshipApplicationId: scholarshipApp ? String(scholarshipApp._id || scholarshipApp) : null,
+    scholarship: scholarshipApp && scholarshipApp.scholarship && typeof scholarshipApp.scholarship === 'object'
+        ? {
+            id: String(scholarshipApp.scholarship._id),
+            title: scholarshipApp.scholarship.title,
+            provider: scholarshipApp.scholarship.provider,
+            country: scholarshipApp.scholarship.country,
+        }
+        : null,
+    destinationCountry: entry.destinationCountry || '',
+    visaType: entry.visaType,
+    status: entry.status,
+    embassy: {
+        country: entry.embassy?.country || '',
+        city: entry.embassy?.city || '',
+        address: entry.embassy?.address || '',
+        website: entry.embassy?.website || '',
+        contactEmail: entry.embassy?.contactEmail || '',
+    },
+    appointmentDate: entry.appointmentDate,
+    submittedAt: entry.submittedAt,
+    decisionAt: entry.decisionAt,
+    visaIssuedAt: entry.visaIssuedAt,
+    visaExpiry: entry.visaExpiry,
+    visaReference: entry.visaReference || '',
+    milestones: (entry.milestones || []).map((m) => ({
+        key: m.key,
+        label: m.label,
+        status: m.status,
+        dueDate: m.dueDate,
+        completedAt: m.completedAt,
+        note: m.note || '',
+    })),
+    timeline: (entry.timeline || []).map((n) => ({
+        id: String(n._id),
+        body: n.body,
+        author: n.author,
+        authorName: n.authorName || '',
+        createdAt: n.createdAt,
+    })),
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+});
+
+// Scholar: list workflows + the approved applications eligible for one.
+app.get('/api/auth/student/visa-workflows', requireScholarSession, async (req, res, next) => {
+    try {
+        const approvedApps = await ScholarshipApplication.find({
+            scholar: req.scholar._id,
+            status: 'approved',
+        }).populate('scholarship', 'title provider country');
+
+        const workflows = await VisaWorkflow.find({ scholar: req.scholar._id })
+            .sort({ createdAt: -1 });
+
+        const wfByAppId = new Map(
+            workflows.map((w) => [String(w.scholarshipApplication), w])
+        );
+
+        const eligibleApps = approvedApps.map((app) => ({
+            id: String(app._id),
+            scholarship: app.scholarship
+                ? {
+                    id: String(app.scholarship._id),
+                    title: app.scholarship.title,
+                    provider: app.scholarship.provider,
+                    country: app.scholarship.country,
+                }
+                : null,
+            hasWorkflow: wfByAppId.has(String(app._id)),
+            workflowId: wfByAppId.has(String(app._id))
+                ? String(wfByAppId.get(String(app._id))._id)
+                : null,
+        }));
+
+        const serialized = workflows.map((w) => {
+            const app = approvedApps.find((a) => String(a._id) === String(w.scholarshipApplication));
+            return serializeVisaWorkflow(w, app);
+        });
+
+        res.json({ workflows: serialized, eligibleApplications: eligibleApps });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Scholar: create a workflow against an approved application.
+app.post('/api/auth/student/visa-workflows', requireScholarSession, async (req, res, next) => {
+    try {
+        const { scholarshipApplicationId, destinationCountry, visaType } = req.body || {};
+        if (!scholarshipApplicationId || !/^[0-9a-fA-F]{24}$/.test(String(scholarshipApplicationId))) {
+            return res.status(400).json({ message: 'A valid scholarshipApplicationId is required.' });
+        }
+
+        const app = await ScholarshipApplication.findOne({
+            _id: scholarshipApplicationId,
+            scholar: req.scholar._id,
+        }).populate('scholarship', 'title provider country');
+
+        if (!app) return res.status(404).json({ message: 'Scholarship application not found.' });
+        if (app.status !== 'approved') {
+            return res.status(403).json({
+                message: 'Visa tracking is only available for approved scholarships.',
+            });
+        }
+
+        const existing = await VisaWorkflow.findOne({ scholarshipApplication: app._id });
+        if (existing) {
+            return res.status(409).json({
+                message: 'A visa workflow already exists for this scholarship.',
+                workflow: serializeVisaWorkflow(existing, app),
+            });
+        }
+
+        const country = String(destinationCountry || app.scholarship?.country || '')
+            .trim().toUpperCase().slice(0, 3);
+        const type = VISA_TYPES.includes(visaType) ? visaType : 'student';
+
+        const created = await VisaWorkflow.create({
+            scholar: req.scholar._id,
+            scholarshipApplication: app._id,
+            destinationCountry: country,
+            visaType: type,
+        });
+
+        res.status(201).json({ workflow: serializeVisaWorkflow(created, app) });
+    } catch (err) {
+        if (err && err.code === 11000) {
+            return res.status(409).json({ message: 'A visa workflow already exists for this application.' });
+        }
+        next(err);
+    }
+});
+
+// Scholar: read one of mine.
+app.get('/api/auth/student/visa-workflows/:id', requireScholarSession, async (req, res, next) => {
+    try {
+        const wf = await VisaWorkflow.findOne({
+            _id: req.params.id,
+            scholar: req.scholar._id,
+        });
+        if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+        const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+            .populate('scholarship', 'title provider country');
+        res.json({ workflow: serializeVisaWorkflow(wf, app) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Scholar: update top-level fields (embassy, dates, visaReference, status).
+app.patch('/api/auth/student/visa-workflows/:id', requireScholarSession, async (req, res, next) => {
+    try {
+        const wf = await VisaWorkflow.findOne({
+            _id: req.params.id,
+            scholar: req.scholar._id,
+        });
+        if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+        const body = req.body || {};
+        if (body.destinationCountry !== undefined) {
+            wf.destinationCountry = String(body.destinationCountry || '').trim().toUpperCase().slice(0, 3);
+        }
+        if (body.visaType !== undefined && VISA_TYPES.includes(body.visaType)) {
+            wf.visaType = body.visaType;
+        }
+        if (body.status !== undefined && VISA_WORKFLOW_STATUSES.includes(body.status)) {
+            wf.status = body.status;
+        }
+        if (body.visaReference !== undefined) {
+            wf.visaReference = String(body.visaReference || '').trim().slice(0, 100);
+        }
+        for (const dateKey of ['appointmentDate', 'submittedAt', 'decisionAt', 'visaIssuedAt', 'visaExpiry']) {
+            if (body[dateKey] !== undefined) {
+                wf[dateKey] = body[dateKey] ? new Date(body[dateKey]) : null;
+            }
+        }
+        if (body.embassy && typeof body.embassy === 'object') {
+            wf.embassy = {
+                country: String(body.embassy.country || '').trim().toUpperCase().slice(0, 3),
+                city: String(body.embassy.city || '').trim().slice(0, 100),
+                address: String(body.embassy.address || '').trim().slice(0, 300),
+                website: String(body.embassy.website || '').trim().slice(0, 300),
+                contactEmail: String(body.embassy.contactEmail || '').trim().toLowerCase().slice(0, 200),
+            };
+        }
+        await wf.save();
+
+        const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+            .populate('scholarship', 'title provider country');
+        res.json({ workflow: serializeVisaWorkflow(wf, app) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Scholar: update a single milestone.
+app.patch(
+    '/api/auth/student/visa-workflows/:id/milestones/:key',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const wf = await VisaWorkflow.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+            const milestone = wf.milestones.find((m) => m.key === req.params.key);
+            if (!milestone) return res.status(404).json({ message: 'Milestone not found.' });
+
+            const body = req.body || {};
+            if (body.status !== undefined && MILESTONE_STATUSES.includes(body.status)) {
+                milestone.status = body.status;
+                if (body.status === 'done') {
+                    milestone.completedAt = milestone.completedAt || new Date();
+                } else {
+                    milestone.completedAt = null;
+                }
+            }
+            if (body.dueDate !== undefined) {
+                milestone.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+            }
+            if (body.note !== undefined) {
+                milestone.note = String(body.note || '').slice(0, 500);
+            }
+            await wf.save();
+
+            const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+                .populate('scholarship', 'title provider country');
+            res.json({ workflow: serializeVisaWorkflow(wf, app) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// Scholar: add a timeline note.
+app.post(
+    '/api/auth/student/visa-workflows/:id/notes',
+    requireScholarSession,
+    async (req, res, next) => {
+        try {
+            const wf = await VisaWorkflow.findOne({
+                _id: req.params.id,
+                scholar: req.scholar._id,
+            });
+            if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+            const body = String(req.body?.body || '').trim();
+            if (!body) return res.status(400).json({ message: 'Note body is required.' });
+
+            wf.timeline.push({
+                body: body.slice(0, 1000),
+                author: 'scholar',
+                authorName: req.scholar.name || '',
+            });
+            await wf.save();
+
+            const app = await ScholarshipApplication.findById(wf.scholarshipApplication)
+                .populate('scholarship', 'title provider country');
+            res.status(201).json({ workflow: serializeVisaWorkflow(wf, app) });
+        } catch (err) {
+            next(err);
+        }
+    }
+);
+
+// Admin: list workflows (optional scholar filter).
+app.get('/api/auth/admin/visa-workflows', requireAdminSession, async (req, res, next) => {
+    try {
+        const { scholar: scholarId, status } = req.query || {};
+        const filter = {};
+        if (scholarId && /^[0-9a-fA-F]{24}$/.test(String(scholarId))) {
+            filter.scholar = scholarId;
+        }
+        if (status && VISA_WORKFLOW_STATUSES.includes(String(status))) {
+            filter.status = String(status);
+        }
+
+        const workflows = await VisaWorkflow.find(filter)
+            .populate('scholar', 'name email legacyId')
+            .sort({ updatedAt: -1 })
+            .limit(500);
+
+        const appIds = workflows.map((w) => w.scholarshipApplication);
+        const apps = await ScholarshipApplication.find({ _id: { $in: appIds } })
+            .populate('scholarship', 'title provider country');
+        const appMap = new Map(apps.map((a) => [String(a._id), a]));
+
+        const serialized = workflows.map((w) => {
+            const app = appMap.get(String(w.scholarshipApplication));
+            const base = serializeVisaWorkflow(w, app);
+            return {
+                ...base,
+                scholar: w.scholar
+                    ? { id: pickId(w.scholar), name: w.scholar.name, email: w.scholar.email }
+                    : null,
+            };
+        });
+
+        res.json({ workflows: serialized });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Admin: add a timeline note on any workflow.
+app.post(
+    '/api/auth/admin/visa-workflows/:id/notes',
+    requireAdminSession,
+    async (req, res, next) => {
+        try {
+            const wf = await VisaWorkflow.findById(req.params.id);
+            if (!wf) return res.status(404).json({ message: 'Visa workflow not found.' });
+
+            const body = String(req.body?.body || '').trim();
+            if (!body) return res.status(400).json({ message: 'Note body is required.' });
+
+            wf.timeline.push({
+                body: body.slice(0, 1000),
+                author: 'admin',
+                authorName: req.admin.name || req.admin.email || 'Admin',
+            });
+            await wf.save();
+
+            res.status(201).json({ ok: true });
         } catch (err) {
             next(err);
         }

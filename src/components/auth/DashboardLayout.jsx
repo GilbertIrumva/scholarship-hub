@@ -20,6 +20,7 @@ import {
   FileText,
   FolderArchive,
   Plane,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -41,6 +42,7 @@ const SCHOLAR_NAV = [
   { to: "/scholar/applications", label: "My applications", icon: FileText },
   { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive },
   { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane },
+  { to: "/scholar/visa-tracker", label: "Visa tracker", icon: ClipboardCheck },
 ];
 
 const ROLE_CONFIG = {

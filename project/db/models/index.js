@@ -7,4 +7,5 @@ module.exports = {
     ContactMessage: require('./ContactMessage'),
     AcademicCredential: require('./AcademicCredential'),
     TravelDocument: require('./TravelDocument'),
+    VisaWorkflow: require('./VisaWorkflow'),
 };
