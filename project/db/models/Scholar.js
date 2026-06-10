@@ -28,6 +28,21 @@ const scholarSchema = new Schema(
         avatarUrl: { type: String, default: '' },
         emailVerified: { type: Boolean, default: false, index: true },
         emailVerifiedAt: { type: Date, default: null },
+        // TOTP (RFC 6238) second factor — opt-in (T3.4). Secret stored
+        // encrypted via AES-256-GCM (encryptSecret in project/index.js).
+        // Backup codes hashed with SHA-256.
+        totpSecret: {
+            ciphertext: { type: String, default: '' },
+            iv: { type: String, default: '' },
+            authTag: { type: String, default: '' },
+        },
+        totpEnabled: { type: Boolean, default: false, index: true },
+        totpBackupCodes: [
+            {
+                hash: { type: String, required: true },
+                usedAt: { type: Date, default: null },
+            },
+        ],
     },
     { timestamps: true }
 );

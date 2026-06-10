@@ -15,6 +15,7 @@ import {
 import { getScholarProfile, signInScholar, signUpScholar, updateScholarProfile } from "../services/scholarAuth";
 import { AuthContext } from "./authContextValue";
 import { bootstrapSession, installAxiosAuthInterceptor, logoutServer } from "../lib/authClient";
+import { completeTwoFactorChallenge } from "../services/twoFactor";
 
 const idleStatus = () => ({ type: "idle", message: "" });
 
@@ -60,6 +61,18 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsSubmitting(true);
       const session = await signInScholar({ email, password });
+      // 2FA gate: backend returns {requires2fa, challengeId} instead of a
+      // session when the scholar has TOTP enabled. Bubble that up so the UI
+      // can prompt for the code without doing a second sign-in round-trip.
+      if (session?.requires2fa && session.challengeId) {
+        return {
+          ok: false,
+          requires2fa: true,
+          challengeId: session.challengeId,
+          expiresAt: session.expiresAt,
+          message: session.message || "Two-factor authentication is required.",
+        };
+      }
       const profile = await getScholarProfile(session.sessionToken);
       setSessionToken(session.sessionToken);
       setScholarProfile(profile);
@@ -68,6 +81,30 @@ export const AuthProvider = ({ children }) => {
       return {
         ok: false,
         message: error.response?.data?.message || "Unable to sign in as scholar.",
+      };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
+
+  // Completes a scholar sign-in that was paused for a TOTP challenge.
+  // `code` is either a 6-digit TOTP or one of the formatted backup codes.
+  const completeScholar2fa = useCallback(async ({ challengeId, totpCode, backupCode }) => {
+    try {
+      setIsSubmitting(true);
+      const result = await completeTwoFactorChallenge({
+        challengeId,
+        totpCode,
+        backupCode,
+      });
+      const profile = await getScholarProfile(result.sessionToken);
+      setSessionToken(result.sessionToken);
+      setScholarProfile(profile);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error.response?.data?.message || "Invalid authenticator or backup code.",
       };
     } finally {
       setIsSubmitting(false);
@@ -149,16 +186,25 @@ export const AuthProvider = ({ children }) => {
 
   // One-shot admin sign-in: chains the challenge + verification calls so the
   // user only sees a single screen. `accessCode` is the admin's department
-  // code or 2FA code.
+  // code, a 6-digit TOTP, or an `xxxx-xxxx` backup code — we pass it under
+  // whichever field shape best matches so the backend can route appropriately.
   const signInAdminDirect = useCallback(
     async ({ email, password, accessCode }) => {
       try {
         setIsSubmitting(true);
         const challenge = await signInAdmin({ email, password });
-        const result = await verifyAdminChallenge({
+        const code = (accessCode || "").trim();
+        const isTotp = /^\d{6}$/.test(code);
+        const isBackup = /^[a-f0-9]{4}-[a-f0-9]{4}$/i.test(code);
+        const verifyPayload = {
           challengeId: challenge.challengeId,
-          verificationCode: accessCode,
-        });
+          // Always include verificationCode (legacy / department) — the
+          // backend prefers it when the admin has no TOTP enrolled.
+          verificationCode: code,
+          ...(isTotp ? { totpCode: code } : {}),
+          ...(isBackup ? { backupCode: code } : {}),
+        };
+        const result = await verifyAdminChallenge(verifyPayload);
         const dashboard = await getAdminDashboard(result.sessionToken);
         setSessionToken(result.sessionToken);
         setAdminDashboard(dashboard);
@@ -422,6 +468,7 @@ export const AuthProvider = ({ children }) => {
       verificationStatus,
       settingsStatus,
       signInAsScholar,
+      completeScholar2fa,
       signUpAsScholar,
       completeScholarOAuth,
       startAdminSignIn,
@@ -455,6 +502,7 @@ export const AuthProvider = ({ children }) => {
       verificationStatus,
       settingsStatus,
       signInAsScholar,
+      completeScholar2fa,
       signUpAsScholar,
       completeScholarOAuth,
       startAdminSignIn,

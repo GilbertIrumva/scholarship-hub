@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
+import TwoFactorAndSessionsPanel from "./shared/TwoFactorAndSessionsPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -423,6 +424,24 @@ const AdminSettingsPage = () => {
           </Button>
         </div>
       </form>
+
+      <Separator className="my-10" />
+
+      {/* T3.4 — Security: 2FA + active sessions */}
+      <section>
+        <div className="flex items-center gap-3 pb-4">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-ink">Security</h2>
+            <p className="text-sm text-muted">
+              Two-factor authentication and active session control for this admin account.
+            </p>
+          </div>
+        </div>
+        <TwoFactorAndSessionsPanel sessionToken={sessionToken} principalKind="admin" />
+      </section>
 
       <Separator className="my-10" />
 

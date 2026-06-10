@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import ScholarProfileCard from "./ScholarProfileCard";
 import ScholarProfileForm from "./ScholarProfileForm";
 import RecommendedRail from "./RecommendedRail";
+import TwoFactorAndSessionsPanel from "./shared/TwoFactorAndSessionsPanel";
 
 // -----------------------------------------------------------------------------
 // Stat card
@@ -343,6 +344,19 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
           </div>
         </CardContent>
       </Card>
+
+      {/* T3.4 — Security: 2FA + device sessions */}
+      {sessionToken && (
+        <section className="space-y-3">
+          <header>
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">Security</h2>
+            <p className="text-sm text-muted">
+              Protect your account with two-factor authentication and review where you&apos;re signed in.
+            </p>
+          </header>
+          <TwoFactorAndSessionsPanel sessionToken={sessionToken} principalKind="scholar" />
+        </section>
+      )}
     </div>
   );
 };

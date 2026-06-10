@@ -27,6 +27,10 @@ const AdminSignInSchema = z.object({
 const AdminVerifySchema = z.object({
     challengeId: z.string().min(1, 'Challenge id is required.'),
     verificationCode: z.string().min(1, 'Verification code is required.'),
+    // Optional: required only if the admin has TOTP enabled. Validated
+    // server-side; the API rejects sign-in without it when enabled.
+    totpCode: z.string().trim().min(1).optional(),
+    backupCode: z.string().trim().min(1).optional(),
 });
 
 const AdminSignUpSchema = z.object({
@@ -111,6 +115,32 @@ const NotificationListQuerySchema = z.object({
         .transform((v) => v === true || v === 'true'),
 });
 
+// ----- TOTP / 2FA (T3.4) -----------------------------------------------------
+
+// Used by POST /api/auth/2fa/enable to confirm the user has correctly
+// scanned the QR by submitting a fresh code from their authenticator.
+const TwoFactorEnableSchema = z.object({
+    totpCode: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code from your authenticator.'),
+});
+
+// Used by POST /api/auth/2fa/disable. Always requires the account password;
+// requires a TOTP/backup code as well when 2FA is currently enabled.
+const TwoFactorDisableSchema = z.object({
+    password: z.string().min(1, 'Password is required to disable two-factor authentication.'),
+    totpCode: z.string().trim().min(1).optional(),
+    backupCode: z.string().trim().min(1).optional(),
+});
+
+// Used by POST /api/auth/2fa/challenge during a pending sign-in.
+const TwoFactorChallengeSchema = z.object({
+    challengeId: z.string().min(1, 'Challenge id is required.'),
+    totpCode: z.string().trim().min(1).optional(),
+    backupCode: z.string().trim().min(1).optional(),
+}).refine((v) => Boolean(v.totpCode || v.backupCode), {
+    message: 'Provide either a TOTP code or a backup code.',
+    path: ['totpCode'],
+});
+
 module.exports = {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -125,5 +155,8 @@ module.exports = {
     AuditLogQuerySchema,
     RecommendationsQuerySchema,
     NotificationListQuerySchema,
+    TwoFactorEnableSchema,
+    TwoFactorDisableSchema,
+    TwoFactorChallengeSchema,
     CONTACT_MAX_LEN,
 };

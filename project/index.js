@@ -11,6 +11,8 @@ const rateLimit = require('express-rate-limit');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 const multer = require('multer');
+const otplib = require('otplib');
+const QRCode = require('qrcode');
 
 const { connectDb } = require('./db/connect');
 const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session, VerificationToken, AuditLog, Notification } = require('./db/models');
@@ -34,6 +36,9 @@ const {
     AuditLogQuerySchema,
     RecommendationsQuerySchema,
     NotificationListQuerySchema,
+    TwoFactorEnableSchema,
+    TwoFactorDisableSchema,
+    TwoFactorChallengeSchema,
 } = require('./lib/schemas');
 
 // ---------------------------------------------------------------------------
@@ -50,6 +55,8 @@ const logger = pino({
             'req.body.verificationCode',
             'req.body.departmentCode',
             'req.body.twoFactorCode',
+            'req.body.totpCode',
+            'req.body.backupCode',
         ],
         censor: '[redacted]',
     },
@@ -269,6 +276,137 @@ const decryptDocNumber = (record) => {
         return decrypted.toString('utf8');
     } catch (err) {
         logger.warn({ err: err.message }, 'Failed to decrypt travel-doc number');
+        return '';
+    }
+};
+
+// ---------------------------------------------------------------------------
+// TOTP (RFC 6238) second-factor helpers — T3.4.
+// The encryption key is derived from TOTP_ENC_SECRET so the encrypted
+// secret stays opaque even to a DB-only attacker. Falls back to a labelled
+// hash of TRAVEL_DOC_SECRET in dev so a single env var keeps both features
+// working; in production both vars MUST be set.
+// ---------------------------------------------------------------------------
+// otplib 13.x exposes a functional API. We compose the crypto + base32
+// plugins once and re-use them across helpers below. `window: 1` permits a
+// ±1-step (~30 s) skew between the user's authenticator and the server.
+const TOTP_PLUGINS = [otplib.NobleCryptoPlugin, otplib.ScureBase32Plugin];
+const TOTP_OPTS = { type: 'totp', plugins: TOTP_PLUGINS, window: 1, step: 30 };
+
+const TOTP_ENC_SECRET = process.env.TOTP_ENC_SECRET
+    || `${TRAVEL_DOC_SECRET}:totp-fallback`;
+if (IS_PROD && !process.env.TOTP_ENC_SECRET) {
+    logger.fatal('TOTP_ENC_SECRET is unset in production. Refusing to start.');
+    process.exit(1);
+}
+const TOTP_KEY = crypto.createHash('sha256').update(TOTP_ENC_SECRET).digest();
+
+const encryptSecret = (plaintext) => {
+    if (plaintext == null || plaintext === '') {
+        return { ciphertext: '', iv: '', authTag: '' };
+    }
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', TOTP_KEY, iv);
+    const encrypted = Buffer.concat([
+        cipher.update(String(plaintext), 'utf8'),
+        cipher.final(),
+    ]);
+    return {
+        ciphertext: encrypted.toString('base64'),
+        iv: iv.toString('base64'),
+        authTag: cipher.getAuthTag().toString('base64'),
+    };
+};
+
+const decryptSecret = (record) => {
+    if (!record || !record.ciphertext || !record.iv || !record.authTag) return '';
+    try {
+        const iv = Buffer.from(record.iv, 'base64');
+        const authTag = Buffer.from(record.authTag, 'base64');
+        const ciphertext = Buffer.from(record.ciphertext, 'base64');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', TOTP_KEY, iv);
+        decipher.setAuthTag(authTag);
+        const decrypted = Buffer.concat([
+            decipher.update(ciphertext),
+            decipher.final(),
+        ]);
+        return decrypted.toString('utf8');
+    } catch (err) {
+        logger.warn({ err: err.message }, 'Failed to decrypt TOTP secret');
+        return '';
+    }
+};
+
+const TOTP_ISSUER = process.env.TOTP_ISSUER || 'ScholarshipZone';
+const BACKUP_CODE_COUNT = 10;
+
+// Backup codes are displayed once as `xxxx-xxxx` for readability, but stored
+// as SHA-256 hashes of the normalised (lowercase, no dashes) value so a DB
+// dump cannot replay them.
+const normalizeBackupCode = (code) =>
+    String(code || '').trim().toLowerCase().replace(/[\s-]/g, '');
+
+const hashBackupCode = (code) =>
+    crypto.createHash('sha256').update(normalizeBackupCode(code)).digest('hex');
+
+const generateBackupCodes = (count = BACKUP_CODE_COUNT) => {
+    const plain = [];
+    const hashed = [];
+    for (let i = 0; i < count; i += 1) {
+        // 4 bytes → 8 hex chars; format as `xxxx-xxxx`.
+        const raw = crypto.randomBytes(4).toString('hex');
+        const formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+        plain.push(formatted);
+        hashed.push({ hash: hashBackupCode(formatted), usedAt: null });
+    }
+    return { plain, hashed };
+};
+
+const verifyTotpCode = (secret, code) => {
+    if (!secret || !code) return false;
+    const normalized = String(code).trim().replace(/\s+/g, '');
+    if (!/^\d{6}$/.test(normalized)) return false;
+    try {
+        // otplib 13.x returns an object like `{valid: true, delta, epoch, timeStep}`
+        // on success and `{valid: false}` on failure. The object is always
+        // truthy, so we MUST check the `valid` field explicitly.
+        const result = otplib.verifySync({ ...TOTP_OPTS, token: normalized, secret });
+        return Boolean(result?.valid);
+    } catch {
+        return false;
+    }
+};
+
+// Consume a backup code in-place on the account doc. Returns true if a
+// matching UNUSED code was found and marked used. Caller must `.save()`.
+const consumeBackupCode = (account, code) => {
+    if (!account?.totpBackupCodes?.length) return false;
+    const target = hashBackupCode(code);
+    if (!target || target.length !== 64) return false;
+    const entry = account.totpBackupCodes.find(
+        (e) => e.hash === target && !e.usedAt,
+    );
+    if (!entry) return false;
+    entry.usedAt = new Date();
+    return true;
+};
+
+const buildOtpAuthUrl = (account, secret) => {
+    const label = account?.email || 'user';
+    return otplib.generateURI({
+        type: 'totp',
+        plugins: TOTP_PLUGINS,
+        accountName: label,
+        issuer: TOTP_ISSUER,
+        secret,
+    });
+};
+
+const buildOtpQrDataUrl = async (otpauthUrl) => {
+    try {
+        return await QRCode.toDataURL(otpauthUrl, { errorCorrectionLevel: 'M', margin: 1 });
+    } catch (err) {
+        logger.warn({ err: err.message }, 'Failed to render TOTP QR code');
         return '';
     }
 };
@@ -893,6 +1031,370 @@ app.post('/api/auth/logout', async (req, res, next) => {
     }
 });
 
+// ----- TOTP 2FA + device/session management (T3.4) ------------------------
+//
+// All routes here work for both scholars and admins. The principal is
+// determined from the bearer token: requireAuthenticatedSession resolves the
+// underlying account and attaches `req.principal = {kind, account, session}`.
+
+const requireAuthenticatedSession = async (req, res, next) => {
+    try {
+        const [scheme, token] = (req.headers.authorization || '').split(' ');
+        if (scheme !== 'Bearer' || !token) {
+            return res.status(401).json({ message: 'Authentication is required.' });
+        }
+        const session = await Session.findOne({
+            token,
+            kind: { $in: ['scholar', 'admin'] },
+        });
+        if (!session) {
+            return res.status(401).json({ message: 'Session is invalid or expired.' });
+        }
+        const accessExpiry = session.accessExpiresAt || session.expiresAt;
+        if (accessExpiry.getTime() <= Date.now()) {
+            return res.status(401).json({ message: 'Session is expired.' });
+        }
+        const Model = session.kind === 'admin' ? Admin : Scholar;
+        const account = await Model.findById(session.principalId);
+        if (!account) {
+            await revokeSession(token);
+            return res.status(401).json({ message: 'Account was not found.' });
+        }
+        req.principal = { kind: session.kind, account, session };
+        req.sessionToken = token;
+        touchLastActive(session);
+        return next();
+    } catch (err) {
+        return next(err);
+    }
+};
+
+// POST /api/auth/2fa/setup
+//   Generates a fresh secret + QR for the signed-in principal. The secret is
+//   stored encrypted but `totpEnabled` stays false until /enable confirms a
+//   working code. Calling /setup again before enabling overwrites the
+//   pending secret (intentional — lets a user start over on a new device).
+app.post('/api/auth/2fa/setup', authLimiter, requireAuthenticatedSession, async (req, res, next) => {
+    try {
+        const { account, kind } = req.principal;
+        if (account.totpEnabled) {
+            return res.status(409).json({ message: 'Two-factor authentication is already enabled.' });
+        }
+        const secret = otplib.generateSecret();
+        account.totpSecret = encryptSecret(secret);
+        await account.save();
+        const otpauthUrl = buildOtpAuthUrl(account, secret);
+        const qrDataUrl = await buildOtpQrDataUrl(otpauthUrl);
+        audit(req, {
+            action: `${kind}.2fa.setup`,
+            actor: { kind, id: account._id, email: account.email },
+        });
+        return res.json({
+            secret,            // shown once as a fallback if the QR scan fails
+            otpauthUrl,
+            qrDataUrl,
+            issuer: TOTP_ISSUER,
+            label: account.email,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/2fa/enable
+//   Confirms the user can produce a valid code, flips totpEnabled to true,
+//   generates one-time backup codes, and returns them (shown ONCE).
+app.post('/api/auth/2fa/enable', authLimiter, requireAuthenticatedSession, validate(TwoFactorEnableSchema), async (req, res, next) => {
+    try {
+        const { account, kind } = req.principal;
+        const { totpCode } = req.body;
+        if (account.totpEnabled) {
+            return res.status(409).json({ message: 'Two-factor authentication is already enabled.' });
+        }
+        const secret = decryptSecret(account.totpSecret);
+        if (!secret) {
+            return res.status(400).json({ message: 'Run /api/auth/2fa/setup first to generate a secret.' });
+        }
+        if (!verifyTotpCode(secret, totpCode)) {
+            audit(req, {
+                action: `${kind}.2fa.enable`,
+                outcome: 'failure',
+                actor: { kind, id: account._id, email: account.email },
+                metadata: { reason: 'bad-totp' },
+            });
+            return res.status(401).json({ message: 'Invalid authenticator code. Try again.' });
+        }
+        const { plain, hashed } = generateBackupCodes();
+        account.totpEnabled = true;
+        account.totpBackupCodes = hashed;
+        await account.save();
+        audit(req, {
+            action: `${kind}.2fa.enable`,
+            actor: { kind, id: account._id, email: account.email },
+        });
+        return res.json({
+            message: 'Two-factor authentication enabled. Store these backup codes — they will not be shown again.',
+            backupCodes: plain,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/2fa/disable
+//   Requires the account password AND a current TOTP/backup code. Wipes the
+//   secret and backup codes.
+app.post('/api/auth/2fa/disable', authLimiter, requireAuthenticatedSession, validate(TwoFactorDisableSchema), async (req, res, next) => {
+    try {
+        const { account, kind } = req.principal;
+        const { password, totpCode, backupCode } = req.body;
+        if (!verifyPassword(password, account)) {
+            audit(req, {
+                action: `${kind}.2fa.disable`,
+                outcome: 'failure',
+                actor: { kind, id: account._id, email: account.email },
+                metadata: { reason: 'bad-password' },
+            });
+            return res.status(401).json({ message: 'Password is incorrect.' });
+        }
+        if (account.totpEnabled) {
+            let ok = false;
+            if (totpCode) {
+                const secret = decryptSecret(account.totpSecret);
+                ok = verifyTotpCode(secret, totpCode);
+            } else if (backupCode) {
+                ok = consumeBackupCode(account, backupCode);
+            }
+            if (!ok) {
+                audit(req, {
+                    action: `${kind}.2fa.disable`,
+                    outcome: 'failure',
+                    actor: { kind, id: account._id, email: account.email },
+                    metadata: { reason: totpCode || backupCode ? 'bad-totp' : 'totp-required' },
+                });
+                return res.status(401).json({
+                    message: totpCode || backupCode
+                        ? 'Invalid authenticator or backup code.'
+                        : 'A current authenticator or backup code is required to disable 2FA.',
+                });
+            }
+        }
+        account.totpEnabled = false;
+        account.totpSecret = { ciphertext: '', iv: '', authTag: '' };
+        account.totpBackupCodes = [];
+        await account.save();
+        audit(req, {
+            action: `${kind}.2fa.disable`,
+            actor: { kind, id: account._id, email: account.email },
+        });
+        return res.json({ message: 'Two-factor authentication disabled.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/auth/2fa/status
+//   Light-weight: lets the settings UI know whether the meter is on.
+app.get('/api/auth/2fa/status', requireAuthenticatedSession, async (req, res, next) => {
+    try {
+        const { account } = req.principal;
+        const backupCodes = account.totpBackupCodes || [];
+        return res.json({
+            enabled: Boolean(account.totpEnabled),
+            backupCodesTotal: backupCodes.length,
+            backupCodesRemaining: backupCodes.filter((c) => !c.usedAt).length,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/2fa/backup-codes/regenerate
+//   Re-issues a fresh set of backup codes. Requires a current TOTP because
+//   anyone with the access token (e.g. a session left open on a friend's
+//   laptop) should NOT be able to invalidate the user's real backup codes
+//   without proving they still have the authenticator.
+app.post('/api/auth/2fa/backup-codes/regenerate', authLimiter, requireAuthenticatedSession, validate(TwoFactorEnableSchema), async (req, res, next) => {
+    try {
+        const { account, kind } = req.principal;
+        const { totpCode } = req.body;
+        if (!account.totpEnabled) {
+            return res.status(409).json({ message: 'Enable two-factor authentication first.' });
+        }
+        const secret = decryptSecret(account.totpSecret);
+        if (!verifyTotpCode(secret, totpCode)) {
+            return res.status(401).json({ message: 'Invalid authenticator code.' });
+        }
+        const { plain, hashed } = generateBackupCodes();
+        account.totpBackupCodes = hashed;
+        await account.save();
+        audit(req, {
+            action: `${kind}.2fa.backup-codes.regenerate`,
+            actor: { kind, id: account._id, email: account.email },
+        });
+        return res.json({
+            message: 'New backup codes issued. The previous set is no longer valid.',
+            backupCodes: plain,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/2fa/challenge
+//   Completes a scholar sign-in that was paused for a TOTP challenge.
+//   (Admins use POST /api/auth/admin/verify which handles the TOTP gate
+//   inline.)
+app.post('/api/auth/2fa/challenge', authLimiter, validate(TwoFactorChallengeSchema), async (req, res, next) => {
+    try {
+        const { challengeId, totpCode, backupCode } = req.body;
+        const challenge = await findActiveSession(challengeId, 'scholar-challenge');
+        if (!challenge) {
+            return res.status(410).json({ message: 'Verification challenge expired. Sign in again.' });
+        }
+        const scholar = await Scholar.findById(challenge.principalId);
+        if (!scholar) {
+            await revokeSession(challengeId);
+            return res.status(404).json({ message: 'Scholar account was not found.' });
+        }
+        if (!scholar.totpEnabled) {
+            // Defensive — should not happen if the challenge was issued from
+            // the sign-in branch that checked totpEnabled.
+            await revokeSession(challengeId);
+            return res.status(409).json({ message: 'Two-factor authentication is not enabled for this account.' });
+        }
+        let ok = false;
+        if (totpCode) {
+            const secret = decryptSecret(scholar.totpSecret);
+            ok = verifyTotpCode(secret, totpCode);
+        } else if (backupCode) {
+            ok = consumeBackupCode(scholar, backupCode);
+            if (ok) await scholar.save();
+        }
+        if (!ok) {
+            audit(req, {
+                action: 'scholar.2fa.challenge',
+                outcome: 'failure',
+                actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+                metadata: { reason: 'bad-code' },
+            });
+            return res.status(401).json({ message: 'Invalid authenticator or backup code.' });
+        }
+        await revokeSession(challengeId);
+        const { token: sessionToken } = await issueSession({
+            kind: 'scholar',
+            principalId: scholar._id,
+            req,
+            res,
+        });
+        audit(req, {
+            action: 'scholar.sign-in',
+            actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            metadata: { totp: backupCode ? 'backup-code' : 'totp' },
+        });
+        return res.json({
+            message: 'Two-factor verification complete.',
+            sessionToken,
+            scholar: toPublicScholar(scholar),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/auth/sessions
+//   Lists all active sessions for the signed-in principal. The current
+//   session is flagged with `current: true` so the UI can disable revoke
+//   on it (sign-out is the appropriate action there).
+app.get('/api/auth/sessions', requireAuthenticatedSession, async (req, res, next) => {
+    try {
+        const { account, kind, session: current } = req.principal;
+        const now = Date.now();
+        const sessions = await Session.find({
+            kind,
+            principalId: account._id,
+            // Skip rows whose access AND refresh windows have both passed.
+            // The TTL index sweeps them eventually but a slightly-stale UI
+            // is worse than a single extra query filter.
+            $or: [
+                { refreshExpiresAt: { $gt: new Date(now) } },
+                { accessExpiresAt: { $gt: new Date(now) } },
+                { expiresAt: { $gt: new Date(now) } },
+            ],
+        }).sort({ lastActiveAt: -1, createdAt: -1 });
+
+        return res.json({
+            sessions: sessions.map((s) => ({
+                id: String(s._id),
+                ip: s.ip || '',
+                userAgent: s.userAgent || '',
+                createdAt: s.createdAt,
+                lastActiveAt: s.lastActiveAt || s.createdAt,
+                accessExpiresAt: s.accessExpiresAt || s.expiresAt,
+                refreshExpiresAt: s.refreshExpiresAt || null,
+                rotationCount: s.rotationCount || 0,
+                current: String(s._id) === String(current._id),
+            })),
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE /api/auth/sessions/:id
+//   Revoke a single session (any of the principal's, including the current
+//   one). DELETE /api/auth/sessions revokes ALL sessions OTHER than the
+//   current one (handy "sign out other devices" button).
+app.delete('/api/auth/sessions/:id', requireAuthenticatedSession, async (req, res, next) => {
+    try {
+        const { account, kind, session: current } = req.principal;
+        const { id } = req.params;
+        // Validate ObjectId so we don't 500 on bad input.
+        if (!/^[0-9a-fA-F]{24}$/.test(String(id))) {
+            return res.status(400).json({ message: 'Invalid session id.' });
+        }
+        const target = await Session.findOne({ _id: id, kind, principalId: account._id });
+        if (!target) {
+            return res.status(404).json({ message: 'Session was not found.' });
+        }
+        await Session.deleteOne({ _id: target._id });
+        const revokedCurrent = String(target._id) === String(current._id);
+        if (revokedCurrent) {
+            clearRefreshCookie(res);
+        }
+        audit(req, {
+            action: `${kind}.session.revoke`,
+            actor: { kind, id: account._id, email: account.email },
+            metadata: { sessionId: String(target._id), current: revokedCurrent },
+        });
+        return res.json({ message: 'Session revoked.', revokedCurrent });
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.delete('/api/auth/sessions', requireAuthenticatedSession, async (req, res, next) => {
+    try {
+        const { account, kind, session: current } = req.principal;
+        const result = await Session.deleteMany({
+            kind,
+            principalId: account._id,
+            _id: { $ne: current._id },
+        });
+        audit(req, {
+            action: `${kind}.session.revoke-others`,
+            actor: { kind, id: account._id, email: account.email },
+            metadata: { deletedCount: result.deletedCount || 0 },
+        });
+        return res.json({
+            message: 'Other sessions revoked.',
+            deletedCount: result.deletedCount || 0,
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ----- Health probes (used by load balancers / orchestrators) ------------
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 app.get('/readyz', async (_req, res) => {
@@ -1225,7 +1727,7 @@ app.post('/api/auth/admin/sign-in', authLimiter, validate(AdminSignInSchema), as
 
 app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), async (req, res, next) => {
     try {
-        const { challengeId, verificationCode } = req.body;
+        const { challengeId, verificationCode, totpCode, backupCode } = req.body;
         const challenge = await findActiveSession(challengeId, 'admin-challenge');
         if (!challenge) {
             return res.status(410).json({ message: 'Verification challenge expired. Sign in again.' });
@@ -1247,6 +1749,31 @@ app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), asy
             });
             return res.status(401).json({ message: 'Invalid department or 2FA code.' });
         }
+        // Second factor (TOTP) — required when the admin has opted in.
+        if (admin.totpEnabled) {
+            let totpOk = false;
+            if (totpCode) {
+                const secret = decryptSecret(admin.totpSecret);
+                totpOk = verifyTotpCode(secret, totpCode);
+            } else if (backupCode) {
+                totpOk = consumeBackupCode(admin, backupCode);
+                if (totpOk) await admin.save();
+            }
+            if (!totpOk) {
+                audit(req, {
+                    action: 'admin.sign-in.verify',
+                    outcome: 'failure',
+                    actor: { kind: 'admin', id: admin._id, email: admin.email },
+                    metadata: { reason: totpCode || backupCode ? 'bad-totp' : 'totp-required' },
+                });
+                return res.status(401).json({
+                    message: totpCode || backupCode
+                        ? 'Invalid authenticator or backup code.'
+                        : 'Two-factor authentication is required for this admin account.',
+                    requires2fa: true,
+                });
+            }
+        }
         await revokeSession(challengeId);
         const { token: sessionToken } = await issueSession({
             kind: 'admin',
@@ -1257,6 +1784,7 @@ app.post('/api/auth/admin/verify', authLimiter, validate(AdminVerifySchema), asy
         audit(req, {
             action: 'admin.sign-in',
             actor: { kind: 'admin', id: admin._id, email: admin.email },
+            metadata: admin.totpEnabled ? { totp: backupCode ? 'backup-code' : 'totp' } : undefined,
         });
         return res.json({
             message: 'Admin verification complete.',
@@ -1460,6 +1988,28 @@ app.post('/api/auth/student/sign-in', authLimiter, validate(ScholarSignInSchema)
                 metadata: { reason: scholar ? 'bad-password' : 'unknown-email' },
             });
             return res.status(401).json({ message: 'Invalid scholar email or password.' });
+        }
+        // Second factor (TOTP). If enabled, issue a short-lived challenge
+        // session instead of a real session. The client must complete it
+        // via POST /api/auth/2fa/challenge with a TOTP or backup code.
+        if (scholar.totpEnabled) {
+            const { token: challengeId, expiresAt } = await issueSession({
+                kind: 'scholar-challenge',
+                principalId: scholar._id,
+                ttlMs: CHALLENGE_TTL_MS,
+                req,
+            });
+            audit(req, {
+                action: 'scholar.sign-in.challenge-issued',
+                actor: { kind: 'scholar', id: scholar._id, email: scholar.email },
+            });
+            return res.json({
+                message: 'Two-factor authentication required.',
+                requires2fa: true,
+                challengeId,
+                expiresAt: expiresAt.getTime(),
+                scholar: toPublicScholar(scholar),
+            });
         }
         const { token: sessionToken } = await issueSession({
             kind: 'scholar',

@@ -6,10 +6,11 @@ const { Schema, model } = require('mongoose');
  * Replaces the in-memory Map()-based stores that did not survive process
  * restarts and could not scale beyond a single Node instance.
  *
- * `kind` discriminates between three uses of the same collection:
- *   - 'admin-challenge'  Short-lived 2FA challenge after admin sign-in.
- *   - 'admin'            Issued after the admin completes 2FA verification.
- *   - 'scholar'          Issued on scholar sign-in / sign-up.
+ * `kind` discriminates between four uses of the same collection:
+ *   - 'admin-challenge'    Short-lived 2FA challenge after admin sign-in.
+ *   - 'scholar-challenge'  Short-lived 2FA challenge after scholar sign-in (T3.4).
+ *   - 'admin'              Issued after the admin completes 2FA verification.
+ *   - 'scholar'            Issued on scholar sign-in / sign-up.
  *
  * Sliding-session model (T3.3):
  *   `token` is a SHORT-LIVED access token (default 15 min, see ACCESS_TTL_MS
@@ -34,7 +35,7 @@ const sessionSchema = new Schema(
         kind: {
             type: String,
             required: true,
-            enum: ['admin-challenge', 'admin', 'scholar'],
+            enum: ['admin-challenge', 'scholar-challenge', 'admin', 'scholar'],
             index: true,
         },
 

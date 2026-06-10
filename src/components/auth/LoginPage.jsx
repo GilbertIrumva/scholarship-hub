@@ -126,7 +126,7 @@ const RoleIndicator = ({ verb, role, onChange }) => (
 const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signInAsScholar, signInAdminDirect, isSubmitting } = useAuth();
+  const { signInAsScholar, completeScholar2fa, signInAdminDirect, isSubmitting } = useAuth();
 
   const initialRole = searchParams.get("role") === "admin" ? "admin" : "scholar";
   const [role, setRole] = useState(initialRole);
@@ -138,6 +138,9 @@ const LoginPage = () => {
     remember: false,
   });
   const [errors, setErrors] = useState({});
+  // Holds the active 2FA challenge while the scholar is on the TOTP step.
+  // When non-null, the form swaps to a code-entry view.
+  const [twoFactor, setTwoFactor] = useState(null); // { challengeId, useBackup, code }
 
   // Reset errors when role changes
   useEffect(() => {
@@ -183,6 +186,11 @@ const LoginPage = () => {
       if (result.ok) {
         toast.success("Welcome back!");
         navigate("/scholar");
+      } else if (result.requires2fa && result.challengeId) {
+        // Pause the sign-in flow until the scholar submits a TOTP / backup
+        // code. The credentials are not retained — only the challengeId.
+        setTwoFactor({ challengeId: result.challengeId, useBackup: false, code: "" });
+        toast("Enter the 6-digit code from your authenticator app.", { icon: "🔐" });
       } else {
         toast.error(result.message);
       }
@@ -201,6 +209,36 @@ const LoginPage = () => {
     }
   };
 
+  // Submit the TOTP / backup code from the 2FA challenge panel.
+  const handleTwoFactorSubmit = async (e) => {
+    e.preventDefault();
+    const raw = (twoFactor?.code || "").trim();
+    if (!raw) {
+      toast.error(
+        twoFactor.useBackup
+          ? "Enter one of your backup codes."
+          : "Enter the 6-digit code from your authenticator app.",
+      );
+      return;
+    }
+    const payload = twoFactor.useBackup
+      ? { challengeId: twoFactor.challengeId, backupCode: raw }
+      : { challengeId: twoFactor.challengeId, totpCode: raw };
+    const result = await completeScholar2fa(payload);
+    if (result.ok) {
+      toast.success("Welcome back!");
+      setTwoFactor(null);
+      navigate("/scholar");
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const cancelTwoFactor = () => {
+    setTwoFactor(null);
+    setForm((f) => ({ ...f, password: "" }));
+  };
+
   const hero = HERO[role];
 
   return (
@@ -216,6 +254,87 @@ const LoginPage = () => {
         eyebrow={hero.eyebrow}
       >
         <AnimatePresence mode="wait">
+          {twoFactor ? (
+            <motion.div
+              key="two-factor"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Two-factor authentication
+              </div>
+              <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                Verify it&apos;s you
+              </h2>
+              <p className="mt-1.5 text-sm text-slate-500">
+                {twoFactor.useBackup
+                  ? "Enter one of the backup codes you saved when you enabled 2FA."
+                  : "Open your authenticator app and enter the 6-digit code."}
+              </p>
+
+              <form className="mt-6 space-y-5" onSubmit={handleTwoFactorSubmit} noValidate>
+                <Field
+                  id="two-factor-code"
+                  name="twoFactorCode"
+                  label={twoFactor.useBackup ? "Backup code" : "Authentication code"}
+                  icon={twoFactor.useBackup ? KeyRound : ShieldCheck}
+                  placeholder={twoFactor.useBackup ? "xxxx-xxxx" : "123 456"}
+                  autoComplete="one-time-code"
+                  value={twoFactor.code}
+                  onChange={(e) =>
+                    setTwoFactor((s) => ({ ...s, code: e.target.value }))
+                  }
+                />
+
+                <motion.button
+                  type="submit"
+                  disabled={isSubmitting}
+                  whileHover={isSubmitting ? undefined : { scale: 1.005 }}
+                  whileTap={isSubmitting ? undefined : { scale: 0.99 }}
+                  className={[
+                    "inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#059669] text-sm font-bold text-white shadow-sm transition-all",
+                    "hover:bg-[#047857] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#059669]/30",
+                    "disabled:cursor-not-allowed disabled:opacity-70",
+                  ].join(" ")}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verifying…
+                    </>
+                  ) : (
+                    <>
+                      Verify <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </motion.button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTwoFactor((s) => ({ ...s, useBackup: !s.useBackup, code: "" }))
+                    }
+                    className="font-semibold text-[#059669] hover:text-[#047857]"
+                  >
+                    {twoFactor.useBackup
+                      ? "Use authenticator code instead"
+                      : "Use a backup code"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelTwoFactor}
+                    className="font-medium text-slate-500 hover:text-slate-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          ) : (
           <motion.div
             key={role}
             initial={{ opacity: 0, y: 8 }}
@@ -354,6 +473,7 @@ const LoginPage = () => {
               </p>
             </form>
           </motion.div>
+          )}
         </AnimatePresence>
       </AuthShell>
 
