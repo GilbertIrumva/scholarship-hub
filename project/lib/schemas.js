@@ -141,6 +141,17 @@ const TwoFactorChallengeSchema = z.object({
     path: ['totpCode'],
 });
 
+// T4.1 — anonymous Core Web Vitals payload from the browser.
+// Kept permissive on optional metadata; strict on `name` + `value`.
+const WebVitalsSchema = z.object({
+    name: z.enum(['CLS', 'LCP', 'INP', 'TTFB', 'FCP']),
+    value: z.number().finite().min(0).max(1_000_000),
+    rating: z.enum(['good', 'needs-improvement', 'poor', 'unknown']).optional(),
+    navigationType: z.string().max(64).nullable().optional(),
+    id: z.string().max(128).nullable().optional(),
+    path: z.string().max(256).nullable().optional(),
+});
+
 module.exports = {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -158,5 +169,6 @@ module.exports = {
     TwoFactorEnableSchema,
     TwoFactorDisableSchema,
     TwoFactorChallengeSchema,
+    WebVitalsSchema,
     CONTACT_MAX_LEN,
 };

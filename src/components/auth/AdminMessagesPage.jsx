@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   Archive,
@@ -27,11 +28,11 @@ import {
 import { cn } from "@/lib/utils";
 
 const STATUS_TABS = [
-  { key: "all", label: "All", icon: Inbox },
-  { key: "new", label: "New", icon: Mail },
-  { key: "read", label: "Read", icon: MailOpen },
-  { key: "replied", label: "Replied", icon: Reply },
-  { key: "archived", label: "Archived", icon: Archive },
+  { key: "all", labelKey: "adminMessages.tabAll", icon: Inbox },
+  { key: "new", labelKey: "adminMessages.tabNew", icon: Mail },
+  { key: "read", labelKey: "adminMessages.tabRead", icon: MailOpen },
+  { key: "replied", labelKey: "adminMessages.tabReplied", icon: Reply },
+  { key: "archived", labelKey: "adminMessages.tabArchived", icon: Archive },
 ];
 
 const STATUS_BADGE = {
@@ -40,6 +41,15 @@ const STATUS_BADGE = {
   replied: "bg-primary/10 text-primary-dark",
   archived: "bg-slate-200 text-slate-700",
 };
+
+const STATUS_LABEL_KEY = {
+  new: "adminMessages.statusNew",
+  read: "adminMessages.statusRead",
+  replied: "adminMessages.statusReplied",
+  archived: "adminMessages.statusArchived",
+};
+
+const MAX_REPLY_LENGTH = 8000;
 
 const formatDate = (iso) => {
   if (!iso) return "—";
@@ -56,6 +66,7 @@ const formatDate = (iso) => {
 };
 
 const AdminMessagesPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { sessionToken, adminDashboard, signOut } = useAuth();
 
@@ -78,23 +89,16 @@ const AdminMessagesPage = () => {
       setMessages(list);
       if (list.length && !selectedId) setSelectedId(list[0]._id || list[0].id);
     } catch {
-      toast.error("Could not load messages.");
+      toast.error(t("adminMessages.couldNotLoad"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, selectedId]);
+  }, [sessionToken, selectedId, t]);
 
   useEffect(() => {
     fetchMessages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  if (!sessionToken) return <Navigate to="/login/admin" replace />;
-
-  const handleSignOut = () => {
-    signOut();
-    navigate("/");
-  };
 
   const filtered = useMemo(() => {
     let list = messages;
@@ -132,6 +136,13 @@ const AdminMessagesPage = () => {
     };
   }, [messages]);
 
+  if (!sessionToken) return <Navigate to="/login/admin" replace />;
+
+  const handleSignOut = () => {
+    signOut();
+    navigate("/");
+  };
+
   const patchMessage = async (msgId, payload) => {
     setBusy(true);
     try {
@@ -140,9 +151,9 @@ const AdminMessagesPage = () => {
       setMessages((curr) =>
         curr.map((m) => ((m._id || m.id) === msgId ? { ...m, ...updated } : m))
       );
-      toast.success("Message updated.");
+      toast.success(t("adminMessages.messageUpdated"));
     } catch {
-      toast.error("Failed to update.");
+      toast.error(t("adminMessages.updateFailed"));
     } finally {
       setBusy(false);
     }
@@ -160,15 +171,16 @@ const AdminMessagesPage = () => {
 
   const handleDelete = async () => {
     if (!selected) return;
-    if (!window.confirm(`Delete message from ${selected.name || selected.email}?`)) return;
+    if (!window.confirm(t("adminMessages.deleteConfirm", { name: selected.name || selected.email })))
+      return;
     setBusy(true);
     try {
       await deleteAdminMessage(sessionToken, selected._id || selected.id);
       setMessages((curr) => curr.filter((m) => (m._id || m.id) !== (selected._id || selected.id)));
       setSelectedId(null);
-      toast.success("Message deleted.");
+      toast.success(t("adminMessages.messageDeleted"));
     } catch {
-      toast.error("Failed to delete.");
+      toast.error(t("adminMessages.deleteFailed"));
     } finally {
       setBusy(false);
     }
@@ -192,9 +204,9 @@ const AdminMessagesPage = () => {
         );
       }
       setReplyDraft("");
-      toast.success(data?.message || "Reply sent.");
+      toast.success(data?.message || t("adminMessages.replySent"));
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to send reply.");
+      toast.error(err?.response?.data?.message || t("adminMessages.replyFailed"));
     } finally {
       setSending(false);
     }
@@ -204,13 +216,13 @@ const AdminMessagesPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title="Messages"
-      subtitle={`${counts.new} new of ${counts.all} total`}
+      title={t("adminMessages.pageTitle")}
+      subtitle={t("adminMessages.subtitle", { newCount: counts.new, total: counts.all })}
       onSignOut={handleSignOut}
       actions={
         <Button onClick={fetchMessages} disabled={loading} variant="outline" size="sm">
           <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
+          {t("common.refresh")}
         </Button>
       }
     >
@@ -222,14 +234,14 @@ const AdminMessagesPage = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <Input
                 type="search"
-                placeholder="Search inbox…"
+                placeholder={t("adminMessages.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {STATUS_TABS.map(({ key, label, icon: Icon }) => (
+              {STATUS_TABS.map(({ key, labelKey, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setActiveTab(key)}
@@ -241,7 +253,7 @@ const AdminMessagesPage = () => {
                   )}
                 >
                   <Icon className="h-3 w-3" />
-                  {label}
+                  {t(labelKey)}
                   <span
                     className={cn(
                       "rounded-full px-1.5 text-[10px] font-bold",
@@ -257,7 +269,7 @@ const AdminMessagesPage = () => {
           <div className="flex-1 divide-y divide-border overflow-y-auto">
             {filtered.length === 0 ? (
               <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
-                {loading ? "Loading…" : "No messages here."}
+                {loading ? t("common.loading") : t("adminMessages.noMessages")}
               </div>
             ) : (
               filtered.map((msg) => {
@@ -281,13 +293,13 @@ const AdminMessagesPage = () => {
                             status === "new" ? "font-bold text-ink" : "font-semibold text-ink"
                           )}
                         >
-                          {msg.name || msg.email || "Anonymous"}
+                          {msg.name || msg.email || t("adminMessages.anonymous")}
                         </p>
                         <span className="shrink-0 text-[10px] text-muted">
                           {formatDate(msg.createdAt)}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-muted">{msg.subject || "(no subject)"}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted">{msg.subject || t("adminMessages.noSubject")}</p>
                       <p className="mt-1 line-clamp-2 text-xs text-muted/80">{msg.message}</p>
                       <div className="mt-2">
                         <span
@@ -296,7 +308,7 @@ const AdminMessagesPage = () => {
                             STATUS_BADGE[status]
                           )}
                         >
-                          {status}
+                          {t(STATUS_LABEL_KEY[status] || "adminMessages.statusNew")}
                         </span>
                       </div>
                     </div>
@@ -315,10 +327,10 @@ const AdminMessagesPage = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-xl font-extrabold text-ink">
-                      {selected.subject || "(no subject)"}
+                      {selected.subject || t("adminMessages.noSubject")}
                     </h2>
                     <p className="mt-1 text-sm text-muted">
-                      from <span className="font-semibold text-ink">{selected.name || "—"}</span> ·{" "}
+                      {t("adminMessages.fromPrefix")} <span className="font-semibold text-ink">{selected.name || "—"}</span> ·{" "}
                       <a
                         href={`mailto:${selected.email}`}
                         className="text-primary hover:text-primary-dark"
@@ -334,13 +346,13 @@ const AdminMessagesPage = () => {
                       STATUS_BADGE[selected.status || "new"]
                     )}
                   >
-                    {selected.status || "new"}
+                    {t(STATUS_LABEL_KEY[selected.status || "new"] || "adminMessages.statusNew")}
                   </span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => handleStatus("read")} disabled={busy}>
                     <CheckCheck className="h-3.5 w-3.5" />
-                    Mark Read
+                    {t("adminMessages.markRead")}
                   </Button>
                   <Button
                     size="sm"
@@ -349,7 +361,7 @@ const AdminMessagesPage = () => {
                     disabled={busy}
                   >
                     <Reply className="h-3.5 w-3.5" />
-                    Replied
+                    {t("adminMessages.replied")}
                   </Button>
                   <Button
                     size="sm"
@@ -358,7 +370,7 @@ const AdminMessagesPage = () => {
                     disabled={busy}
                   >
                     <Archive className="h-3.5 w-3.5" />
-                    Archive
+                    {t("adminMessages.archive")}
                   </Button>
                   <Button
                     size="sm"
@@ -368,7 +380,7 @@ const AdminMessagesPage = () => {
                     className="ml-auto"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Delete
+                    {t("adminMessages.delete")}
                   </Button>
                 </div>
               </div>
@@ -377,7 +389,7 @@ const AdminMessagesPage = () => {
                 {/* Original message */}
                 <div>
                   <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">
-                    From {selected.name || selected.email}
+                    {t("adminMessages.fromHeading", { name: selected.name || selected.email })}
                   </p>
                   <div className="rounded-xl bg-slate-50 p-4 text-sm leading-7 text-ink whitespace-pre-wrap">
                     {selected.message}
@@ -388,7 +400,7 @@ const AdminMessagesPage = () => {
                 {selected.replies?.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
-                      Conversation
+                      {t("adminMessages.conversation")}
                     </h3>
                     {selected.replies.map((reply, i) => (
                       <div
@@ -397,7 +409,7 @@ const AdminMessagesPage = () => {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs font-bold text-primary-dark">
-                            {reply.sentByName || "Admin"}
+                            {reply.sentByName || t("adminMessages.admin")}
                             {reply.sentByEmail && (
                               <span className="ml-1 font-normal text-muted">
                                 · {reply.sentByEmail}
@@ -423,11 +435,11 @@ const AdminMessagesPage = () => {
                             )}
                           >
                             {reply.deliveryStatus === "sent" && reply.deliveredVia === "smtp"
-                              ? "Emailed"
+                              ? t("adminMessages.emailed")
                               : reply.deliveryStatus === "sent" && reply.deliveredVia === "log"
-                              ? "Logged (no SMTP)"
+                              ? t("adminMessages.loggedNoSmtp")
                               : reply.deliveryStatus === "failed"
-                              ? "Delivery failed"
+                              ? t("adminMessages.deliveryFailed")
                               : reply.deliveryStatus}
                           </span>
                           {reply.deliveryError && (
@@ -442,28 +454,32 @@ const AdminMessagesPage = () => {
                 {/* Reply composer */}
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
-                    Compose reply
+                    {t("adminMessages.composeReply")}
                   </h3>
                   <p className="mt-1 text-xs text-muted">
-                    Sends an email to{" "}
-                    <span className="font-semibold text-ink">{selected.email}</span> and
-                    marks the conversation as replied.
+                    {t("adminMessages.sendsAnEmail")}{" "}
+                    <span className="font-semibold text-ink">{selected.email}</span>{" "}
+                    {t("adminMessages.andMarksReplied")}
                   </p>
                   <textarea
                     value={replyDraft}
                     onChange={(e) => setReplyDraft(e.target.value)}
                     rows={6}
-                    placeholder={`Hi ${selected.name?.split(" ")[0] || "there"}, thanks for reaching out…`}
+                    placeholder={t("adminMessages.replyPlaceholder", {
+                      firstName: selected.name?.split(" ")[0] || t("adminMessages.replyDefaultName"),
+                    })}
                     className="mt-2 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-xs text-muted">{replyDraft.length} / 8000</span>
+                    <span className="text-xs text-muted">
+                      {t("adminMessages.charCounter", { count: replyDraft.length, max: MAX_REPLY_LENGTH })}
+                    </span>
                     <Button
                       onClick={handleSendReply}
-                      disabled={sending || !replyDraft.trim() || replyDraft.length > 8000}
+                      disabled={sending || !replyDraft.trim() || replyDraft.length > MAX_REPLY_LENGTH}
                     >
                       <Send className="h-4 w-4" />
-                      {sending ? "Sending…" : "Send reply"}
+                      {sending ? t("adminMessages.sending") : t("adminMessages.sendReply")}
                     </Button>
                   </div>
                 </div>
@@ -471,16 +487,16 @@ const AdminMessagesPage = () => {
                 {/* Internal notes */}
                 <div className="border-t border-border pt-6">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted">
-                    Internal notes
+                    {t("adminMessages.internalNotes")}
                   </h3>
                   <p className="mt-1 text-xs text-muted">
-                    Private to your team — never sent to the sender.
+                    {t("adminMessages.internalNotesHint")}
                   </p>
                   <textarea
                     value={notesDraft}
                     onChange={(e) => setNotesDraft(e.target.value)}
                     rows={3}
-                    placeholder="Add private notes for your team…"
+                    placeholder={t("adminMessages.internalNotesPlaceholder")}
                     className="mt-2 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                   />
                   <div className="mt-3 flex justify-end">
@@ -490,7 +506,7 @@ const AdminMessagesPage = () => {
                       onClick={handleSaveNotes}
                       disabled={busy || notesDraft === (selected.notes || "")}
                     >
-                      Save notes
+                      {t("adminMessages.saveNotes")}
                     </Button>
                   </div>
                 </div>
@@ -499,7 +515,7 @@ const AdminMessagesPage = () => {
           ) : (
             <CardContent className="flex h-full flex-col items-center justify-center text-center">
               <Mail className="h-14 w-14 text-muted/40" />
-              <p className="mt-4 text-sm font-semibold text-ink">Select a message to view details.</p>
+              <p className="mt-4 text-sm font-semibold text-ink">{t("adminMessages.selectPrompt")}</p>
             </CardContent>
           )}
         </Card>

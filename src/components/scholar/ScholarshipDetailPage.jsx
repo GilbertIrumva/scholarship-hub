@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { SaveButton } from "./SaveButton";
@@ -23,8 +24,8 @@ import { Button } from "../ui/button";
 import { getPublicScholarshipById } from "../../services/publicApi";
 import { listMyApplications } from "../../services/applications";
 
-const formatAmount = (amount, currency = "USD") => {
-  if (!amount) return "Amount on request";
+const formatAmount = (amount, currency = "USD", t) => {
+  if (!amount) return t("scholarshipDetail.amountOnRequest");
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -36,10 +37,10 @@ const formatAmount = (amount, currency = "USD") => {
   }
 };
 
-const formatDeadline = (deadline) => {
-  if (!deadline) return "Rolling — no fixed deadline";
+const formatDeadline = (deadline, t) => {
+  if (!deadline) return t("scholarshipDetail.rollingNoDeadline");
   const d = new Date(deadline);
-  if (Number.isNaN(d.getTime())) return "Rolling";
+  if (Number.isNaN(d.getTime())) return t("catalog.rolling");
   return d.toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",
@@ -68,6 +69,7 @@ const InfoTile = ({ icon: Icon, label, value }) => (
 );
 
 const ScholarshipDetailPage = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
@@ -88,7 +90,7 @@ const ScholarshipDetailPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.response?.data?.message || "Scholarship not found.");
+          setError(err?.response?.data?.message || t("scholarshipDetail.notFound"));
         }
       })
       .finally(() => {
@@ -130,7 +132,7 @@ const ScholarshipDetailPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Scholarship"
+        title={t("scholarshipDetail.fallbackTitle")}
         onSignOut={handleSignOut}
       >
         <div className="flex items-center justify-center py-20">
@@ -145,18 +147,18 @@ const ScholarshipDetailPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Scholarship"
+        title={t("scholarshipDetail.fallbackTitle")}
         onSignOut={handleSignOut}
       >
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-20 text-center">
             <AlertCircle className="h-12 w-12 text-muted/40" />
             <h3 className="mt-4 text-lg font-bold text-ink">
-              {error || "Scholarship not found"}
+              {error || t("scholarshipDetail.notFound")}
             </h3>
             <Button asChild variant="outline" className="mt-5">
               <Link to="/scholar/scholarships">
-                <ArrowLeft className="h-4 w-4" /> Back to browse
+                <ArrowLeft className="h-4 w-4" /> {t("scholarshipDetail.backToBrowse")}
               </Link>
             </Button>
           </CardContent>
@@ -173,7 +175,7 @@ const ScholarshipDetailPage = () => {
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
       title={scholarship.title}
-      subtitle={scholarship.provider || "Scholarship details"}
+      subtitle={scholarship.provider || t("scholarshipDetail.fallbackSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
@@ -181,7 +183,7 @@ const ScholarshipDetailPage = () => {
           to="/scholar/scholarships"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-primary"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to scholarships
+          <ArrowLeft className="h-4 w-4" /> {t("scholarshipDetail.backToScholarships")}
         </Link>
 
         {/* Hero card */}
@@ -206,12 +208,12 @@ const ScholarshipDetailPage = () => {
                 </div>
                 {isClosed ? (
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Closed
+                    {t("scholarshipDetail.closed")}
                   </span>
                 ) : days !== null && days <= 14 ? (
                   <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-accent-dark">
                     <Clock className="-mt-0.5 mr-1 inline h-3 w-3" />
-                    {days === 0 ? "Closes today" : `${days} days left`}
+                    {days === 0 ? t("scholarshipDetail.closesToday") : t("scholarshipDetail.daysLeft", { count: days })}
                   </span>
                 ) : null}
                 <SaveButton
@@ -225,18 +227,18 @@ const ScholarshipDetailPage = () => {
               <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <InfoTile
                   icon={DollarSign}
-                  label="Award"
-                  value={formatAmount(scholarship.amount, scholarship.currency)}
+                  label={t("scholarshipDetail.award")}
+                  value={formatAmount(scholarship.amount, scholarship.currency, t)}
                 />
                 <InfoTile
                   icon={Calendar}
-                  label="Deadline"
-                  value={formatDeadline(scholarship.deadline)}
+                  label={t("scholarshipDetail.deadline")}
+                  value={formatDeadline(scholarship.deadline, t)}
                 />
                 <InfoTile
                   icon={GraduationCap}
-                  label="Grade level"
-                  value={scholarship.grades?.join(", ") || "All levels"}
+                  label={t("scholarshipDetail.gradeLevel")}
+                  value={scholarship.grades?.join(", ") || t("scholarshipDetail.allLevels")}
                 />
               </div>
 
@@ -270,7 +272,7 @@ const ScholarshipDetailPage = () => {
             {scholarship.description && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">About this scholarship</CardTitle>
+                  <CardTitle className="text-lg">{t("scholarshipDetail.about")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
@@ -283,7 +285,7 @@ const ScholarshipDetailPage = () => {
             {scholarship.eligibility && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Eligibility</CardTitle>
+                  <CardTitle className="text-lg">{t("scholarshipDetail.eligibility")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
@@ -300,10 +302,10 @@ const ScholarshipDetailPage = () => {
               <CardHeader>
                 <CardTitle className="text-lg">
                   {existingApp && existingApp.status !== "draft"
-                    ? "Application submitted"
+                    ? t("scholarshipDetail.applicationSubmitted")
                     : existingApp && existingApp.status === "draft"
-                      ? "Draft in progress"
-                      : "Apply now"}
+                      ? t("scholarshipDetail.draftInProgress")
+                      : t("scholarshipDetail.applyNow")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -313,16 +315,16 @@ const ScholarshipDetailPage = () => {
                       <CheckCircle2 className="h-7 w-7" />
                     </span>
                     <p className="mt-3 text-sm font-semibold text-ink">
-                      You've already applied.
+                      {t("scholarshipDetail.alreadyApplied")}
                     </p>
                     <p className="mt-1 text-xs text-muted">
-                      Status:{" "}
+                      {t("scholarshipDetail.statusPrefix")}{" "}
                       <span className="font-bold capitalize text-primary-dark">
                         {(existingApp?.status || "submitted").replace("-", " ")}
                       </span>
                     </p>
                     <Button asChild variant="outline" size="sm" className="mt-5">
-                      <Link to="/scholar/applications">View my applications</Link>
+                      <Link to="/scholar/applications">{t("scholarshipDetail.viewMyApplications")}</Link>
                     </Button>
                   </div>
                 ) : isClosed ? (
@@ -331,32 +333,29 @@ const ScholarshipDetailPage = () => {
                       <Clock className="h-7 w-7" />
                     </span>
                     <p className="mt-3 text-sm font-semibold text-ink">
-                      Applications are closed.
+                      {t("scholarshipDetail.applicationsClosed")}
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {existingApp?.status === "draft" && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
-                        You have an unfinished draft for this scholarship.
-                        Pick up where you left off.
+                        {t("scholarshipDetail.draftNotice")}
                       </div>
                     )}
                     <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                      Apply in 4 quick steps — personal info, academic
-                      background, motivation, and a final review. Your progress
-                      is auto-saved as you go.
+                      {t("scholarshipDetail.applyBlurb")}
                     </p>
                     <Button asChild className="w-full" size="lg">
                       <Link to={`/scholar/scholarships/${id}/apply`}>
                         <ShieldCheck className="h-4 w-4" />
                         {existingApp?.status === "draft"
-                          ? "Continue application"
-                          : "Start application"}
+                          ? t("scholarshipDetail.continueApplication")
+                          : t("scholarshipDetail.startApplication")}
                       </Link>
                     </Button>
                     <p className="text-center text-[11px] leading-relaxed text-muted">
-                      Your profile information will be shared with the reviewer.
+                      {t("scholarshipDetail.sharedWithReviewer")}
                     </p>
                   </div>
                 )}

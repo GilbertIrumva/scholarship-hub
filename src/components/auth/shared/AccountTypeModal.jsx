@@ -1,21 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { GraduationCap, ShieldCheck, X } from "lucide-react";
-
-const ROLE_OPTIONS = [
-  {
-    id: "scholar",
-    title: "Student",
-    description: "Access courses, resources, and learning opportunities.",
-    icon: GraduationCap,
-  },
-  {
-    id: "admin",
-    title: "Admin",
-    description: "Manage users, programs, and platform operations.",
-    icon: ShieldCheck,
-  },
-];
+import { useTranslation } from "react-i18next";
 
 /**
  * AccountTypeModal
@@ -27,8 +13,27 @@ const ROLE_OPTIONS = [
  *   onConfirm:     (role) => void
  */
 const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState(currentRole);
   const dialogRef = useRef(null);
+
+  const roleOptions = useMemo(
+    () => [
+      {
+        id: "scholar",
+        title: t("auth.accountTypeStudent"),
+        description: t("auth.accountTypeStudentDesc"),
+        icon: GraduationCap,
+      },
+      {
+        id: "admin",
+        title: t("auth.accountTypeAdmin"),
+        description: t("auth.accountTypeAdminDesc"),
+        icon: ShieldCheck,
+      },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (open) setSelected(currentRole);
@@ -87,16 +92,16 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                   id="account-type-title"
                   className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl"
                 >
-                  Choose Account Type
+                  {t("auth.accountTypeTitle")}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Switch the form to match the account you want.
+                  {t("auth.accountTypeSubtitle")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close"
+                aria-label={t("auth.accountTypeAriaClose")}
                 className="grid h-9 w-9 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-5 w-5" />
@@ -105,10 +110,10 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
 
             <div
               role="radiogroup"
-              aria-label="Account type"
+              aria-label={t("auth.accountTypeAriaGroup")}
               className="mt-6 flex flex-col gap-3"
             >
-              {ROLE_OPTIONS.map((option) => {
+              {roleOptions.map((option) => {
                 const Icon = option.icon;
                 const isSelected = selected === option.id;
                 return (
@@ -174,7 +179,7 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                 onClick={onClose}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -184,7 +189,7 @@ const AccountTypeModal = ({ open, currentRole, onClose, onConfirm }) => {
                 }}
                 className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/30"
               >
-                Continue
+                {t("auth.accountTypeContinue")}
               </button>
             </div>
           </motion.div>

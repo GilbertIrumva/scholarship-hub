@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Plane,
   Loader2,
@@ -23,22 +24,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  TRAVEL_DOC_TYPES,
   listAdminTravelDocs,
   checkTravelDocEligibility,
   reviewAdminTravelDoc,
   adminTravelDocDownloadUrl,
 } from "../../services/travelDocs";
 
-const TYPE_LABELS = Object.fromEntries(
-  TRAVEL_DOC_TYPES.map((t) => [t.value, t.label])
-);
+// Map service API values → i18n keys (under `travelDocs.type*`).
+const TYPE_KEY = {
+  passport: "travelDocs.typePassport",
+  visa: "travelDocs.typeVisa",
+  "travel-insurance": "travelDocs.typeTravelInsurance",
+  vaccination: "travelDocs.typeVaccination",
+  "other-travel": "travelDocs.typeOtherTravel",
+};
 
 const STATUS_META = {
-  unverified: { label: "Not reviewed", chip: "bg-slate-100 text-slate-600", icon: Clock },
-  pending: { label: "Pending", chip: "bg-amber-100 text-amber-800", icon: Clock },
-  verified: { label: "Verified", chip: "bg-emerald-100 text-emerald-800", icon: CheckCircle2 },
-  rejected: { label: "Rejected", chip: "bg-rose-100 text-rose-700", icon: AlertCircle },
+  unverified: { chip: "bg-slate-100 text-slate-600", icon: Clock, labelKey: "travelDocs.statusUnverified" },
+  pending: { chip: "bg-amber-100 text-amber-800", icon: Clock, labelKey: "travelDocs.statusPending" },
+  verified: { chip: "bg-emerald-100 text-emerald-800", icon: CheckCircle2, labelKey: "travelDocs.statusVerified" },
+  rejected: { chip: "bg-rose-100 text-rose-700", icon: AlertCircle, labelKey: "travelDocs.statusRejected" },
 };
 
 const formatBytes = (n) => {
@@ -66,6 +71,7 @@ const FileIcon = ({ mimeType }) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const meta = STATUS_META[status] || STATUS_META.unverified;
   const Icon = meta.icon;
   return (
@@ -76,12 +82,13 @@ const StatusChip = ({ status }) => {
       ].join(" ")}
     >
       <Icon className="h-3 w-3" />
-      {meta.label}
+      {t(meta.labelKey)}
     </span>
   );
 };
 
 const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
+  const { t } = useTranslation();
   const [note, setNote] = useState(doc.verificationNote || "");
   const [submitting, setSubmitting] = useState(false);
   const [pending, setPending] = useState(null);
@@ -92,7 +99,7 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
 
   const submit = async (status) => {
     if (status === "rejected" && !note.trim()) {
-      toast.error("Please add a brief reason when rejecting.");
+      toast.error(t("admin.errRejectReason"));
       return;
     }
     setPending(status);
@@ -104,14 +111,14 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
       });
       toast.success(
         status === "verified"
-          ? "Document verified."
+          ? t("adminTravelDocs.toastVerified")
           : status === "rejected"
-            ? "Document rejected."
-            : "Status updated."
+            ? t("adminTravelDocs.toastRejected")
+            : t("adminTravelDocs.toastStatusUpdated")
       );
       onReviewed(updated);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update.");
+      toast.error(err?.response?.data?.message || t("adminTravelDocs.failedUpdate"));
     } finally {
       setPending(null);
       setSubmitting(false);
@@ -121,13 +128,13 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
   return (
     <div className="mt-4 rounded-xl border border-border bg-slate-50 p-4">
       <Label className="text-xs font-bold uppercase tracking-wider text-muted">
-        Reviewer note
+        {t("common.reviewerNote")}
       </Label>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value.slice(0, 1000))}
         rows={2}
-        placeholder="Optional for verify · required for reject"
+        placeholder={t("admin.notePlaceholderReview")}
         className="mt-2 w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
       <div className="mt-3 flex flex-wrap gap-2">
@@ -142,7 +149,7 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
           ) : (
             <CheckCircle2 className="h-3.5 w-3.5" />
           )}
-          Verify
+          {t("admin.verify")}
         </Button>
         <Button
           size="sm"
@@ -155,7 +162,7 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
           ) : (
             <Clock className="h-3.5 w-3.5" />
           )}
-          Mark pending
+          {t("admin.markPending")}
         </Button>
         <Button
           size="sm"
@@ -169,7 +176,7 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
           ) : (
             <XCircle className="h-3.5 w-3.5" />
           )}
-          Reject
+          {t("admin.reject")}
         </Button>
       </div>
     </div>
@@ -177,6 +184,7 @@ const ReviewPanel = ({ doc, sessionToken, onReviewed }) => {
 };
 
 const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [revealNumber, setRevealNumber] = useState(false);
 
@@ -193,7 +201,7 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
       const blob = await fetchBlob();
       window.open(URL.createObjectURL(blob), "_blank", "noopener");
     } catch {
-      toast.error("Could not open file.");
+      toast.error(t("adminTravelDocs.couldNotOpen"));
     }
   };
 
@@ -207,9 +215,12 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error("Could not download file.");
+      toast.error(t("adminTravelDocs.couldNotDownload"));
     }
   };
+
+  const typeKey = TYPE_KEY[doc.type];
+  const typeLabel = typeKey ? t(typeKey) : doc.type;
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -224,7 +235,7 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h4 className="truncate text-sm font-bold text-ink">{doc.title}</h4>
-                  <p className="text-xs text-muted">{TYPE_LABELS[doc.type] || doc.type}</p>
+                  <p className="text-xs text-muted">{typeLabel}</p>
                 </div>
                 <StatusChip status={doc.verificationStatus} />
               </div>
@@ -243,7 +254,7 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
                       onClick={() => setRevealNumber((v) => !v)}
                       className="text-[10px] font-bold uppercase text-primary hover:underline"
                     >
-                      {revealNumber ? "Hide" : "Reveal"}
+                      {revealNumber ? t("common.hide") : t("common.reveal")}
                     </button>
                   )}
                 </div>
@@ -259,13 +270,13 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
                 {doc.issuedDate && (
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    Issued {formatDate(doc.issuedDate)}
+                    {t("adminTravelDocs.issuedPrefix", { date: formatDate(doc.issuedDate) })}
                   </span>
                 )}
                 {doc.expiryDate && (
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    Expires {formatDate(doc.expiryDate)}
+                    {t("adminTravelDocs.expiresPrefix", { date: formatDate(doc.expiryDate) })}
                   </span>
                 )}
                 <span>
@@ -275,16 +286,16 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
 
               {doc.verificationNote && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  <span className="font-semibold">Note:</span> {doc.verificationNote}
+                  <span className="font-semibold">{t("admin.notePrefix")}</span> {doc.verificationNote}
                 </p>
               )}
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Button size="sm" variant="ghost" onClick={previewFile}>
-                  <Eye className="h-3.5 w-3.5" /> View
+                  <Eye className="h-3.5 w-3.5" /> {t("common.view")}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={downloadFile}>
-                  <Download className="h-3.5 w-3.5" /> Download
+                  <Download className="h-3.5 w-3.5" /> {t("common.download")}
                 </Button>
                 <Button
                   size="sm"
@@ -292,7 +303,7 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
                   onClick={() => setExpanded((v) => !v)}
                 >
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  {expanded ? "Close" : "Review"}
+                  {expanded ? t("adminTravelDocs.close") : t("admin.review")}
                 </Button>
               </div>
 
@@ -319,6 +330,7 @@ const TravelDocRow = ({ doc, sessionToken, onReviewed }) => {
  * that scholar has an approved scholarship. Otherwise renders a notice.
  */
 const AdminTravelDocsSection = ({ sessionToken, scholarId }) => {
+  const { t } = useTranslation();
   const [docs, setDocs] = useState([]);
   const [eligibility, setEligibility] = useState(null); // { eligible, approvedCount }
   const [loading, setLoading] = useState(true);
@@ -338,11 +350,11 @@ const AdminTravelDocsSection = ({ sessionToken, scholarId }) => {
         setDocs([]);
       }
     } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load travel documents.");
+      setError(err?.response?.data?.message || t("adminTravelDocs.failedLoad"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, scholarId]);
+  }, [sessionToken, scholarId, t]);
 
   useEffect(() => {
     load();
@@ -357,11 +369,10 @@ const AdminTravelDocsSection = ({ sessionToken, scholarId }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Plane className="h-5 w-5 text-primary" />
-          Travel documents
+          {t("adminTravelDocs.title")}
         </CardTitle>
         <p className="text-xs text-muted">
-          Identity and travel documents (passport, visa, insurance) shared by
-          the scholar.
+          {t("adminTravelDocs.subtitle")}
         </p>
       </CardHeader>
       <CardContent>
@@ -378,17 +389,17 @@ const AdminTravelDocsSection = ({ sessionToken, scholarId }) => {
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div>
-              <p className="font-semibold text-amber-900">Locked</p>
+              <p className="font-semibold text-amber-900">{t("adminTravelDocs.locked")}</p>
               <p className="text-amber-800">
-                Travel documents are only visible after at least one of this
-                scholar's applications has been{" "}
-                <span className="font-semibold">approved</span>.
+                {t("adminTravelDocs.lockedBodyPrefix")}
+                <span className="font-semibold">{t("adminTravelDocs.approved")}</span>
+                {t("adminTravelDocs.lockedBodySuffix")}
               </p>
             </div>
           </div>
         ) : docs.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-muted">
-            This scholar hasn't uploaded any travel documents yet.
+            {t("adminTravelDocs.empty")}
           </p>
         ) : (
           <div className="grid gap-3">

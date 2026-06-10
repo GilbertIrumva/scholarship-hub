@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -15,6 +15,7 @@ import {
   Compass,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -24,31 +25,31 @@ import { listMyApplications } from "../../services/applications";
 
 const STATUS_STYLES = {
   submitted: {
-    label: "Submitted",
+    labelKey: "applications.statusSubmitted",
     icon: Clock,
     chip: "bg-sky-100 text-sky-700",
     dot: "bg-sky-500",
   },
   "under-review": {
-    label: "Under review",
+    labelKey: "applications.statusUnderReview",
     icon: Search,
     chip: "bg-amber-100 text-amber-800",
     dot: "bg-amber-500",
   },
   approved: {
-    label: "Approved",
+    labelKey: "applications.statusApproved",
     icon: CheckCircle2,
     chip: "bg-emerald-100 text-emerald-800",
     dot: "bg-emerald-500",
   },
   rejected: {
-    label: "Rejected",
+    labelKey: "applications.statusRejected",
     icon: XCircle,
     chip: "bg-rose-100 text-rose-700",
     dot: "bg-rose-500",
   },
   withdrawn: {
-    label: "Withdrawn",
+    labelKey: "applications.statusWithdrawn",
     icon: AlertCircle,
     chip: "bg-slate-100 text-slate-600",
     dot: "bg-slate-400",
@@ -80,6 +81,7 @@ const formatDate = (date) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const cfg = STATUS_STYLES[status] || STATUS_STYLES.submitted;
   const Icon = cfg.icon;
   return (
@@ -90,12 +92,13 @@ const StatusChip = ({ status }) => {
       ].join(" ")}
     >
       <Icon className="h-3 w-3" />
-      {cfg.label}
+      {t(cfg.labelKey)}
     </span>
   );
 };
 
 const ApplicationCard = ({ application }) => {
+  const { t } = useTranslation();
   const s = application.scholarship;
   const status = application.status;
   const cfg = STATUS_STYLES[status] || STATUS_STYLES.submitted;
@@ -111,7 +114,7 @@ const ApplicationCard = ({ application }) => {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-bold leading-snug text-ink">
-                {s?.title || "Scholarship"}
+                {s?.title || t("applications.scholarshipFallback")}
               </h3>
               {s?.provider && (
                 <p className="mt-0.5 text-sm font-semibold text-muted">{s.provider}</p>
@@ -122,27 +125,27 @@ const ApplicationCard = ({ application }) => {
 
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
             <div>
-              <p className="font-bold uppercase tracking-wider text-muted">Award</p>
+              <p className="font-bold uppercase tracking-wider text-muted">{t("applications.award")}</p>
               <p className="mt-0.5 inline-flex items-center gap-1 font-semibold text-ink">
                 <DollarSign className="h-3 w-3 text-primary" />
                 {formatAmount(s?.amount, s?.currency)}
               </p>
             </div>
             <div>
-              <p className="font-bold uppercase tracking-wider text-muted">Deadline</p>
+              <p className="font-bold uppercase tracking-wider text-muted">{t("applications.deadline")}</p>
               <p className="mt-0.5 inline-flex items-center gap-1 font-semibold text-ink">
                 <Calendar className="h-3 w-3 text-primary" />
                 {formatDate(s?.deadline)}
               </p>
             </div>
             <div>
-              <p className="font-bold uppercase tracking-wider text-muted">Submitted</p>
+              <p className="font-bold uppercase tracking-wider text-muted">{t("applications.submittedAt")}</p>
               <p className="mt-0.5 font-semibold text-ink">
                 {formatDate(application.submittedAt)}
               </p>
             </div>
             <div>
-              <p className="font-bold uppercase tracking-wider text-muted">Updated</p>
+              <p className="font-bold uppercase tracking-wider text-muted">{t("applications.updatedAt")}</p>
               <p className="mt-0.5 font-semibold text-ink">
                 {formatDate(application.updatedAt)}
               </p>
@@ -152,7 +155,7 @@ const ApplicationCard = ({ application }) => {
           {application.decisionNote && (
             <div className="mt-4 rounded-lg border border-border bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
               <p className="font-bold uppercase tracking-wider text-muted">
-                Reviewer note
+                {t("applications.reviewerNote")}
               </p>
               <p className="mt-1">{application.decisionNote}</p>
             </div>
@@ -162,7 +165,7 @@ const ApplicationCard = ({ application }) => {
             <div className="mt-4 flex justify-end">
               <Button asChild variant="ghost" size="sm" className="gap-1">
                 <Link to={`/scholar/scholarships/${s.id}`}>
-                  View scholarship <ExternalLink className="h-3 w-3" />
+                  {t("applications.viewScholarship")} <ExternalLink className="h-3 w-3" />
                 </Link>
               </Button>
             </div>
@@ -174,6 +177,7 @@ const ApplicationCard = ({ application }) => {
 };
 
 const MyApplicationsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
 
@@ -194,7 +198,7 @@ const MyApplicationsPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          toast.error(err?.response?.data?.message || "Failed to load applications.");
+          toast.error(err?.response?.data?.message || t("applications.loadFailed"));
         }
       })
       .finally(() => {
@@ -209,6 +213,17 @@ const MyApplicationsPage = () => {
     signOut();
     navigate("/");
   }, [signOut, navigate]);
+
+  const TABS = useMemo(
+    () => [
+      { id: "all", label: t("applications.tabAll") },
+      { id: "submitted", label: t("applications.statusSubmitted") },
+      { id: "under-review", label: t("applications.statusUnderReview") },
+      { id: "approved", label: t("applications.statusApproved") },
+      { id: "rejected", label: t("applications.statusRejected") },
+    ],
+    [t]
+  );
 
   if (!sessionToken || !scholarProfile) return <Navigate to="/login?role=scholar" replace />;
   const scholar = scholarProfile.scholar;
@@ -233,20 +248,12 @@ const MyApplicationsPage = () => {
     return true;
   });
 
-  const TABS = [
-    { id: "all", label: "All" },
-    { id: "submitted", label: "Submitted" },
-    { id: "under-review", label: "Under review" },
-    { id: "approved", label: "Approved" },
-    { id: "rejected", label: "Rejected" },
-  ];
-
   return (
     <DashboardLayout
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-      title="My applications"
-      subtitle="Track the status of every scholarship you've applied to"
+      title={t("applications.pageTitle")}
+      subtitle={t("applications.pageSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
@@ -258,7 +265,7 @@ const MyApplicationsPage = () => {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by scholarship or provider..."
+                placeholder={t("applications.searchPlaceholder")}
                 className="pl-9"
               />
             </div>
@@ -305,14 +312,13 @@ const MyApplicationsPage = () => {
               <span className="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
                 <FileText className="h-8 w-8" />
               </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">No applications yet</h3>
+              <h3 className="mt-4 text-lg font-bold text-ink">{t("applications.noneTitle")}</h3>
               <p className="mt-1 max-w-sm text-sm text-muted">
-                Browse open scholarships and submit your first application — it only takes
-                a moment.
+                {t("applications.noneDescription")}
               </p>
               <Button asChild className="mt-5">
                 <Link to="/scholar/scholarships">
-                  <Compass className="h-4 w-4" /> Browse scholarships
+                  <Compass className="h-4 w-4" /> {t("applications.browseScholarships")}
                 </Link>
               </Button>
             </CardContent>
@@ -322,7 +328,7 @@ const MyApplicationsPage = () => {
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Search className="h-10 w-10 text-muted/40" />
               <p className="mt-3 text-sm font-semibold text-muted">
-                No applications match your filter.
+                {t("applications.filterNoMatch")}
               </p>
             </CardContent>
           </Card>

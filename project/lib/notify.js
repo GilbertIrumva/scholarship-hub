@@ -1,12 +1,14 @@
 'use strict';
 
 const { Notification } = require('../db/models');
+const { logger } = require('./logger');
 
 /**
  * notify(recipient, payload) — fire-and-forget Notification create.
  *
  * Never blocks the caller, never throws — failed inserts are logged via
- * console.warn so a flaky write does not break the user-visible request.
+ * the shared pino logger so a flaky write does not break the user-visible
+ * request.
  *
  *   recipient = { kind: 'scholar' | 'admin', id: ObjectId | string }
  *   payload   = { kind, title, body?, url?, data? }
@@ -29,8 +31,7 @@ const notify = (recipient, payload) => {
         url: payload.url || '',
         data: payload.data || {},
     }).catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn('notify(): failed to persist notification', err && err.message);
+        logger.warn({ err: err && err.message }, 'notify: failed to persist notification');
         return null;
     });
 };
@@ -45,8 +46,7 @@ const notifyAdmins = async (payload) => {
         const admins = await Admin.find({}, { _id: 1 }).lean();
         await Promise.all(admins.map((a) => notify({ kind: 'admin', id: a._id }, payload)));
     } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn('notifyAdmins(): failed', err && err.message);
+        logger.warn({ err: err && err.message }, 'notifyAdmins failed');
     }
 };
 

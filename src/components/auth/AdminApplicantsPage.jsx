@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { ChevronRight, RefreshCcw, Search, UserRound, Users } from "lucide-react";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const AdminApplicantsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     sessionToken,
@@ -25,8 +27,6 @@ const AdminApplicantsPage = () => {
     if (sessionToken) loadApplicants();
   }, [sessionToken, loadApplicants]);
 
-  if (!sessionToken) return <Navigate to="/login/admin" replace />;
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return applicantsList;
@@ -37,6 +37,8 @@ const AdminApplicantsPage = () => {
     );
   }, [applicantsList, query]);
 
+  if (!sessionToken) return <Navigate to="/login/admin" replace />;
+
   const handleSignOut = () => {
     signOut();
     navigate("/");
@@ -46,13 +48,13 @@ const AdminApplicantsPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title="Applicants"
-      subtitle={`${applicantsList.length} total profiles`}
+      title={t("adminApplicants.pageTitle")}
+      subtitle={t("adminApplicants.totalProfiles", { count: applicantsList.length })}
       onSignOut={handleSignOut}
       actions={
         <Button onClick={loadApplicants} disabled={isSubmitting} variant="outline" size="sm">
           <RefreshCcw className="h-4 w-4" />
-          Refresh
+          {t("admin.refresh")}
         </Button>
       }
     >
@@ -67,7 +69,7 @@ const AdminApplicantsPage = () => {
               <div>
                 <p className="text-2xl font-extrabold text-ink">{filtered.length}</p>
                 <p className="text-xs font-semibold text-muted">
-                  {query ? "matching" : "active"} applicants
+                  {query ? t("adminApplicants.matchingApplicants") : t("adminApplicants.activeApplicants")}
                 </p>
               </div>
             </div>
@@ -75,7 +77,7 @@ const AdminApplicantsPage = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <Input
                 type="search"
-                placeholder="Search by name, nationality, education…"
+                placeholder={t("adminApplicants.searchPlaceholder")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="pl-9"
@@ -123,7 +125,7 @@ const AdminApplicantsPage = () => {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-base font-bold text-ink group-hover:text-primary">
-                            {applicant.name || "Unnamed"}
+                            {applicant.name || t("adminApplicants.unnamed")}
                           </p>
                           <p className="text-xs text-muted truncate">
                             #{applicant.id} · {applicant.nationality || "—"}
@@ -132,8 +134,8 @@ const AdminApplicantsPage = () => {
                       </div>
                       <div className="mt-4 space-y-1.5 text-xs">
                         <p className="text-muted line-clamp-2">
-                          <span className="font-semibold text-ink">Education:</span>{" "}
-                          {applicant.education || "Not supplied"}
+                          <span className="font-semibold text-ink">{t("adminApplicants.educationLabel")}</span>{" "}
+                          {applicant.education || t("adminApplicants.notSupplied")}
                         </p>
                         {applicant.status && (
                           <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary-dark">
@@ -142,7 +144,7 @@ const AdminApplicantsPage = () => {
                         )}
                       </div>
                       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs font-bold uppercase tracking-wider text-primary group-hover:gap-2 transition-all">
-                        View profile
+                        {t("adminApplicants.viewProfile")}
                         <ChevronRight className="h-3.5 w-3.5" />
                       </div>
                     </CardContent>
@@ -156,14 +158,14 @@ const AdminApplicantsPage = () => {
             <CardContent className="p-12 text-center">
               <UserRound className="mx-auto h-12 w-12 text-muted/40" />
               <p className="mt-4 text-sm font-semibold text-ink">
-                {query ? "No applicants matched your search." : "No applicants found."}
+                {query ? t("adminApplicants.noMatchingSearch") : t("adminApplicants.noneFound")}
               </p>
               {query && (
                 <button
                   onClick={() => setQuery("")}
                   className="mt-2 text-xs font-semibold text-primary hover:text-primary-dark"
                 >
-                  Clear search
+                  {t("adminApplicants.clearSearch")}
                 </button>
               )}
             </CardContent>

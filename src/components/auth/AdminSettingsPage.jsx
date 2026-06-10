@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   KeyRound,
@@ -37,6 +38,7 @@ const buildScholarForm = (settings) => ({
 });
 
 const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: scholar.name || "",
     email: scholar.email || "",
@@ -50,10 +52,11 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
 
   const handleSave = async () => {
     setError("");
-    if (!form.name.trim()) return setError("Name is required.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setError("Valid email required.");
+    if (!form.name.trim()) return setError(t("adminSettings.errNameReq"));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
+      return setError(t("adminSettings.errValidEmail"));
     if (form.password.trim() && form.password.trim().length < 8)
-      return setError("Password must be ≥ 8 characters.");
+      return setError(t("adminSettings.errPasswordMin"));
 
     const payload = {
       name: form.name.trim(),
@@ -65,7 +68,7 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
   };
 
   const handleDelete = () => {
-    if (!window.confirm(`Remove scholar account for ${scholar.email}?`)) return;
+    if (!window.confirm(t("adminSettings.removeConfirm", { email: scholar.email }))) return;
     onDelete(scholar.id);
   };
 
@@ -79,19 +82,19 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                Scholar #{scholar.id}
+                {t("adminSettings.scholarNumber", { id: scholar.id })}
               </p>
-              <p className="text-sm font-bold text-ink">{scholar.name || "Unnamed"}</p>
+              <p className="text-sm font-bold text-ink">{scholar.name || t("adminSettings.unnamed")}</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleDelete} disabled={busy}>
             <Trash2 className="h-3.5 w-3.5" />
-            Remove
+            {t("adminSettings.removeScholar")}
           </Button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Name</Label>
+            <Label>{t("adminSettings.fieldName")}</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
@@ -99,7 +102,7 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
             />
           </div>
           <div>
-            <Label>Email</Label>
+            <Label>{t("adminSettings.fieldEmail")}</Label>
             <Input
               type="email"
               value={form.email}
@@ -108,21 +111,21 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
             />
           </div>
           <div className="sm:col-span-2">
-            <Label>New password (optional)</Label>
+            <Label>{t("adminSettings.labelNewPasswordOptional")}</Label>
             <PasswordInput
               value={form.password}
               onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
-              placeholder="Leave empty to keep current password"
+              placeholder={t("adminSettings.scholarPasswordPlaceholder")}
               className="mt-1.5"
             />
           </div>
         </div>
         {error && <p className="mt-3 text-sm font-semibold text-rose-600">{error}</p>}
         <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted">
-          <span>Application: {scholar.applicationId ? `#${scholar.applicationId}` : "Not linked"}</span>
+          <span>{t("adminSettings.applicationLine", { value: scholar.applicationId ? `#${scholar.applicationId}` : t("adminSettings.applicationNotLinked") })}</span>
           <Button size="sm" onClick={handleSave} disabled={busy}>
             <Save className="h-3.5 w-3.5" />
-            Save
+            {t("adminSettings.save")}
           </Button>
         </div>
       </CardContent>
@@ -131,6 +134,7 @@ const ScholarRow = ({ scholar, onSave, onDelete, busy }) => {
 };
 
 const AdminSettingsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     sessionToken,
@@ -183,26 +187,26 @@ const AdminSettingsPage = () => {
   const validate = () => {
     const e = {};
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!adminForm.name.trim()) e.adminName = "Required.";
-    if (!adminForm.email.trim()) e.adminEmail = "Required.";
-    else if (!emailPattern.test(adminForm.email)) e.adminEmail = "Invalid email.";
+    if (!adminForm.name.trim()) e.adminName = t("adminSettings.errRequired");
+    if (!adminForm.email.trim()) e.adminEmail = t("adminSettings.errRequired");
+    else if (!emailPattern.test(adminForm.email)) e.adminEmail = t("adminSettings.errInvalidEmail");
     else if (!adminForm.email.endsWith("@schooladmin.com"))
-      e.adminEmail = "Must end with @schooladmin.com";
-    if (!adminForm.department.trim()) e.department = "Required.";
-    if (!adminForm.departmentCode.trim()) e.departmentCode = "Required.";
-    if (!adminForm.twoFactorCode.trim()) e.twoFactorCode = "Required.";
+      e.adminEmail = t("adminSettings.errAdminDomain");
+    if (!adminForm.department.trim()) e.department = t("adminSettings.errRequired");
+    if (!adminForm.departmentCode.trim()) e.departmentCode = t("adminSettings.errRequired");
+    if (!adminForm.twoFactorCode.trim()) e.twoFactorCode = t("adminSettings.errRequired");
     if (adminForm.password && adminForm.password.length < 8)
-      e.adminPassword = "≥ 8 characters.";
-    if (!scholarForm.name.trim()) e.scholarName = "Required.";
-    if (!scholarForm.email.trim()) e.scholarEmail = "Required.";
-    else if (!emailPattern.test(scholarForm.email)) e.scholarEmail = "Invalid email.";
+      e.adminPassword = t("adminSettings.err8Chars");
+    if (!scholarForm.name.trim()) e.scholarName = t("adminSettings.errRequired");
+    if (!scholarForm.email.trim()) e.scholarEmail = t("adminSettings.errRequired");
+    else if (!emailPattern.test(scholarForm.email)) e.scholarEmail = t("adminSettings.errInvalidEmail");
     if (scholarForm.password && scholarForm.password.length < 8)
-      e.scholarPassword = "≥ 8 characters.";
+      e.scholarPassword = t("adminSettings.err8Chars");
     if (
       adminForm.email.trim().toLowerCase() === scholarForm.email.trim().toLowerCase() &&
       adminForm.email.trim()
     )
-      e.scholarEmail = "Must differ from admin email.";
+      e.scholarEmail = t("adminSettings.errDifferFromAdmin");
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -210,7 +214,7 @@ const AdminSettingsPage = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!validate()) {
-      toast.error("Please fix the highlighted fields.");
+      toast.error(t("adminSettings.errFixHighlighted"));
       return;
     }
     await saveSettings({
@@ -235,11 +239,11 @@ const AdminSettingsPage = () => {
       <DashboardLayout
         role="admin"
         user={adminDashboard?.admin}
-        title="Settings"
+        title={t("adminSettings.pageTitle")}
         onSignOut={handleSignOut}
       >
         <Card>
-          <CardContent className="p-12 text-center text-sm text-muted">Loading settings…</CardContent>
+          <CardContent className="p-12 text-center text-sm text-muted">{t("adminSettings.loadingSettings")}</CardContent>
         </Card>
       </DashboardLayout>
     );
@@ -249,13 +253,13 @@ const AdminSettingsPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title="Settings"
-      subtitle="Manage admin and scholar credentials"
+      title={t("adminSettings.pageTitle")}
+      subtitle={t("adminSettings.subtitle")}
       onSignOut={handleSignOut}
       actions={
         <Button variant="outline" size="sm" onClick={loadSettings} disabled={isSubmitting}>
           <RefreshCcw className="h-4 w-4" />
-          Refresh
+          {t("common.refresh")}
         </Button>
       }
     >
@@ -269,14 +273,14 @@ const AdminSettingsPage = () => {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle>Admin account</CardTitle>
-                  <CardDescription>Protected administrator credentials</CardDescription>
+                  <CardTitle>{t("adminSettings.adminAccount")}</CardTitle>
+                  <CardDescription>{t("adminSettings.adminAccountDesc")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="admin-name">Name</Label>
+                <Label htmlFor="admin-name">{t("adminSettings.fieldName")}</Label>
                 <Input
                   id="admin-name"
                   value={adminForm.name}
@@ -289,7 +293,7 @@ const AdminSettingsPage = () => {
               </div>
               <div>
                 <Label htmlFor="admin-email" className="inline-flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5" /> Email
+                  <Mail className="h-3.5 w-3.5" /> {t("adminSettings.fieldEmail")}
                 </Label>
                 <Input
                   id="admin-email"
@@ -304,7 +308,7 @@ const AdminSettingsPage = () => {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="admin-dept">Department</Label>
+                  <Label htmlFor="admin-dept">{t("adminSettings.fieldDepartment")}</Label>
                   <Input
                     id="admin-dept"
                     value={adminForm.department}
@@ -316,7 +320,7 @@ const AdminSettingsPage = () => {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="admin-deptcode">Department code</Label>
+                  <Label htmlFor="admin-deptcode">{t("adminSettings.fieldDepartmentCode")}</Label>
                   <Input
                     id="admin-deptcode"
                     value={adminForm.departmentCode}
@@ -329,7 +333,7 @@ const AdminSettingsPage = () => {
                 </div>
               </div>
               <div>
-                <Label htmlFor="admin-2fa">2FA code</Label>
+                <Label htmlFor="admin-2fa">{t("adminSettings.field2fa")}</Label>
                 <Input
                   id="admin-2fa"
                   value={adminForm.twoFactorCode}
@@ -342,13 +346,13 @@ const AdminSettingsPage = () => {
               </div>
               <div>
                 <Label htmlFor="admin-pw" className="inline-flex items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5" /> New password (optional)
+                  <KeyRound className="h-3.5 w-3.5" /> {t("adminSettings.fieldNewPasswordOptional")}
                 </Label>
                 <PasswordInput
                   id="admin-pw"
                   value={adminForm.password}
                   onChange={(e) => setAdminForm((c) => ({ ...c, password: e.target.value }))}
-                  placeholder="Leave empty to keep current"
+                  placeholder={t("adminSettings.passwordKeepCurrent")}
                   error={errors.adminPassword}
                   className="mt-1.5"
                 />
@@ -364,14 +368,14 @@ const AdminSettingsPage = () => {
                   <UserRound className="h-5 w-5" />
                 </div>
                 <div>
-                  <CardTitle>Primary scholar account</CardTitle>
-                  <CardDescription>Default student sign-in</CardDescription>
+                  <CardTitle>{t("adminSettings.scholarAccount")}</CardTitle>
+                  <CardDescription>{t("adminSettings.scholarAccountDesc")}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="scholar-name">Name</Label>
+                <Label htmlFor="scholar-name">{t("adminSettings.fieldName")}</Label>
                 <Input
                   id="scholar-name"
                   value={scholarForm.name}
@@ -384,7 +388,7 @@ const AdminSettingsPage = () => {
               </div>
               <div>
                 <Label htmlFor="scholar-email" className="inline-flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5" /> Email
+                  <Mail className="h-3.5 w-3.5" /> {t("adminSettings.fieldEmail")}
                 </Label>
                 <Input
                   id="scholar-email"
@@ -399,13 +403,13 @@ const AdminSettingsPage = () => {
               </div>
               <div>
                 <Label htmlFor="scholar-pw" className="inline-flex items-center gap-1.5">
-                  <KeyRound className="h-3.5 w-3.5" /> New password (optional)
+                  <KeyRound className="h-3.5 w-3.5" /> {t("adminSettings.fieldNewPasswordOptional")}
                 </Label>
                 <PasswordInput
                   id="scholar-pw"
                   value={scholarForm.password}
                   onChange={(e) => setScholarForm((c) => ({ ...c, password: e.target.value }))}
-                  placeholder="Leave empty to keep current"
+                  placeholder={t("adminSettings.passwordKeepCurrent")}
                   error={errors.scholarPassword}
                   className="mt-1.5"
                 />
@@ -416,11 +420,11 @@ const AdminSettingsPage = () => {
 
         <div className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            Changes write to the backend immediately and apply on the next sign-in.
+            {t("adminSettings.changesApply")}
           </p>
           <Button type="submit" size="lg" disabled={isSubmitting}>
             <Save className="h-4 w-4" />
-            {isSubmitting ? "Saving…" : "Save credential changes"}
+            {isSubmitting ? t("adminSettings.savingChanges") : t("adminSettings.saveChanges")}
           </Button>
         </div>
       </form>
@@ -434,9 +438,9 @@ const AdminSettingsPage = () => {
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-ink">Security</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-ink">{t("adminSettings.security")}</h2>
             <p className="text-sm text-muted">
-              Two-factor authentication and active session control for this admin account.
+              {t("adminSettings.securityDesc")}
             </p>
           </div>
         </div>
@@ -453,15 +457,15 @@ const AdminSettingsPage = () => {
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight text-ink">All scholar accounts</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight text-ink">{t("adminSettings.allScholars")}</h2>
               <p className="text-sm text-muted">
-                Inspect and update every registered scholar in your tenant.
+                {t("adminSettings.allScholarsDesc")}
               </p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={loadScholars} disabled={isSubmitting}>
             <RefreshCcw className="h-4 w-4" />
-            Reload
+            {t("admin.reload")}
           </Button>
         </div>
 
@@ -486,7 +490,7 @@ const AdminSettingsPage = () => {
         ) : (
           <Card>
             <CardContent className="p-12 text-center text-sm text-muted">
-              No scholar accounts found yet.
+              {t("adminSettings.noScholars")}
             </CardContent>
           </Card>
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Cake,
@@ -44,6 +45,7 @@ const Field = ({ icon: Icon, label, value }) => (
 );
 
 const AdminApplicantDetailPage = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { sessionToken, adminDashboard, signOut } = useAuth();
@@ -58,7 +60,7 @@ const AdminApplicantDetailPage = () => {
       const data = await getAdminApplicant(sessionToken, id);
       setApplicant(data?.applicant || data);
     } catch {
-      toast.error("Could not load applicant.");
+      toast.error(t("adminApplicants.couldNotLoad"));
     } finally {
       setLoading(false);
     }
@@ -80,28 +82,28 @@ const AdminApplicantDetailPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title={applicant?.name || "Applicant detail"}
-      subtitle={applicant ? `#${applicant.id || applicant.legacyId || id}` : "Loading…"}
+      title={applicant?.name || t("adminApplicants.detailTitle")}
+      subtitle={applicant ? `#${applicant.id || applicant.legacyId || id}` : t("common.loading")}
       onSignOut={handleSignOut}
       actions={
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
             <Link to="/admin/applicants">
               <ArrowLeft className="h-4 w-4" />
-              Back
+              {t("common.back")}
             </Link>
           </Button>
           {applicant?.scholarAccountId && (
             <Button asChild variant="outline" size="sm">
               <Link to={`/admin/credentials?scholar=${applicant.scholarAccountId}`}>
                 <FolderArchive className="h-4 w-4" />
-                Credentials
+                {t("adminApplicants.credentialsLink")}
               </Link>
             </Button>
           )}
           <Button onClick={fetchApplicant} disabled={loading} size="sm">
             <RefreshCcw className="h-4 w-4" />
-            Refresh
+            {t("admin.refresh")}
           </Button>
         </div>
       }
@@ -109,13 +111,13 @@ const AdminApplicantDetailPage = () => {
       {loading && !applicant ? (
         <Card>
           <CardContent className="p-16 text-center text-sm text-muted">
-            Loading applicant…
+            {t("adminApplicants.loadingApplicant")}
           </CardContent>
         </Card>
       ) : !applicant ? (
         <Card>
           <CardContent className="p-16 text-center text-sm text-muted">
-            Applicant not found.
+            {t("adminApplicants.notFound")}
           </CardContent>
         </Card>
       ) : (
@@ -136,7 +138,7 @@ const AdminApplicantDetailPage = () => {
                   </div>
                 )}
               </div>
-              <h2 className="mt-4 text-xl font-extrabold text-ink">{applicant.name || "Unnamed"}</h2>
+              <h2 className="mt-4 text-xl font-extrabold text-ink">{applicant.name || t("adminApplicants.unnamed")}</h2>
               <p className="text-sm text-muted">
                 #{applicant.id || applicant.legacyId || id}
               </p>
@@ -146,7 +148,7 @@ const AdminApplicantDetailPage = () => {
                     STATUS_STYLES[applicant.reviewStatus] || "bg-slate-100 text-muted"
                   }`}
                 >
-                  {applicant.reviewStatus}
+                  {t(`adminApplicants.reviewStatus.${applicant.reviewStatus}`, { defaultValue: applicant.reviewStatus })}
                 </span>
               )}
               {applicant.status && applicant.status !== applicant.reviewStatus && (
@@ -155,10 +157,10 @@ const AdminApplicantDetailPage = () => {
             </CardContent>
             <Separator />
             <CardContent className="space-y-4 p-6">
-              <Field icon={Mail} label="Contact" value={applicant.contact} />
-              <Field icon={Phone} label="Phone" value={applicant.phone} />
-              <Field icon={MapPin} label="Address" value={applicant.address} />
-              <Field icon={MapPin} label="Nationality" value={applicant.nationality} />
+              <Field icon={Mail} label={t("adminApplicants.fieldContact")} value={applicant.contact} />
+              <Field icon={Phone} label={t("adminApplicants.fieldPhone")} value={applicant.phone} />
+              <Field icon={MapPin} label={t("adminApplicants.fieldAddress")} value={applicant.address} />
+              <Field icon={MapPin} label={t("adminApplicants.fieldNationality")} value={applicant.nationality} />
             </CardContent>
           </Card>
 
@@ -166,14 +168,14 @@ const AdminApplicantDetailPage = () => {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Personal information</CardTitle>
+                <CardTitle>{t("adminApplicants.personalInformation")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field icon={Cake} label="Age" value={applicant.age ? `${applicant.age} years` : null} />
-                  <Field icon={Cake} label="Date of birth" value={applicant.dateOfBirth} />
-                  <Field icon={Users} label="Gender" value={applicant.gender} />
-                  <Field icon={GraduationCap} label="Education" value={applicant.education} />
+                  <Field icon={Cake} label={t("adminApplicants.fieldAge")} value={applicant.age ? t("adminApplicants.ageYears", { count: applicant.age }) : null} />
+                  <Field icon={Cake} label={t("adminApplicants.fieldDob")} value={applicant.dateOfBirth} />
+                  <Field icon={Users} label={t("adminApplicants.fieldGender")} value={applicant.gender} />
+                  <Field icon={GraduationCap} label={t("adminApplicants.fieldEducation")} value={applicant.education} />
                 </div>
               </CardContent>
             </Card>
@@ -181,7 +183,7 @@ const AdminApplicantDetailPage = () => {
             {applicant.bio && (
               <Card>
                 <CardHeader>
-                  <CardTitle>About</CardTitle>
+                  <CardTitle>{t("adminApplicants.aboutSection")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="whitespace-pre-wrap text-sm leading-7 text-ink">{applicant.bio}</p>
@@ -191,12 +193,12 @@ const AdminApplicantDetailPage = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Metadata</CardTitle>
+                <CardTitle>{t("adminApplicants.metadata")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field
-                    label="Created"
+                    label={t("adminApplicants.fieldCreated")}
                     value={
                       applicant.createdAt
                         ? new Date(applicant.createdAt).toLocaleString()
@@ -204,15 +206,15 @@ const AdminApplicantDetailPage = () => {
                     }
                   />
                   <Field
-                    label="Updated"
+                    label={t("adminApplicants.fieldUpdated")}
                     value={
                       applicant.updatedAt
                         ? new Date(applicant.updatedAt).toLocaleString()
                         : null
                     }
                   />
-                  <Field label="Legacy ID" value={applicant.legacyId} />
-                  <Field label="Scholarship" value={applicant.scholarship} />
+                  <Field label={t("adminApplicants.fieldLegacyId")} value={applicant.legacyId} />
+                  <Field label={t("adminApplicants.fieldScholarship")} value={applicant.scholarship} />
                 </div>
               </CardContent>
             </Card>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,7 +24,7 @@ import { listSystems, convertGrade } from "../../lib/gradeConversion";
 import { Seo } from "../seo/Seo";
 
 // ---------------------------------------------------------------------------
-// Country lookup (covers all systems registered in Phase 1; expand in P3)
+// Country fallback names (English defaults; translated copy lives in i18n)
 // ---------------------------------------------------------------------------
 const COUNTRY_NAMES = {
   NG: "Nigeria",
@@ -63,41 +64,26 @@ const COUNTRY_NAMES = {
 
 const TIER_META = {
   "top-tier": {
-    label: "Top-tier competitive",
-    description:
-      "Strong fit for highly selective universities and major international scholarships.",
     icon: Trophy,
     accent: "from-primary to-primary-dark",
     chip: "bg-primary-light text-primary-dark",
   },
   competitive: {
-    label: "Competitive",
-    description:
-      "Eligible for most reputable universities; competitive for many full scholarships.",
     icon: Award,
     accent: "from-primary to-primary-dark",
     chip: "bg-primary-light text-primary-dark",
   },
   standard: {
-    label: "Standard pass",
-    description:
-      "Meets entry requirements for many universities; consider partial scholarships and bursaries.",
     icon: TrendingUp,
     accent: "from-sky-500 to-indigo-600",
     chip: "bg-sky-100 text-sky-700",
   },
   developing: {
-    label: "Developing",
-    description:
-      "Below typical scholarship thresholds. Explore foundation programs or retake options.",
     icon: Info,
     accent: "from-amber-400 to-orange-500",
     chip: "bg-amber-100 text-amber-800",
   },
   "below-threshold": {
-    label: "Below threshold",
-    description:
-      "Does not meet typical academic entry. Consider resits, foundation years, or alternative pathways.",
     icon: AlertCircle,
     accent: "from-rose-500 to-red-600",
     chip: "bg-rose-100 text-rose-700",
@@ -111,22 +97,13 @@ const STAT_PRIMARY = (label, value, sub) => ({ label, value, sub });
 // ---------------------------------------------------------------------------
 const allSystems = listSystems();
 
-// Unique country code list (sorted by name, with International last)
-const allCountries = (() => {
+// Unique country codes (sorted later inside the component once translated)
+const ALL_COUNTRY_CODES = (() => {
   const codes = new Set();
   for (const sys of allSystems) {
     for (const c of sys.countries || []) codes.add(c);
   }
-  const list = Array.from(codes).map((code) => ({
-    code,
-    name: COUNTRY_NAMES[code] || code,
-  }));
-  list.sort((a, b) => {
-    if (a.code === "INT") return 1;
-    if (b.code === "INT") return -1;
-    return a.name.localeCompare(b.name);
-  });
-  return list;
+  return Array.from(codes);
 })();
 
 const systemsForCountry = (countryCode) => {
@@ -184,6 +161,7 @@ const ResultMetric = ({ label, value, hint, accent }) => (
 );
 
 const ResultPanel = ({ result, error }) => {
+  const { t } = useTranslation();
   if (error) {
     return (
       <Card>
@@ -193,7 +171,7 @@ const ResultPanel = ({ result, error }) => {
               <AlertCircle className="h-5 w-5" />
             </span>
             <div>
-              <p className="font-bold text-ink">Can't convert that input</p>
+              <p className="font-bold text-ink">{t("gradeConverter.cannotConvert")}</p>
               <p className="mt-0.5 text-sm text-muted">{error}</p>
             </div>
           </div>
@@ -208,9 +186,9 @@ const ResultPanel = ({ result, error }) => {
           <span className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
             <Calculator className="h-7 w-7" />
           </span>
-          <p className="mt-3 text-sm font-semibold text-ink">Pick a system and enter your grade</p>
+          <p className="mt-3 text-sm font-semibold text-ink">{t("gradeConverter.emptyTitle")}</p>
           <p className="mt-1 max-w-xs text-xs text-muted">
-            Your results will appear here instantly as you type.
+            {t("gradeConverter.emptyHint")}
           </p>
         </CardContent>
       </Card>
@@ -219,6 +197,12 @@ const ResultPanel = ({ result, error }) => {
 
   const tier = TIER_META[result.tier] || TIER_META.standard;
   const TierIcon = tier.icon;
+  const tierLabel = t(`gradeConverter.tiers.${result.tier}.label`, {
+    defaultValue: result.tier,
+  });
+  const tierDescription = t(`gradeConverter.tiers.${result.tier}.description`, {
+    defaultValue: "",
+  });
 
   return (
     <motion.div
@@ -239,14 +223,14 @@ const ResultPanel = ({ result, error }) => {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-extrabold text-ink">{tier.label}</p>
+                <p className="text-sm font-extrabold text-ink">{tierLabel}</p>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tier.chip}`}
                 >
                   {result.interpretation}
                 </span>
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-muted">{tier.description}</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{tierDescription}</p>
             </div>
           </div>
         </CardContent>
@@ -255,17 +239,25 @@ const ResultPanel = ({ result, error }) => {
       {/* Metrics grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ResultMetric
-          label="Percentage"
+          label={t("gradeConverter.metricPercentage")}
           value={`${result.percentage}%`}
           accent="text-primary-dark"
         />
         <ResultMetric
-          label="US GPA"
+          label={t("gradeConverter.metricGpa")}
           value={result.gpa4.toFixed(2)}
-          hint="4.0 scale"
+          hint={t("gradeConverter.metricGpaHint")}
         />
-        <ResultMetric label="UK class" value={result.ukClass} hint="UK equivalent" />
-        <ResultMetric label="ECTS" value={result.ects} hint="European" />
+        <ResultMetric
+          label={t("gradeConverter.metricUk")}
+          value={result.ukClass}
+          hint={t("gradeConverter.metricUkHint")}
+        />
+        <ResultMetric
+          label={t("gradeConverter.metricEcts")}
+          value={result.ects}
+          hint={t("gradeConverter.metricEctsHint")}
+        />
       </div>
 
       {/* System notes */}
@@ -278,7 +270,7 @@ const ResultPanel = ({ result, error }) => {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                  About this conversion
+                  {t("gradeConverter.aboutConversion")}
                 </p>
                 <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-slate-700">
                   {result.notes.map((note, i) => (
@@ -301,9 +293,25 @@ const ResultPanel = ({ result, error }) => {
 // Main page
 // ---------------------------------------------------------------------------
 const GradeConverterPage = () => {
+  const { t } = useTranslation();
   const [country, setCountry] = useState("ALL");
   const [systemId, setSystemId] = useState(allSystems[0]?.id || "");
   const [input, setInput] = useState("");
+
+  const allCountries = useMemo(() => {
+    const list = ALL_COUNTRY_CODES.map((code) => ({
+      code,
+      name: t(`gradeConverter.countries.${code}`, {
+        defaultValue: COUNTRY_NAMES[code] || code,
+      }),
+    }));
+    list.sort((a, b) => {
+      if (a.code === "INT") return 1;
+      if (b.code === "INT") return -1;
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [t]);
 
   const filteredSystems = useMemo(() => systemsForCountry(country), [country]);
   const system = useMemo(
@@ -337,29 +345,29 @@ const GradeConverterPage = () => {
   return (
     <main className="min-h-screen bg-background">
       <Seo
-        title="Grade Converter"
-        description="Convert academic grades between international grading systems — GPA, percentage, ECTS, and more. Free and instant."
+        title={t("gradeConverter.seoTitle")}
+        description={t("gradeConverter.seoDescription")}
         path="/grade-converter"
-        keywords="grade converter, gpa converter, ects converter, international grading scales"
+        keywords={t("gradeConverter.seoKeywords")}
       />
       {/* ====== Top bar ====== */}
       <header className="sticky top-3 z-40 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
         <Link to="/" className="flex shrink-0 items-center">
           <img
             src="/logo.png"
-            alt="ScholarshipZone"
+            alt={t("common.appName")}
             className="h-12 w-auto object-contain"
           />
         </Link>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
             <Link to="/">
-              <ArrowLeft className="h-4 w-4" /> Home
+              <ArrowLeft className="h-4 w-4" /> {t("gradeConverter.navHome")}
             </Link>
           </Button>
           <Button asChild size="sm">
             <Link to="/signup">
-              Sign up <ArrowRight className="h-4 w-4" />
+              {t("common.signUp")} <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
         </div>
@@ -372,38 +380,36 @@ const GradeConverterPage = () => {
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
                 <Sparkles className="h-3.5 w-3.5" />
-                Free • No sign-up required
+                {t("gradeConverter.heroBadge")}
               </span>
               <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-                Convert your school grades to the world standard
+                {t("gradeConverter.heroTitle")}
               </h1>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-                See instantly how your secondary-school certificate compares to US GPA,
-                UK degree class, and European ECTS — so you know which scholarships you
-                qualify for, anywhere in the world.
+                {t("gradeConverter.heroSubtitle")}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <a
                   href="#converter"
                   className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-ink shadow-sm transition-all hover:bg-accent-dark"
                 >
-                  Start converting <ArrowRight className="h-4 w-4" />
+                  {t("gradeConverter.heroCta")} <ArrowRight className="h-4 w-4" />
                 </a>
                 <Link
                   to="/scholar/scholarships"
                   className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20"
                 >
-                  Browse scholarships
+                  {t("gradeConverter.browseScholarships")}
                 </Link>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               {[
-                STAT_PRIMARY("Systems", `${allSystems.length}+`, "Grading systems supported"),
-                STAT_PRIMARY("Countries", `${allCountries.length - 1}+`, "Across Africa & worldwide"),
-                STAT_PRIMARY("Outputs", "4", "GPA, UK, ECTS, %"),
-                STAT_PRIMARY("Cost", "Free", "Always — no account"),
+                STAT_PRIMARY(t("gradeConverter.statSystems"), `${allSystems.length}+`, t("gradeConverter.statSystemsSub")),
+                STAT_PRIMARY(t("gradeConverter.statCountries"), `${allCountries.length - 1}+`, t("gradeConverter.statCountriesSub")),
+                STAT_PRIMARY(t("gradeConverter.statOutputs"), "4", t("gradeConverter.statOutputsSub")),
+                STAT_PRIMARY(t("gradeConverter.statCost"), t("gradeConverter.statCostValue"), t("gradeConverter.statCostSub")),
               ].map((s) => (
                 <div
                   key={s.label}
@@ -431,21 +437,21 @@ const GradeConverterPage = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">
                   <span className="inline-flex items-center gap-2">
-                    <Globe2 className="h-4 w-4 text-primary" /> 1. Where did you study?
+                    <Globe2 className="h-4 w-4 text-primary" /> {t("gradeConverter.step1Title")}
                   </span>
                 </CardTitle>
-                <p className="text-sm text-muted">Optional — narrows the system list.</p>
+                <p className="text-sm text-muted">{t("gradeConverter.step1Hint")}</p>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2">
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">{t("gradeConverter.countryLabel")}</Label>
                   <select
                     id="country"
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
                     className="flex h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
-                    <option value="ALL">All countries</option>
+                    <option value="ALL">{t("gradeConverter.allCountries")}</option>
                     {allCountries.map((c) => (
                       <option key={c.code} value={c.code}>
                         {c.name}
@@ -461,24 +467,23 @@ const GradeConverterPage = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">
                   <span className="inline-flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-primary" /> 2. Which certificate?
+                    <GraduationCap className="h-4 w-4 text-primary" /> {t("gradeConverter.step2Title")}
                   </span>
                 </CardTitle>
                 <p className="text-sm text-muted">
-                  {filteredSystems.length}{" "}
-                  {filteredSystems.length === 1 ? "system" : "systems"} available.
+                  {t("gradeConverter.systemsAvailable", { count: filteredSystems.length })}
                 </p>
               </CardHeader>
               <CardContent>
                 {filteredSystems.length === 0 ? (
                   <p className="text-sm text-muted">
-                    No systems yet for that country.{" "}
+                    {t("gradeConverter.noSystemsForCountry")}{" "}
                     <button
                       type="button"
                       onClick={() => setCountry("ALL")}
                       className="font-semibold text-primary hover:underline"
                     >
-                      Show all
+                      {t("gradeConverter.showAll")}
                     </button>
                   </p>
                 ) : (
@@ -502,7 +507,7 @@ const GradeConverterPage = () => {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
                     <span className="inline-flex items-center gap-2">
-                      <Calculator className="h-4 w-4 text-primary" /> 3. Enter your grade
+                      <Calculator className="h-4 w-4 text-primary" /> {t("gradeConverter.step3Title")}
                     </span>
                   </CardTitle>
                   <p className="text-sm text-muted">{system.description}</p>
@@ -510,14 +515,14 @@ const GradeConverterPage = () => {
                 <CardContent>
                   {system.type === "discrete" ? (
                     <div>
-                      <Label htmlFor="grade-discrete">Grade</Label>
+                      <Label htmlFor="grade-discrete">{t("gradeConverter.gradeLabel")}</Label>
                       <select
                         id="grade-discrete"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         className="mt-1.5 flex h-11 w-full rounded-lg border border-border bg-white px-3 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="">Select your grade…</option>
+                        <option value="">{t("gradeConverter.selectGrade")}</option>
                         {system.grades.map((g) => (
                           <option key={g.code} value={g.code}>
                             {g.code} — {g.label}
@@ -528,9 +533,10 @@ const GradeConverterPage = () => {
                   ) : (
                     <div>
                       <Label htmlFor="grade-numeric">
-                        Score ({system.range?.min ?? 0}
-                        {" – "}
-                        {system.range?.max ?? 100})
+                        {t("gradeConverter.scoreLabel", {
+                          min: system.range?.min ?? 0,
+                          max: system.range?.max ?? 100,
+                        })}
                       </Label>
                       <Input
                         id="grade-numeric"
@@ -541,15 +547,16 @@ const GradeConverterPage = () => {
                         max={system.range?.max ?? 100}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder={`e.g. ${
-                          system.id === "US_GPA"
-                            ? "3.5"
-                            : system.id === "IB"
-                            ? "36"
-                            : system.id === "BAC_20"
-                            ? "14"
-                            : "85"
-                        }`}
+                        placeholder={t("gradeConverter.examplePlaceholder", {
+                          example:
+                            system.id === "US_GPA"
+                              ? "3.5"
+                              : system.id === "IB"
+                              ? "36"
+                              : system.id === "BAC_20"
+                              ? "14"
+                              : "85",
+                        })}
                         className="mt-1.5"
                       />
                     </div>
@@ -572,10 +579,8 @@ const GradeConverterPage = () => {
                   <div className="flex items-start gap-3">
                     <Info className="h-4 w-4 shrink-0 text-muted mt-0.5" />
                     <p className="text-xs leading-relaxed text-muted">
-                      <strong className="text-ink">Advisory only.</strong> Grade conversions
-                      are estimates based on commonly cited equivalency tables. Universities
-                      and scholarship boards make the final admission decisions and may use
-                      their own conversion criteria.
+                      <strong className="text-ink">{t("gradeConverter.disclaimerLead")}</strong>{" "}
+                      {t("gradeConverter.disclaimerBody")}
                     </p>
                   </div>
                 </CardContent>
@@ -589,16 +594,15 @@ const GradeConverterPage = () => {
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
         <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-emerald-900 p-8 text-center text-white shadow-modal sm:p-12">
           <h2 className="text-2xl font-extrabold sm:text-3xl">
-            Ready to find scholarships that match your grades?
+            {t("gradeConverter.ctaTitle")}
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-white/80 sm:text-base">
-            Sign up to save your conversions, upload your certificates, and apply to
-            scholarships worldwide — all in one place.
+            {t("gradeConverter.ctaSubtitle")}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" variant="accent">
               <Link to="/signup">
-                Create free account <ArrowRight className="h-4 w-4" />
+                {t("gradeConverter.ctaCreate")} <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button
@@ -607,7 +611,7 @@ const GradeConverterPage = () => {
               variant="outline"
               className="border-white/40 bg-white/10 text-white hover:bg-white/20"
             >
-              <Link to="/scholar/scholarships">Browse scholarships</Link>
+              <Link to="/scholar/scholarships">{t("gradeConverter.browseScholarships")}</Link>
             </Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /**
  * AuthShell — split-screen wrapper for unified Login / Signup
@@ -20,10 +21,12 @@ const DEFAULT_HERO = "/pexels-ai25studioai-5306455.jpg";
 const AuthShell = ({
   headline,
   subtitle,
-  eyebrow = "Welcome aboard",
+  eyebrow,
   heroImage = DEFAULT_HERO,
   children,
 }) => {
+  const { t } = useTranslation();
+  const resolvedEyebrow = eyebrow ?? t("auth.shellEyebrowDefault");
 
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
@@ -60,7 +63,7 @@ const AuthShell = ({
             className="hidden items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-md transition-colors hover:bg-white/20 sm:inline-flex"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Choose role
+            {t("auth.shellChooseRole")}
           </Link>
         </header>
 
@@ -76,13 +79,13 @@ const AuthShell = ({
             <div className="pointer-events-none absolute inset-0 -z-10 rounded-[32px] bg-white/15 blur-2xl" />
             <img
               src={heroImage}
-              alt="Learning illustration"
+              alt={t("auth.shellHeroAlt")}
               className="w-full rounded-[28px] object-cover shadow-2xl ring-1 ring-white/20"
               style={{ aspectRatio: "4 / 3" }}
             />
           </motion.div>
 
-          {eyebrow && (
+          {resolvedEyebrow && (
             <motion.span
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -90,7 +93,7 @@ const AuthShell = ({
               className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-md"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              {eyebrow}
+              {resolvedEyebrow}
             </motion.span>
           )}
 
@@ -130,7 +133,7 @@ const AuthShell = ({
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900 lg:hidden"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Choose role
+            {t("auth.shellChooseRole")}
           </Link>
 
           {children}

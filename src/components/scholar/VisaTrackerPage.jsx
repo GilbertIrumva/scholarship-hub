@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -56,7 +57,14 @@ const MILESTONE_META = {
   skipped: { chip: "bg-slate-100 text-slate-500", icon: XCircle },
 };
 
-const STATUS_LABEL = Object.fromEntries(WORKFLOW_STATUSES.map((s) => [s.value, s.label]));
+const workflowStatusLabel = (t, status) =>
+  t(`visa.workflowStatuses.${status}`, { defaultValue: status });
+const milestoneStatusLabel = (t, status) =>
+  t(`visa.milestoneStatuses.${status}`, { defaultValue: status });
+const milestoneLabel = (t, milestone) =>
+  t(`visa.milestoneLabels.${milestone.key}`, { defaultValue: milestone.label || milestone.key });
+const visaTypeLabel = (t, value, fallback) =>
+  t(`visa.visaTypes.${value}`, { defaultValue: fallback || value });
 
 const formatDate = (date) => {
   if (!date) return "—";
@@ -90,17 +98,19 @@ const toDateInput = (date) => {
 };
 
 const StatusChip = ({ status, meta = STATUS_META }) => {
+  const { t } = useTranslation();
   const cfg = meta[status] || meta.pending || { chip: "bg-slate-100 text-slate-600", icon: Clock };
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${cfg.chip}`}>
       <Icon className="h-3 w-3" />
-      {STATUS_LABEL[status] || status}
+      {workflowStatusLabel(t, status)}
     </span>
   );
 };
 
 const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(milestone.status);
   const [dueDate, setDueDate] = useState(toDateInput(milestone.dueDate));
@@ -119,11 +129,11 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
       const { workflow } = await updateMilestone(sessionToken, workflowId, milestone.key, {
         status, dueDate: dueDate || null, note,
       });
-      toast.success("Milestone updated.");
+      toast.success(t("visa.milestoneUpdated"));
       onUpdated(workflow);
       setExpanded(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update.");
+      toast.error(err?.response?.data?.message || t("visa.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -136,7 +146,7 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
       const { workflow } = await updateMilestone(sessionToken, workflowId, milestone.key, { status: next });
       onUpdated(workflow);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update.");
+      toast.error(err?.response?.data?.message || t("visa.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -153,34 +163,34 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
           onClick={quickToggle}
           disabled={saving}
           className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors ${cfg.chip}`}
-          title={milestone.status === "done" ? "Mark as pending" : "Mark as done"}
+          title={milestone.status === "done" ? t("visa.markPending") : t("visa.markDone")}
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className={`text-sm font-semibold ${milestone.status === "done" ? "text-muted line-through" : "text-ink"}`}>
-              {milestone.label}
+              {milestoneLabel(t, milestone)}
             </p>
             <Button size="sm" variant="ghost" onClick={() => setExpanded((v) => !v)}>
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              Details
+              {t("visa.details")}
             </Button>
           </div>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted">
             {milestone.dueDate && (
               <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Due {formatDate(milestone.dueDate)}
+                <Calendar className="h-3 w-3" /> {t("visa.duePrefix", { date: formatDate(milestone.dueDate) })}
               </span>
             )}
             {milestone.completedAt && (
               <span className="inline-flex items-center gap-1 text-emerald-700">
-                <CheckCircle2 className="h-3 w-3" /> Done {formatDate(milestone.completedAt)}
+                <CheckCircle2 className="h-3 w-3" /> {t("visa.donePrefix", { date: formatDate(milestone.completedAt) })}
               </span>
             )}
             {milestone.note && (
               <span className="inline-flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" /> Note
+                <MessageSquare className="h-3 w-3" /> {t("visa.noteShort")}
               </span>
             )}
           </div>
@@ -190,19 +200,19 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
         <div className="border-t border-border bg-slate-50 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label className="text-xs">Status</Label>
+              <Label className="text-xs">{t("common.status")}</Label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className="h-9 rounded-md border border-border bg-white px-2 text-sm"
               >
                 {MILESTONE_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                  <option key={s.value} value={s.value}>{milestoneStatusLabel(t, s.value)}</option>
                 ))}
               </select>
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Due date</Label>
+              <Label className="text-xs">{t("visa.dueDate")}</Label>
               <Input
                 type="date"
                 value={dueDate}
@@ -212,20 +222,20 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
             </div>
           </div>
           <div className="mt-3 grid gap-1.5">
-            <Label className="text-xs">Note</Label>
+            <Label className="text-xs">{t("visa.noteLabel")}</Label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, 500))}
               rows={2}
               className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              placeholder="Optional note for this milestone"
+              placeholder={t("visa.notePlaceholder")}
             />
             <p className="text-right text-[10px] text-muted">{note.length}/500</p>
           </div>
           <div className="mt-3 flex justify-end">
             <Button size="sm" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-              Save
+              {t("common.save")}
             </Button>
           </div>
         </div>
@@ -235,6 +245,7 @@ const MilestoneRow = ({ milestone, sessionToken, workflowId, onUpdated }) => {
 };
 
 const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     visaType: workflow.visaType,
     status: workflow.status,
@@ -263,53 +274,60 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
     setSaving(true);
     try {
       const { workflow: updated } = await updateVisaWorkflow(sessionToken, workflow.id, form);
-      toast.success("Saved.");
+      toast.success(t("visa.savedToast"));
       onUpdated(updated);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save.");
+      toast.error(err?.response?.data?.message || t("visa.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
+  const dateFields = [
+    ["submittedAt", t("visa.submittedAt")],
+    ["decisionAt", t("visa.decisionAt")],
+    ["visaIssuedAt", t("visa.visaIssuedAt")],
+    ["visaExpiry", t("visa.visaExpiry")],
+  ];
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Workflow details</CardTitle>
+        <CardTitle className="text-base">{t("visa.workflowDetailsTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="grid gap-1.5">
-            <Label className="text-xs">Visa type</Label>
+            <Label className="text-xs">{t("visa.visaType")}</Label>
             <select
               value={form.visaType}
               onChange={(e) => set("visaType", e.target.value)}
               className="h-9 rounded-md border border-border bg-white px-2 text-sm"
             >
-              {VISA_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+              {VISA_TYPES.map((vt) => (
+                <option key={vt.value} value={vt.value}>{visaTypeLabel(t, vt.value, vt.label)}</option>
               ))}
             </select>
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs">Overall status</Label>
+            <Label className="text-xs">{t("visa.overallStatus")}</Label>
             <select
               value={form.status}
               onChange={(e) => set("status", e.target.value)}
               className="h-9 rounded-md border border-border bg-white px-2 text-sm"
             >
               {WORKFLOW_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+                <option key={s.value} value={s.value}>{workflowStatusLabel(t, s.value)}</option>
               ))}
             </select>
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs">Destination country (ISO)</Label>
+            <Label className="text-xs">{t("visa.destinationCountry")}</Label>
             <Input
               value={form.destinationCountry}
               onChange={(e) => set("destinationCountry", e.target.value.toUpperCase().slice(0, 3))}
               maxLength={3}
-              placeholder="US, GB, DE..."
+              placeholder={t("visa.destinationPlaceholder")}
               className="h-9"
             />
           </div>
@@ -317,17 +335,17 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <Label className="text-xs">Visa reference number</Label>
+            <Label className="text-xs">{t("visa.visaReference")}</Label>
             <Input
               value={form.visaReference}
               onChange={(e) => set("visaReference", e.target.value)}
               maxLength={100}
-              placeholder="Visa application reference"
+              placeholder={t("visa.visaReferencePlaceholder")}
               className="h-9"
             />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs">Embassy appointment</Label>
+            <Label className="text-xs">{t("visa.appointment")}</Label>
             <Input
               type="date"
               value={form.appointmentDate}
@@ -338,12 +356,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-4">
-          {[
-            ["submittedAt", "Submitted"],
-            ["decisionAt", "Decision date"],
-            ["visaIssuedAt", "Visa issued"],
-            ["visaExpiry", "Visa expiry"],
-          ].map(([key, label]) => (
+          {dateFields.map(([key, label]) => (
             <div className="grid gap-1.5" key={key}>
               <Label className="text-xs">{label}</Label>
               <Input
@@ -359,11 +372,11 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
         <div className="border-t border-border pt-3">
           <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted">
             <Building2 className="h-3.5 w-3.5" />
-            Embassy / Consulate
+            {t("visa.embassySection")}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label className="text-xs">Embassy country</Label>
+              <Label className="text-xs">{t("visa.embassyCountry")}</Label>
               <Input
                 value={form.embassy.country}
                 onChange={(e) => setEmbassy("country", e.target.value.toUpperCase().slice(0, 3))}
@@ -373,7 +386,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">City</Label>
+              <Label className="text-xs">{t("visa.embassyCity")}</Label>
               <Input
                 value={form.embassy.city}
                 onChange={(e) => setEmbassy("city", e.target.value)}
@@ -382,7 +395,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
               />
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
-              <Label className="text-xs">Address</Label>
+              <Label className="text-xs">{t("visa.embassyAddress")}</Label>
               <Input
                 value={form.embassy.address}
                 onChange={(e) => setEmbassy("address", e.target.value)}
@@ -391,7 +404,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Website</Label>
+              <Label className="text-xs">{t("visa.embassyWebsite")}</Label>
               <Input
                 value={form.embassy.website}
                 onChange={(e) => setEmbassy("website", e.target.value)}
@@ -401,7 +414,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Contact email</Label>
+              <Label className="text-xs">{t("visa.embassyEmail")}</Label>
               <Input
                 type="email"
                 value={form.embassy.contactEmail}
@@ -416,7 +429,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
         <div className="flex justify-end">
           <Button onClick={save} disabled={saving}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Save details
+            {t("visa.saveDetails")}
           </Button>
         </div>
       </CardContent>
@@ -425,6 +438,7 @@ const WorkflowDetailsForm = ({ workflow, sessionToken, onUpdated }) => {
 };
 
 const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
+  const { t } = useTranslation();
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
 
@@ -436,9 +450,9 @@ const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
       const { workflow: updated } = await addVisaNote(sessionToken, workflow.id, trimmed);
       onUpdated(updated);
       setBody("");
-      toast.success("Note added.");
+      toast.success(t("visa.noteAddedToast"));
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to add note.");
+      toast.error(err?.response?.data?.message || t("visa.noteAddFailed"));
     } finally {
       setPosting(false);
     }
@@ -449,7 +463,7 @@ const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageSquare className="h-4 w-4 text-primary" />
-          Timeline notes
+          {t("visa.timelineTitle")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -458,21 +472,21 @@ const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 1000))}
             rows={2}
-            placeholder="Log a quick update for yourself and reviewers..."
+            placeholder={t("visa.timelinePlaceholder")}
             className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted">{body.length}/1000</span>
             <Button size="sm" onClick={post} disabled={posting || !body.trim()}>
               {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Add note
+              {t("visa.addNote")}
             </Button>
           </div>
         </div>
 
         {workflow.timeline.length === 0 ? (
           <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-muted">
-            No notes yet — add one above to start the timeline.
+            {t("visa.timelineEmpty")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -487,7 +501,7 @@ const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted">
-                    {note.author === "admin" ? "Reviewer" : "You"} · {note.authorName || ""}
+                    {note.author === "admin" ? t("visa.authorReviewer") : t("visa.authorYou")} · {note.authorName || ""}
                   </span>
                   <span className="text-[10px] text-muted">{formatDateTime(note.createdAt)}</span>
                 </div>
@@ -502,6 +516,7 @@ const TimelineSection = ({ workflow, sessionToken, onUpdated }) => {
 };
 
 const WorkflowPanel = ({ workflow, sessionToken, onUpdated }) => {
+  const { t } = useTranslation();
   const doneCount = workflow.milestones.filter((m) => m.status === "done").length;
   const total = workflow.milestones.length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
@@ -517,10 +532,10 @@ const WorkflowPanel = ({ workflow, sessionToken, onUpdated }) => {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                Visa workflow
+                {t("visa.workflowEyebrow")}
               </p>
               <h2 className="mt-1 text-xl font-extrabold text-ink">
-                {workflow.scholarship?.title || "Approved scholarship"}
+                {workflow.scholarship?.title || t("visa.scholarshipFallback")}
               </h2>
               <p className="text-sm text-muted">
                 {workflow.scholarship?.provider || ""}
@@ -532,8 +547,8 @@ const WorkflowPanel = ({ workflow, sessionToken, onUpdated }) => {
 
           <div className="mt-4">
             <div className="mb-1 flex items-center justify-between text-xs font-semibold text-muted">
-              <span>Milestones progress</span>
-              <span>{doneCount} / {total} · {pct}%</span>
+              <span>{t("visa.milestonesProgress")}</span>
+              <span>{t("visa.milestonesProgressValue", { done: doneCount, total, pct })}</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
               <div
@@ -547,7 +562,7 @@ const WorkflowPanel = ({ workflow, sessionToken, onUpdated }) => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Milestones</CardTitle>
+          <CardTitle className="text-base">{t("visa.milestonesTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {workflow.milestones.map((m) => (
@@ -578,6 +593,7 @@ const WorkflowPanel = ({ workflow, sessionToken, onUpdated }) => {
 };
 
 const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) => {
+  const { t } = useTranslation();
   const available = useMemo(
     () => eligibleApplications.filter((a) => !a.hasWorkflow),
     [eligibleApplications]
@@ -604,10 +620,10 @@ const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) =
         destinationCountry: country,
         visaType,
       });
-      toast.success("Visa workflow created.");
+      toast.success(t("visa.createdToast"));
       onCreated(workflow);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to create workflow.");
+      toast.error(err?.response?.data?.message || t("visa.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -618,16 +634,16 @@ const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) =
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Plus className="h-4 w-4 text-primary" />
-          Start a new visa workflow
+          {t("visa.createTitle")}
         </CardTitle>
         <p className="text-xs text-muted">
-          You have approved scholarships waiting for a visa tracker.
+          {t("visa.createSubtitle")}
         </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label className="text-xs">Approved scholarship</Label>
+            <Label className="text-xs">{t("visa.approvedScholarship")}</Label>
             <select
               value={appId}
               onChange={(e) => {
@@ -639,7 +655,7 @@ const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) =
             >
               {available.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.scholarship?.title || "Scholarship"}
+                  {a.scholarship?.title || t("visa.scholarshipFallback")}
                   {a.scholarship?.country ? ` (${a.scholarship.country})` : ""}
                 </option>
               ))}
@@ -647,31 +663,31 @@ const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) =
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label className="text-xs">Visa type</Label>
+              <Label className="text-xs">{t("visa.visaType")}</Label>
               <select
                 value={visaType}
                 onChange={(e) => setVisaType(e.target.value)}
                 className="h-10 rounded-md border border-border bg-white px-3 text-sm"
               >
-                {VISA_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                {VISA_TYPES.map((vt) => (
+                  <option key={vt.value} value={vt.value}>{visaTypeLabel(t, vt.value, vt.label)}</option>
                 ))}
               </select>
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">Destination country (ISO)</Label>
+              <Label className="text-xs">{t("visa.destinationCountry")}</Label>
               <Input
                 value={country}
                 onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 3))}
                 maxLength={3}
-                placeholder="US, GB, DE..."
+                placeholder={t("visa.destinationPlaceholder")}
               />
             </div>
           </div>
           <div className="flex justify-end">
             <Button type="submit" disabled={creating}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Create workflow
+              {t("visa.createBtn")}
             </Button>
           </div>
         </form>
@@ -681,6 +697,7 @@ const CreateWorkflowForm = ({ eligibleApplications, sessionToken, onCreated }) =
 };
 
 const VisaTrackerPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
 
@@ -699,11 +716,11 @@ const VisaTrackerPage = () => {
       setEligibleApps(Array.isArray(data?.eligibleApplications) ? data.eligibleApplications : []);
       setActiveId((prev) => prev || wfs[0]?.id || null);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to load visa workflows.");
+      toast.error(err?.response?.data?.message || t("visa.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken]);
+  }, [sessionToken, t]);
 
   useEffect(() => {
     refresh();
@@ -739,8 +756,8 @@ const VisaTrackerPage = () => {
     <DashboardLayout
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-      title="Visa tracker"
-      subtitle="Track every step of your visa application once a scholarship is approved"
+      title={t("visa.pageTitle")}
+      subtitle={t("visa.pageSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
@@ -749,11 +766,10 @@ const VisaTrackerPage = () => {
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <div className="text-sm">
               <p className="font-semibold text-primary-dark">
-                Visa workflows are private to you.
+                {t("visa.privacyTitle")}
               </p>
               <p className="text-muted">
-                Only you and the admin team supporting your approved scholarship
-                can see the milestones, embassy info, and notes here.
+                {t("visa.privacyBody")}
               </p>
             </div>
           </CardContent>
@@ -770,11 +786,10 @@ const VisaTrackerPage = () => {
                 <Plane className="h-8 w-8" />
               </span>
               <h3 className="mt-4 text-lg font-bold text-ink">
-                No approved scholarships yet
+                {t("visa.noEligibleTitle")}
               </h3>
               <p className="mt-1 max-w-md text-sm text-muted">
-                Visa tracking unlocks automatically once one of your scholarship
-                applications is approved.
+                {t("visa.noEligibleBody")}
               </p>
             </CardContent>
           </Card>
@@ -800,7 +815,7 @@ const VisaTrackerPage = () => {
                     }`}
                   >
                     <Plane className="h-3 w-3" />
-                    {w.scholarship?.title || "Workflow"}
+                    {w.scholarship?.title || t("visa.workflowFallback")}
                   </button>
                 ))}
               </div>
@@ -817,7 +832,7 @@ const VisaTrackerPage = () => {
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                   <Plane className="h-8 w-8 text-muted/40" />
                   <p className="mt-2 text-sm font-semibold text-muted">
-                    Create your first visa workflow above to get started.
+                    {t("visa.noActiveWorkflow")}
                   </p>
                 </CardContent>
               </Card>

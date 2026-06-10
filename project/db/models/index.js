@@ -12,4 +12,5 @@ module.exports = {
     VerificationToken: require('./VerificationToken'),
     AuditLog: require('./AuditLog'),
     Notification: require('./Notification'),
+    Metric: require('./Metric'),
 };

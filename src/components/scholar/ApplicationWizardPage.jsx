@@ -15,6 +15,7 @@ import {
   User,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -36,12 +37,13 @@ import { listMyCredentials } from "../../services/credentials";
 const MOTIVATION_MAX = 2000;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
-const STEPS = [
-  { id: "personal", title: "Personal info", icon: User },
-  { id: "academic", title: "Academic background", icon: GraduationCap },
-  { id: "documents", title: "Motivation & documents", icon: FileText },
-  { id: "review", title: "Review & submit", icon: ShieldCheck },
+const STEP_DEFS = [
+  { id: "personal", titleKey: "wizard.stepPersonal", icon: User },
+  { id: "academic", titleKey: "wizard.stepAcademic", icon: GraduationCap },
+  { id: "documents", titleKey: "wizard.stepDocuments", icon: FileText },
+  { id: "review", titleKey: "wizard.stepReview", icon: ShieldCheck },
 ];
+const STEP_COUNT = STEP_DEFS.length;
 
 const emptyDraft = {
   motivation: "",
@@ -123,13 +125,17 @@ const Field = ({ label, hint, required, error, children }) => (
   </div>
 );
 
-const StepIndicator = ({ current, total, onJump, completed }) => {
+const StepIndicator = ({ current, total, onJump, completed, steps }) => {
+  const { t } = useTranslation();
   const pct = Math.round(((current + 1) / total) * 100);
   return (
     <div className="space-y-3">
-      <Progress value={pct} aria-label={`Step ${current + 1} of ${total}`} />
+      <Progress
+        value={pct}
+        aria-label={t("wizard.stepIndicatorAria", { current: current + 1, total })}
+      />
       <ol className="grid gap-2 sm:grid-cols-4">
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const Icon = s.icon;
           const isActive = i === current;
           const isDone = completed.has(i) || i < current;
@@ -162,7 +168,9 @@ const StepIndicator = ({ current, total, onJump, completed }) => {
                   {isDone ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
                 </span>
                 <span className="truncate">
-                  <span className="hidden sm:inline">Step {i + 1}: </span>
+                  <span className="hidden sm:inline">
+                    {t("wizard.stepPrefix", { number: i + 1 })}{" "}
+                  </span>
                   {s.title}
                 </span>
               </button>
@@ -175,11 +183,12 @@ const StepIndicator = ({ current, total, onJump, completed }) => {
 };
 
 const AutosaveBadge = ({ saving, dirty, lastSavedAt }) => {
+  const { t } = useTranslation();
   if (saving) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted">
         <CloudUpload className="h-3.5 w-3.5 animate-pulse" />
-        Saving…
+        {t("wizard.savingBadge")}
       </span>
     );
   }
@@ -187,7 +196,7 @@ const AutosaveBadge = ({ saving, dirty, lastSavedAt }) => {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
         <CloudUpload className="h-3.5 w-3.5" />
-        Unsaved changes
+        {t("wizard.unsavedChanges")}
       </span>
     );
   }
@@ -195,7 +204,7 @@ const AutosaveBadge = ({ saving, dirty, lastSavedAt }) => {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
         <CheckCircle2 className="h-3.5 w-3.5" />
-        Saved {new Date(lastSavedAt).toLocaleTimeString()}
+        {t("wizard.savedAt", { time: new Date(lastSavedAt).toLocaleTimeString() })}
       </span>
     );
   }
@@ -203,6 +212,7 @@ const AutosaveBadge = ({ saving, dirty, lastSavedAt }) => {
 };
 
 const ApplicationWizardPage = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
@@ -216,6 +226,11 @@ const ApplicationWizardPage = () => {
   const [saving, setSaving] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+
+  const STEPS = useMemo(
+    () => STEP_DEFS.map((s) => ({ ...s, title: t(s.titleKey) })),
+    [t]
+  );
 
   // Track which steps the user has at least visited — useful for the
   // indicator + jump-back behaviour.
@@ -243,7 +258,7 @@ const ApplicationWizardPage = () => {
         if (cancelled) return;
         const sch = sData?.scholarship || null;
         if (!sch) {
-          setLoadError("Scholarship not found or no longer active.");
+          setLoadError(t("wizard.scholarshipNotFoundOrInactive"));
           setLoading(false);
           return;
         }
@@ -280,20 +295,20 @@ const ApplicationWizardPage = () => {
         dispatch({
           type: "hydrate",
           form: seeded,
-          step: Math.min(seeded.lastStep || 0, STEPS.length - 1),
+          step: Math.min(seeded.lastStep || 0, STEP_COUNT - 1),
         });
         setLoading(false);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadError("Failed to load application.");
+        setLoadError(t("wizard.loadFailed"));
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [sessionToken, id, scholarProfile]);
+  }, [sessionToken, id, scholarProfile, t]);
 
   // 2. Autosave whenever the form becomes dirty. Debounced.
   useEffect(() => {
@@ -311,13 +326,13 @@ const ApplicationWizardPage = () => {
         dispatch({ type: "markSaved", at: new Date().toISOString() });
       } catch (err) {
         // Stay dirty so the next change retries — but tell the user.
-        toast.error(err?.response?.data?.message || "Could not auto-save draft.");
+        toast.error(err?.response?.data?.message || t("wizard.autosaveFailed"));
       } finally {
         setSaving(false);
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [state.dirty, state.form, state.step, sessionToken, id, alreadySubmitted, loading]);
+  }, [state.dirty, state.form, state.step, sessionToken, id, alreadySubmitted, loading, t]);
 
   // Field helpers ----------------------------------------------------------
   const setField = (section, name) => (e) => {
@@ -329,7 +344,7 @@ const ApplicationWizardPage = () => {
     const errors = {};
     if (stepIndex === 0) {
       if (!state.form.personalInfo.fullName.trim()) {
-        errors["personalInfo.fullName"] = "Full name is required.";
+        errors["personalInfo.fullName"] = t("wizard.fullNameRequired");
       }
     }
     // Other steps stay friendly — optional fields throughout.
@@ -340,11 +355,11 @@ const ApplicationWizardPage = () => {
     const errors = validateStep(state.step);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error("Please correct the highlighted fields.");
+      toast.error(t("auth.fixHighlightedFields"));
       return;
     }
     setValidationErrors({});
-    dispatch({ type: "setStep", step: Math.min(state.step + 1, STEPS.length - 1) });
+    dispatch({ type: "setStep", step: Math.min(state.step + 1, STEP_COUNT - 1) });
   };
 
   const goBack = () => {
@@ -364,20 +379,20 @@ const ApplicationWizardPage = () => {
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       dispatch({ type: "setStep", step: 0 });
-      toast.error("Please complete the required fields before submitting.");
+      toast.error(t("wizard.fixRequiredBeforeSubmit"));
       return;
     }
     setSubmitting(true);
     try {
       await submitApplicationWizard(sessionToken, id, {
         ...state.form,
-        lastStep: STEPS.length - 1,
+        lastStep: STEP_COUNT - 1,
       });
-      toast.success("Application submitted!");
+      toast.success(t("wizard.submittedToast"));
       navigate("/scholar/applications", { replace: true });
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || "Could not submit application."
+        err?.response?.data?.message || t("wizard.submitFailed")
       );
     } finally {
       setSubmitting(false);
@@ -401,7 +416,7 @@ const ApplicationWizardPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Application"
+        title={t("wizard.fallbackTitle")}
         onSignOut={handleSignOut}
       >
         <div className="space-y-4">
@@ -418,17 +433,17 @@ const ApplicationWizardPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Application"
+        title={t("wizard.fallbackTitle")}
         onSignOut={handleSignOut}
       >
         <Alert variant="danger">
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>{t("common.somethingWentWrong")}</AlertTitle>
           <AlertDescription>{loadError}</AlertDescription>
         </Alert>
         <div className="mt-4">
           <Button asChild variant="outline">
             <Link to="/scholar/scholarships">
-              <ArrowLeft className="h-4 w-4" /> Back to scholarships
+              <ArrowLeft className="h-4 w-4" /> {t("scholarshipDetail.backToScholarships")}
             </Link>
           </Button>
         </div>
@@ -441,7 +456,7 @@ const ApplicationWizardPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Already submitted"
+        title={t("wizard.alreadySubmittedTitle")}
         onSignOut={handleSignOut}
       >
         <Card>
@@ -450,17 +465,17 @@ const ApplicationWizardPage = () => {
               <CheckCircle2 className="h-7 w-7" />
             </span>
             <h2 className="mt-4 text-xl font-bold text-ink">
-              Your application has already been submitted.
+              {t("wizard.alreadySubmittedHeading")}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              You can track its status from "My applications".
+              {t("wizard.trackFromMyApplications")}
             </p>
             <div className="mt-6 flex gap-2">
               <Button asChild variant="outline">
-                <Link to={`/scholar/scholarships/${id}`}>View scholarship</Link>
+                <Link to={`/scholar/scholarships/${id}`}>{t("wizard.viewScholarship")}</Link>
               </Button>
               <Button asChild>
-                <Link to="/scholar/applications">My applications</Link>
+                <Link to="/scholar/applications">{t("wizard.myApplications")}</Link>
               </Button>
             </div>
           </CardContent>
@@ -474,19 +489,19 @@ const ApplicationWizardPage = () => {
       <DashboardLayout
         role="scholar"
         user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-        title="Scholarship closed"
+        title={t("wizard.scholarshipClosedTitle")}
         onSignOut={handleSignOut}
       >
         <Alert variant="warning">
-          <AlertTitle>Applications are closed</AlertTitle>
+          <AlertTitle>{t("wizard.applicationsClosedTitle")}</AlertTitle>
           <AlertDescription>
-            The deadline for this scholarship has already passed.
+            {t("wizard.applicationsClosedBody")}
           </AlertDescription>
         </Alert>
         <div className="mt-4">
           <Button asChild variant="outline">
             <Link to={`/scholar/scholarships/${id}`}>
-              <ArrowLeft className="h-4 w-4" /> Back to scholarship
+              <ArrowLeft className="h-4 w-4" /> {t("wizard.backToScholarshipShort")}
             </Link>
           </Button>
         </div>
@@ -498,8 +513,8 @@ const ApplicationWizardPage = () => {
     <DashboardLayout
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-      title={`Apply: ${scholarship.title}`}
-      subtitle={scholarship.provider || "Multi-step application"}
+      title={t("wizard.applyTitle", { title: scholarship.title })}
+      subtitle={scholarship.provider || t("wizard.multiStepSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-5">
@@ -507,7 +522,7 @@ const ApplicationWizardPage = () => {
           to={`/scholar/scholarships/${id}`}
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-primary"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to scholarship details
+          <ArrowLeft className="h-4 w-4" /> {t("wizard.backToScholarship")}
         </Link>
 
         <Card>
@@ -524,9 +539,10 @@ const ApplicationWizardPage = () => {
             </div>
             <StepIndicator
               current={state.step}
-              total={STEPS.length}
+              total={STEP_COUNT}
               onJump={jumpTo}
               completed={visitedSteps.current}
+              steps={STEPS}
             />
           </CardContent>
         </Card>
@@ -587,14 +603,14 @@ const ApplicationWizardPage = () => {
             disabled={state.step === 0}
             className="gap-1.5"
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4" /> {t("common.back")}
           </Button>
 
           <AutosaveBadge saving={saving} dirty={state.dirty} lastSavedAt={state.lastSavedAt} />
 
-          {state.step < STEPS.length - 1 ? (
+          {state.step < STEP_COUNT - 1 ? (
             <Button type="button" onClick={goNext} className="gap-1.5">
-              Next <ArrowRight className="h-4 w-4" />
+              {t("common.next")} <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
             <Button
@@ -606,11 +622,11 @@ const ApplicationWizardPage = () => {
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t("wizard.submitting")}
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" /> Submit application
+                  <Send className="h-4 w-4" /> {t("wizard.submit")}
                 </>
               )}
             </Button>
@@ -625,115 +641,122 @@ const ApplicationWizardPage = () => {
 // Step bodies
 // ---------------------------------------------------------------------------
 
-const StepPersonal = ({ form, setField, errors }) => (
+const StepPersonal = ({ form, setField, errors }) => {
+  const { t } = useTranslation();
+  return (
   <div className="grid gap-4 sm:grid-cols-2">
-    <Field label="Full name" required error={errors["personalInfo.fullName"]}>
+    <Field label={t("wizard.fullName")} required error={errors["personalInfo.fullName"]}>
       <Input
         value={form.fullName}
         onChange={setField("fullName")}
-        placeholder="As it appears on your ID"
+        placeholder={t("wizard.fullNamePlaceholder")}
         autoComplete="name"
       />
     </Field>
-    <Field label="Phone number">
+    <Field label={t("wizard.phone")}>
       <Input
         type="tel"
         value={form.phone}
         onChange={setField("phone")}
-        placeholder="+250 700 000 000"
+        placeholder={t("wizard.phonePlaceholder")}
         autoComplete="tel"
       />
     </Field>
-    <Field label="Date of birth">
+    <Field label={t("wizard.dob")}>
       <Input
         type="date"
         value={form.dateOfBirth}
         onChange={setField("dateOfBirth")}
       />
     </Field>
-    <Field label="Nationality">
+    <Field label={t("wizard.nationality")}>
       <Input
         value={form.nationality}
         onChange={setField("nationality")}
-        placeholder="Rwandan"
+        placeholder={t("wizard.nationalityPlaceholder")}
       />
     </Field>
-    <Field label="Country of residence">
+    <Field label={t("wizard.countryOfResidence")}>
       <Input
         value={form.country}
         onChange={setField("country")}
-        placeholder="Rwanda"
+        placeholder={t("wizard.countryPlaceholder")}
         autoComplete="country-name"
       />
     </Field>
-    <Field label="Address">
+    <Field label={t("wizard.address")}>
       <Input
         value={form.address}
         onChange={setField("address")}
-        placeholder="City, neighborhood"
+        placeholder={t("wizard.addressPlaceholder")}
         autoComplete="street-address"
       />
     </Field>
   </div>
-);
+  );
+};
 
-const StepAcademic = ({ form, setField }) => (
+const StepAcademic = ({ form, setField }) => {
+  const { t } = useTranslation();
+  return (
   <div className="grid gap-4 sm:grid-cols-2">
-    <Field label="Current level">
+    <Field label={t("wizard.currentLevel")}>
       <Input
         value={form.currentLevel}
         onChange={setField("currentLevel")}
-        placeholder="Undergraduate, Masters, PhD…"
+        placeholder={t("wizard.currentLevelPlaceholder")}
       />
     </Field>
-    <Field label="Institution">
+    <Field label={t("wizard.institution")}>
       <Input
         value={form.institution}
         onChange={setField("institution")}
-        placeholder="University of …"
+        placeholder={t("wizard.institutionPlaceholder")}
       />
     </Field>
-    <Field label="Field of study">
+    <Field label={t("wizard.fieldOfStudy")}>
       <Input
         value={form.fieldOfStudy}
         onChange={setField("fieldOfStudy")}
-        placeholder="Computer Science"
+        placeholder={t("wizard.fieldOfStudyPlaceholder")}
       />
     </Field>
-    <Field label="Grade / GPA">
+    <Field label={t("wizard.gradePoint")}>
       <Input
         value={form.gradePoint}
         onChange={setField("gradePoint")}
-        placeholder="e.g. 3.8 / 4.0"
+        placeholder={t("wizard.gradePointPlaceholder")}
       />
     </Field>
     <Field
-      label="Expected completion"
-      hint="Year or month/year"
+      label={t("wizard.expectedCompletion")}
+      hint={t("wizard.expectedCompletionHint")}
     >
       <Input
         value={form.expectedCompletion}
         onChange={setField("expectedCompletion")}
-        placeholder="2027 or Jun 2027"
+        placeholder={t("wizard.expectedCompletionPlaceholder")}
       />
     </Field>
   </div>
-);
+  );
+};
 
 const StepDocuments = ({ motivation, setMotivation, selected, credentials, onToggle }) => {
+  const { t } = useTranslation();
   const selectedIds = new Set(selected.map((d) => d.credentialId));
   return (
     <div className="space-y-5">
       <Field
-        label="Why are you a great fit?"
-        hint={`up to ${MOTIVATION_MAX} characters`}
+        label={t("wizard.motivationLabel")}
+        hint={t("wizard.motivationHint", { max: MOTIVATION_MAX })}
       >
         <textarea
           rows={8}
           maxLength={MOTIVATION_MAX}
           value={motivation}
           onChange={setMotivation}
-          placeholder="Tell the reviewer about your goals, achievements, and why this scholarship matters to you."
+          placeholder={t("wizard.motivationPlaceholder")}
           className="block w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
         <p className="mt-1 text-right text-[11px] text-muted">
@@ -743,19 +766,19 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
 
       <div>
         <Label className="mb-1.5 block text-sm">
-          Supporting documents{" "}
+          {t("wizard.supportingDocuments")}{" "}
           <span className="text-xs font-normal text-muted">
-            (optional — pick from your saved credentials)
+            {t("wizard.supportingDocumentsHint")}
           </span>
         </Label>
         {credentials.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-surface p-4 text-sm text-muted">
-            You haven't uploaded any credentials yet.{" "}
+            {t("wizard.noCredentialsYet")}{" "}
             <Link
               to="/scholar/credentials"
               className="font-semibold text-primary hover:underline"
             >
-              Upload one here →
+              {t("wizard.uploadOneHere")}
             </Link>
           </div>
         ) : (
@@ -779,7 +802,7 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
                       onChange={() =>
                         onToggle({
                           credentialId: cid,
-                          title: c.title || c.originalName || "Credential",
+                          title: c.title || c.originalName || t("wizard.credentialFallbackTitle"),
                           type: c.type || "other",
                         })
                       }
@@ -790,7 +813,7 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
                         {c.title || c.originalName}
                       </span>
                       <span className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                        {c.type?.replace(/-/g, " ")}
+                        {c.type ? t(`credentials.type${c.type.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("")}`, { defaultValue: c.type.replace(/-/g, " ") }) : ""}
                         {c.verificationStatus && (
                           <Badge
                             variant={
@@ -802,7 +825,7 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
                             }
                             className="ml-1 px-1.5 py-0 text-[10px]"
                           >
-                            {c.verificationStatus}
+                            {t(`credentials.status${c.verificationStatus.charAt(0).toUpperCase() + c.verificationStatus.slice(1)}`, { defaultValue: c.verificationStatus })}
                           </Badge>
                         )}
                       </span>
@@ -818,63 +841,67 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
   );
 };
 
-const ReviewRow = ({ label, value }) => (
+const ReviewRow = ({ label, value }) => {
+  const { t } = useTranslation();
+  return (
   <div className="flex items-start justify-between gap-3 border-b border-border py-2 last:border-b-0">
     <span className="text-xs font-bold uppercase tracking-wider text-muted">{label}</span>
     <span className="text-right text-sm font-semibold text-ink">
-      {value || <em className="font-normal text-muted">Not provided</em>}
+      {value || <em className="font-normal text-muted">{t("common.notProvided")}</em>}
     </span>
   </div>
-);
+  );
+};
 
-const StepReview = ({ form, scholarship }) => (
+const StepReview = ({ form, scholarship }) => {
+  const { t } = useTranslation();
+  return (
   <div className="space-y-5">
     <Alert variant="info">
-      <AlertTitle>Final check</AlertTitle>
+      <AlertTitle>{t("wizard.finalCheckTitle")}</AlertTitle>
       <AlertDescription>
-        Once submitted, you won't be able to edit this application. Drafts are
-        auto-saved as you go.
+        {t("wizard.finalCheckBody")}
       </AlertDescription>
     </Alert>
 
     <div className="rounded-xl border border-border bg-surface p-4">
-      <h3 className="mb-2 text-sm font-bold text-ink">Scholarship</h3>
-      <ReviewRow label="Title" value={scholarship.title} />
-      <ReviewRow label="Provider" value={scholarship.provider} />
+      <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionScholarship")}</h3>
+      <ReviewRow label={t("wizard.reviewTitle")} value={scholarship.title} />
+      <ReviewRow label={t("wizard.reviewProvider")} value={scholarship.provider} />
     </div>
 
     <div className="rounded-xl border border-border bg-surface p-4">
-      <h3 className="mb-2 text-sm font-bold text-ink">Personal info</h3>
-      <ReviewRow label="Full name" value={form.personalInfo.fullName} />
-      <ReviewRow label="Phone" value={form.personalInfo.phone} />
-      <ReviewRow label="Date of birth" value={form.personalInfo.dateOfBirth} />
-      <ReviewRow label="Nationality" value={form.personalInfo.nationality} />
-      <ReviewRow label="Country" value={form.personalInfo.country} />
-      <ReviewRow label="Address" value={form.personalInfo.address} />
+      <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionPersonal")}</h3>
+      <ReviewRow label={t("wizard.fullName")} value={form.personalInfo.fullName} />
+      <ReviewRow label={t("wizard.reviewPhone")} value={form.personalInfo.phone} />
+      <ReviewRow label={t("wizard.dob")} value={form.personalInfo.dateOfBirth} />
+      <ReviewRow label={t("wizard.nationality")} value={form.personalInfo.nationality} />
+      <ReviewRow label={t("wizard.reviewCountry")} value={form.personalInfo.country} />
+      <ReviewRow label={t("wizard.address")} value={form.personalInfo.address} />
     </div>
 
     <div className="rounded-xl border border-border bg-surface p-4">
-      <h3 className="mb-2 text-sm font-bold text-ink">Academic background</h3>
-      <ReviewRow label="Level" value={form.academicInfo.currentLevel} />
-      <ReviewRow label="Institution" value={form.academicInfo.institution} />
-      <ReviewRow label="Field" value={form.academicInfo.fieldOfStudy} />
-      <ReviewRow label="Grade" value={form.academicInfo.gradePoint} />
-      <ReviewRow label="Expected completion" value={form.academicInfo.expectedCompletion} />
+      <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionAcademic")}</h3>
+      <ReviewRow label={t("wizard.reviewLevel")} value={form.academicInfo.currentLevel} />
+      <ReviewRow label={t("wizard.institution")} value={form.academicInfo.institution} />
+      <ReviewRow label={t("wizard.reviewField")} value={form.academicInfo.fieldOfStudy} />
+      <ReviewRow label={t("wizard.reviewGrade")} value={form.academicInfo.gradePoint} />
+      <ReviewRow label={t("wizard.expectedCompletion")} value={form.academicInfo.expectedCompletion} />
     </div>
 
     <div className="rounded-xl border border-border bg-surface p-4">
-      <h3 className="mb-2 text-sm font-bold text-ink">Motivation</h3>
+      <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionMotivation")}</h3>
       <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         {form.motivation || (
-          <em className="text-muted">No motivation statement provided.</em>
+          <em className="text-muted">{t("wizard.noMotivation")}</em>
         )}
       </p>
     </div>
 
     <div className="rounded-xl border border-border bg-surface p-4">
-      <h3 className="mb-2 text-sm font-bold text-ink">Selected documents</h3>
+      <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionDocuments")}</h3>
       {form.documents.length === 0 ? (
-        <p className="text-sm text-muted">No documents attached.</p>
+        <p className="text-sm text-muted">{t("wizard.noDocuments")}</p>
       ) : (
         <ul className="space-y-1.5 text-sm">
           {form.documents.map((d) => (
@@ -885,7 +912,7 @@ const StepReview = ({ form, scholarship }) => (
               <FileText className="h-3.5 w-3.5 text-primary" />
               <span className="font-semibold">{d.title}</span>
               <span className="text-xs text-muted">
-                ({d.type?.replace(/-/g, " ")})
+                ({d.type ? t(`credentials.type${d.type.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("")}`, { defaultValue: d.type.replace(/-/g, " ") }) : ""})
               </span>
             </li>
           ))}
@@ -893,6 +920,7 @@ const StepReview = ({ form, scholarship }) => (
       )}
     </div>
   </div>
-);
+  );
+};
 
 export default ApplicationWizardPage;

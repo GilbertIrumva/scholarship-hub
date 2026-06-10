@@ -43,7 +43,6 @@ import {
   WebSiteSchema,
 } from "../seo/structured-data";
 import heroImage from "../../assets/landing/hero.webp";
-import impactImage from "../../assets/landing/impact.webp";
 const impactPublicImage = "/pexels-mikhail-nilov-9158761.jpg";
 import searchImage from "../../assets/landing/search.webp";
 import contactImage from "../../assets/landing/contact.webp";
@@ -75,71 +74,79 @@ const FALLBACK_FILTERS = {
   ],
 };
 
-const NAV_SECTIONS = [
-  { id: "home", label: "Home" },
-  { id: "impact", label: "Impact" },
-  { id: "search", label: "Find Scholarships" },
-  { id: "how", label: "How It Works" },
-  { id: "about", label: "About" },
-  { id: "contact", label: "Contact" },
+// =============================================================================
+// I18N BUILDERS
+// -----------------------------------------------------------------------------
+// Constants below are *built* from the active i18n `t()` function so a language
+// switch re-runs them through useMemo and re-renders translated strings.
+// =============================================================================
+const buildNavSections = (t) => [
+  { id: "home", label: t("landing.navHome") },
+  { id: "impact", label: t("landing.navImpact") },
+  { id: "search", label: t("landing.navSearch") },
+  { id: "how", label: t("landing.navHow") },
+  { id: "about", label: t("landing.navAbout") },
+  { id: "contact", label: t("landing.navContact") },
 ];
 
-const TRUST_SIGNALS = [
+const buildTrustSignals = (t) => [
   {
     icon: ShieldCheck,
-    title: "Verified opportunities",
-    copy: "Every listing is reviewed before it reaches scholars, reducing dead links, expired calls, and low-quality submissions.",
+    title: t("landing.trustVerifiedTitle"),
+    copy: t("landing.trustVerifiedCopy"),
   },
   {
     icon: Smartphone,
-    title: "Built for low bandwidth",
-    copy: "Lightweight, mobile-first, and designed to work reliably on slower connections and basic devices.",
+    title: t("landing.trustLowBwTitle"),
+    copy: t("landing.trustLowBwCopy"),
   },
   {
     icon: Globe2,
-    title: "Partner-ready workflows",
-    copy: "Scholar support, scholarship intake, and applicant routing are structured so schools, NGOs, and sponsors can work at scale.",
+    title: t("landing.trustPartnerTitle"),
+    copy: t("landing.trustPartnerCopy"),
   },
 ];
 
-const HOW_STEPS = [
+const buildHowSteps = (t) => [
   {
     image: stepProfileImage,
-    alt: "Student filling profile details on a mobile device",
-    title: "Create your profile",
-    copy: "A short, mobile-friendly form. Save your draft and continue whenever you have signal.",
+    alt: t("landing.howStep1Alt"),
+    title: t("landing.howStep1Title"),
+    copy: t("landing.howStep1Copy"),
   },
   {
     image: stepMatchImage,
-    alt: "Students discussing opportunities around a laptop",
-    title: "Get matched",
-    copy: "We surface scholarships that fit your country, grade, and field — no scrolling through hundreds of irrelevant listings.",
+    alt: t("landing.howStep2Alt"),
+    title: t("landing.howStep2Title"),
+    copy: t("landing.howStep2Copy"),
   },
   {
     image: stepApplyImage,
-    alt: "Student preparing documents for scholarship application",
-    title: "Apply with one click",
-    copy: "Reuse your profile across applications and track every deadline from a single dashboard.",
+    alt: t("landing.howStep3Alt"),
+    title: t("landing.howStep3Title"),
+    copy: t("landing.howStep3Copy"),
   },
 ];
 
-const WHAT_WE_DO = [
-  { icon: Search, title: "Curate", copy: "We hand-verify scholarships from foundations, NGOs, and universities so no one wastes time on dead links or scams." },
-  { icon: Target, title: "Match", copy: "Smart filters surface scholarships that actually fit each scholar's country, grade level, and field of study." },
-  { icon: Compass, title: "Guide", copy: "Step-by-step application support, deadline tracking, and mentor connections — built for low-bandwidth networks." },
-  { icon: Heart, title: "Champion", copy: "We follow scholars from first application to first day on campus — and celebrate every placement, loudly." },
+const buildWhatWeDo = (t) => [
+  { icon: Search,  title: t("landing.whatWeDoCurateTitle"),   copy: t("landing.whatWeDoCurateCopy") },
+  { icon: Target,  title: t("landing.whatWeDoMatchTitle"),    copy: t("landing.whatWeDoMatchCopy") },
+  { icon: Compass, title: t("landing.whatWeDoGuideTitle"),    copy: t("landing.whatWeDoGuideCopy") },
+  { icon: Heart,   title: t("landing.whatWeDoChampionTitle"), copy: t("landing.whatWeDoChampionCopy") },
 ];
 
-const WHY_US = [
-  { num: "01", title: "Verified, not vague", copy: "Every listing is reviewed by a real human before it reaches your dashboard — no broken links, no expired calls." },
-  { num: "02", title: "Designed for slow networks", copy: "The whole platform is engineered to work on a basic phone with a weak signal. Speed is access." },
-  { num: "03", title: "Privacy by default", copy: "We collect only what is needed to support applications, and keep scholar data out of ad-tech and data resale workflows." },
-  { num: "04", title: "Free for scholars, forever", copy: "No application fees. No premium tier. Funding is for students, not platforms." },
-  { num: "05", title: "Local context first", copy: "Built with — not for — communities in Eastern Africa and beyond. Real stories shape every feature." },
-  { num: "06", title: "Always learning", copy: "We treat every applicant's feedback as a roadmap, and ship improvements every single week." },
+const buildWhyUs = (t) => [
+  { num: "01", title: t("landing.whyUs01Title"), copy: t("landing.whyUs01Copy") },
+  { num: "02", title: t("landing.whyUs02Title"), copy: t("landing.whyUs02Copy") },
+  { num: "03", title: t("landing.whyUs03Title"), copy: t("landing.whyUs03Copy") },
+  { num: "04", title: t("landing.whyUs04Title"), copy: t("landing.whyUs04Copy") },
+  { num: "05", title: t("landing.whyUs05Title"), copy: t("landing.whyUs05Copy") },
+  { num: "06", title: t("landing.whyUs06Title"), copy: t("landing.whyUs06Copy") },
 ];
 
-// FAQ surfaced both visually and as JSON-LD for rich results.
+// FAQ surfaced only as JSON-LD (no visible component on landing).
+// Kept in English because Google's structured-data guidelines expect a single
+// language per document; if/when we add hreflang variants we can translate.
 const LANDING_FAQ = [
   {
     q: "Who can apply for scholarships on ScholarshipZone?",
@@ -166,6 +173,11 @@ const LANDING_FAQ = [
 // =============================================================================
 // HOOKS
 // =============================================================================
+// Shared class for native <select> — surface-aware (works in dark mode),
+// crisp 1px border, refined focus ring matching the design system.
+const SELECT_CLS =
+  "flex h-10 w-full rounded-lg border border-border bg-surface px-3 py-2 text-small text-ink shadow-elev-1 transition-colors focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
+
 const useCountUp = (target, durationMs = 1200) => {
   const [value, setValue] = useState(0);
   const frame = useRef(null);
@@ -210,24 +222,25 @@ const StatCard = ({ value, label, live, icon: Icon }) => {
   const display = useCountUp(value);
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5 }}
-      className="relative rounded-2xl border border-border bg-white p-6 shadow-card hover:shadow-lg transition-shadow"
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+      className="hover-lift relative rounded-2xl border border-border bg-surface p-6 shadow-elev-2 hover:shadow-elev-3"
     >
       {Icon && (
-        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
+        <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
       )}
-      <div className="text-4xl font-extrabold text-ink tracking-tight">
-        {display.toLocaleString()}+
+      <div className="text-h2 text-ink">
+        {display.toLocaleString()}
+        <span className="text-primary">+</span>
       </div>
-      <div className="mt-1 text-sm font-medium text-muted">{label}</div>
+      <div className="mt-1 text-small font-medium text-muted">{label}</div>
       {live && (
-        <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-caption font-semibold uppercase tracking-wider text-emerald-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
           Live
         </span>
       )}
@@ -246,31 +259,32 @@ const ResultCard = ({ item }) => {
     <motion.article
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group rounded-xl border border-border bg-white p-5 shadow-card hover:border-primary hover:shadow-lg transition-all"
+      transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
+      className="group hover-lift rounded-2xl border border-border bg-surface p-5 shadow-elev-1 hover:border-primary/40 hover:shadow-elev-3"
     >
-      <h3 className="text-lg font-bold text-ink group-hover:text-primary transition-colors">
+      <h3 className="text-h4 text-ink group-hover:text-primary transition-colors">
         {item.title}
       </h3>
-      <div className="mt-1 text-sm font-semibold text-muted">{item.provider}</div>
+      <div className="mt-1 text-small font-semibold text-muted">{item.provider}</div>
       {item.description && (
-        <p className="mt-3 text-sm text-slate-600 line-clamp-3">{item.description}</p>
+        <p className="mt-3 text-small text-muted line-clamp-3">{item.description}</p>
       )}
       {chips.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-1.5">
           {chips.map((c) => (
             <span
               key={c}
-              className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary-dark"
+              className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-caption font-semibold uppercase tracking-wider text-primary-dark"
             >
               {c}
             </span>
           ))}
         </div>
       )}
-      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-sm">
-        <span className="text-muted">Deadline: <span className="font-semibold text-ink">{deadlineLabel}</span></span>
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-small">
+        <span className="text-muted">Deadline · <span className="font-semibold text-ink">{deadlineLabel}</span></span>
         {item.amount > 0 && (
-          <span className="font-bold text-accent-dark">
+          <span className="font-bold text-accent-dark tracking-tight">
             {item.currency || "USD"} {Number(item.amount).toLocaleString()}
           </span>
         )}
@@ -281,21 +295,15 @@ const ResultCard = ({ item }) => {
 
 const SectionHeader = ({ eyebrow, title, subtitle, align = "center" }) => (
   <motion.header
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 16 }}
     whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true }}
-    transition={{ duration: 0.5 }}
-    className={`mb-12 ${align === "center" ? "text-center max-w-2xl mx-auto" : ""}`}
+    viewport={{ once: true, margin: "-60px" }}
+    transition={{ duration: 0.55, ease: [0.25, 1, 0.5, 1] }}
+    className={`mb-12 sm:mb-14 ${align === "center" ? "text-center max-w-2xl mx-auto" : "max-w-3xl"}`}
   >
-    <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary-dark">
-      {eyebrow}
-    </span>
-    <h2 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-ink">
-      {title}
-    </h2>
-    {subtitle && (
-      <p className="mt-4 text-base sm:text-lg text-muted leading-relaxed">{subtitle}</p>
-    )}
+    {eyebrow && <span className="eyebrow">{eyebrow}</span>}
+    <h2 className="mt-5 text-h2 text-ink">{title}</h2>
+    {subtitle && <p className="mt-4 text-lead">{subtitle}</p>}
   </motion.header>
 );
 
@@ -303,7 +311,17 @@ const SectionHeader = ({ eyebrow, title, subtitle, align = "center" }) => (
 // MAIN COMPONENT
 // =============================================================================
 const LandingPage = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // Memoised, translated content sets. Re-built whenever the active i18n
+  // language changes, which is exactly what causes the page to switch
+  // languages on the fly.
+  const NAV_SECTIONS = useMemo(() => buildNavSections(t), [t, i18n.language]);
+  const TRUST_SIGNALS = useMemo(() => buildTrustSignals(t), [t, i18n.language]);
+  const HOW_STEPS = useMemo(() => buildHowSteps(t), [t, i18n.language]);
+  const WHAT_WE_DO = useMemo(() => buildWhatWeDo(t), [t, i18n.language]);
+  const WHY_US = useMemo(() => buildWhyUs(t), [t, i18n.language]);
+
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [filters, setFilters] = useState(FALLBACK_FILTERS);
   const [selection, setSelection] = useState({ country: "", grade: "", field: "" });
@@ -344,7 +362,7 @@ const LandingPage = () => {
       const data = await searchPublicScholarships(selection);
       setResults(data.items || []);
     } catch {
-      toast.error("We couldn't reach the catalog. Please try again.");
+      toast.error(t("landing.catalogError"));
       setResults([]);
     } finally {
       setLoading(false);
@@ -352,21 +370,21 @@ const LandingPage = () => {
   };
 
   const resultsLabel = useMemo(() => {
-    if (loading) return "Searching…";
+    if (loading) return t("landing.searching");
     if (!searched) return null;
-    if (results.length === 0) return "No scholarships matched those filters.";
-    return `${results.length} match${results.length === 1 ? "" : "es"} found`;
-  }, [loading, searched, results.length]);
+    if (results.length === 0) return t("landing.searchNoMatches");
+    return t("landing.searchMatches", { count: results.length });
+  }, [loading, searched, results.length, t]);
 
   const handleContactSubmit = async (event) => {
     event.preventDefault();
     const { name, email, message } = contact;
     if (!name.trim() || !email.trim() || !message.trim()) {
-      toast.error("Please fill in your name, email, and message.");
+      toast.error(t("landing.contactErrorFields"));
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      toast.error("That email address doesn't look right.");
+      toast.error(t("landing.contactErrorEmail"));
       return;
     }
 
@@ -378,46 +396,57 @@ const LandingPage = () => {
         body: JSON.stringify({ ...contact, name: name.trim(), email: email.trim(), message: message.trim() }),
       });
       if (!res.ok) throw new Error("Bad response");
-      toast.success("Thanks! We'll get back to you within one working day.");
+      toast.success(t("landing.contactSuccess"));
       setContact({ name: "", email: "", topic: "general", message: "" });
     } catch {
-      toast.error("Couldn't send your message. Please email hello@scholarshipzone.org.");
+      toast.error(t("landing.contactErrorNetwork"));
     } finally {
       setContactSending(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-ink antialiased">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-elev-3"
+      >
+        {t("landing.skipToMain")}
+      </a>
       <Seo
-        title="Verified Scholarships for Underserved Students"
-        description="Discover verified scholarships matched to your country, grade, and field. Low-bandwidth application workflows, deadline tracking, and trusted support — built for real-world access."
+        title={t("landing.seoTitle")}
+        description={t("landing.seoDescription")}
         path="/"
-        keywords="scholarships, africa scholarships, underserved students, undergraduate scholarships, scholarship search, scholarship deadlines"
+        keywords={t("landing.seoKeywords")}
       />
       <EducationalOrganizationSchema />
       <WebSiteSchema />
       <FAQSchema items={LANDING_FAQ} />
 
       {/* ===================== NAV ===================== */}
-      <nav className="sticky top-3 z-50 mx-auto mt-3 flex max-w-7xl items-center justify-between gap-4 rounded-2xl border border-border bg-white/85 px-4 py-3 shadow-nav backdrop-blur-md sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center font-extrabold text-ink">
+      <nav
+        aria-label={t("landing.navPrimaryAria")}
+        className="sticky top-3 z-50 mx-auto mt-3 flex w-[min(100%-1.5rem,80rem)] items-center justify-between gap-4 rounded-2xl border border-border/80 bg-surface/80 px-4 py-2.5 shadow-nav backdrop-blur-xl supports-[backdrop-filter]:bg-surface/65 sm:px-6"
+      >
+        <Link to="/" className="flex shrink-0 items-center font-extrabold text-ink" aria-label={t("landing.navHomeAria")}>
           <img
             src="/logo.png"
-            alt="ScholarshipZone"
-            className="h-20 w-auto shrink-0 object-contain"
+            alt=""
+            className="h-14 w-auto shrink-0 object-contain sm:h-16"
           />
+          <span className="sr-only">ScholarshipZone</span>
         </Link>
 
-        <ul className="hidden lg:flex flex-1 items-center justify-center gap-1">
+        <ul className="hidden lg:flex flex-1 items-center justify-center gap-0.5">
           {NAV_SECTIONS.map((section) => (
             <li key={section.id}>
               <a
                 href={`#${section.id}`}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                aria-current={activeSection === section.id ? "true" : undefined}
+                className={`rounded-lg px-3 py-2 text-small font-semibold tracking-tight transition-colors duration-200 ${
                   activeSection === section.id
                     ? "bg-primary/10 text-primary-dark"
-                    : "text-muted hover:bg-slate-100 hover:text-ink"
+                    : "text-muted hover:bg-surface-2 hover:text-ink"
                 }`}
               >
                 {section.label}
@@ -426,12 +455,18 @@ const LandingPage = () => {
           ))}
         </ul>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Link to="/grade-converter" className="hidden md:inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-primary-dark hover:bg-primary/10 transition-colors">
-            Grade converter
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            to="/grade-converter"
+            className="hidden md:inline-flex items-center gap-1 rounded-lg px-3 py-2 text-small font-semibold text-primary-dark hover:bg-primary/10 transition-colors"
+          >
+            {t("landing.navGradeConverter")}
           </Link>
-          <Link to="/login/admin" className="hidden md:block text-sm font-semibold text-muted hover:text-ink transition-colors px-2">
-            Admin
+          <Link
+            to="/login/admin"
+            className="hidden md:inline-flex text-small font-semibold text-muted hover:text-ink transition-colors px-2"
+          >
+            {t("landing.navAdmin")}
           </Link>
           <LanguageSwitcher variant="compact" className="hidden md:inline-flex" />
           <ThemeToggle variant="icon" className="hidden md:inline-flex" />
@@ -441,10 +476,12 @@ const LandingPage = () => {
           <button
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
-            className="lg:hidden grid h-10 w-10 place-items-center rounded-lg border border-border text-ink"
-            aria-label="Toggle navigation"
+            className="lg:hidden grid h-10 w-10 place-items-center rounded-lg border border-border text-ink transition-colors hover:bg-surface-2"
+            aria-label={menuOpen ? t("landing.navClose") : t("landing.navOpen")}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav"
           >
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
       </nav>
@@ -453,10 +490,12 @@ const LandingPage = () => {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
+            id="mobile-nav"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-border bg-white shadow-nav"
+            transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+            className="lg:hidden mx-auto mt-2 w-[min(100%-1.5rem,80rem)] overflow-hidden rounded-2xl border border-border bg-surface shadow-nav"
           >
             <ul className="flex flex-col p-2">
               {NAV_SECTIONS.map((section) => (
@@ -464,18 +503,26 @@ const LandingPage = () => {
                   <a
                     href={`#${section.id}`}
                     onClick={() => setMenuOpen(false)}
-                    className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-ink hover:bg-slate-100"
+                    className="block rounded-lg px-3 py-2.5 text-small font-semibold text-ink transition-colors hover:bg-surface-2"
                   >
                     {section.label}
                   </a>
                 </li>
               ))}
               <li className="md:hidden border-t border-border mt-2 pt-2">
-                <Link to="/grade-converter" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-primary-dark hover:bg-primary/10">
-                  Grade converter
+                <Link
+                  to="/grade-converter"
+                  onClick={() => setMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2.5 text-small font-semibold text-primary-dark hover:bg-primary/10"
+                >
+                  {t("landing.navGradeConverter")}
                 </Link>
-                <Link to="/login/admin" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-muted hover:bg-slate-100">
-                  Admin sign in
+                <Link
+                  to="/login/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2.5 text-small font-semibold text-muted hover:bg-surface-2"
+                >
+                  {t("landing.navAdminSignIn")}
                 </Link>
               </li>
             </ul>
@@ -483,47 +530,84 @@ const LandingPage = () => {
         )}
       </AnimatePresence>
 
+      <main id="main" className="focus:outline-none" tabIndex={-1}>
+
       {/* ===================== HERO ===================== */}
-      <section id="home" className="relative mx-auto mt-6 max-w-7xl px-4 sm:px-6">
+      <section id="home" aria-labelledby="hero-title" className="relative mx-auto mt-6 w-[min(100%-1.5rem,80rem)]">
         <div className="relative overflow-hidden rounded-3xl shadow-modal">
           <img
             src={heroImage}
-            alt="Happy students laughing and collaborating"
-            className="h-[560px] w-full object-cover sm:h-[640px]"
+            alt=""
+            className="h-[clamp(28rem,75vh,44rem)] w-full object-cover"
             loading="eager"
             decoding="async"
+            fetchpriority="high"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-black/55 to-black/30" />
+          {/* Layered, refined gradient — deeper at the bottom-left, lifts content cleanly. */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/55 to-black/20" aria-hidden="true" />
+          <div className="absolute inset-0 bg-[radial-gradient(120%_60%_at_0%_100%,rgba(5,150,105,0.35),transparent_55%)]" aria-hidden="true" />
           <div className="absolute inset-0 flex items-center">
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
-              className="max-w-3xl px-6 sm:px-12 lg:px-16"
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full px-4 sm:px-8 lg:px-16"
             >
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5" />
-                The Gateway to Opportunity
+              <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/90 backdrop-blur-md">
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                {t("landing.heroEyebrow")}
               </span>
-              <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Your academic journey doesn't end at the{" "}
-                <span className="bg-gradient-to-r from-accent to-yellow-300 bg-clip-text text-transparent">
-                  campus gates
+              {/*
+                Two-line headline: first clause on line 1, gradient
+                accent phrase on line 2. Each line is `nowrap` so words
+                inside a line never break, but the explicit <br /> forces
+                the visual line break between the two clauses.
+                Font auto-scales so the longer of the two lines always fits.
+              */}
+              <h1
+                id="hero-title"
+                className="mt-5 font-display font-extrabold text-white"
+                style={{
+                  color: "#ffffff",
+                  fontSize: "clamp(1.1rem, calc(4vw - 0.25rem), 3.5rem)",
+                  lineHeight: 1.08,
+                  letterSpacing: "-0.04em",
+                  textShadow: "0 2px 28px rgba(0,0,0,0.4)",
+                }}
+              >
+                <span style={{ display: "block", whiteSpace: "nowrap" }}>
+                  {t("landing.heroTitle")}
                 </span>
-                .
+                <span
+                  className="bg-gradient-to-r from-accent to-yellow-300 bg-clip-text text-transparent"
+                  style={{ display: "block", whiteSpace: "nowrap" }}
+                >
+                  {t("landing.heroTitleAccent")}
+                </span>
               </h1>
-              <p className="mt-6 max-w-2xl text-base text-white/90 sm:text-lg leading-relaxed">
-                ScholarshipZone connects displaced and underserved students to verified
-                scholarships, mentors, and pathways — wherever you are, whatever your grade.
+              <p
+                className="mt-5 max-w-[80ch] text-white/85"
+                style={{
+                  fontSize: "clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem)",
+                  lineHeight: 1.55,
+                  textWrap: "pretty",
+                }}
+              >
+                {t("landing.heroSubtitle")}
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="shadow-lg">
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Button asChild size="lg" className="shadow-elev-3">
                   <Link to="/signup/scholar">
-                    Join the Hub <ArrowRight className="h-4 w-4" />
+                    {t("landing.heroCtaPrimary")} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="bg-white/10 backdrop-blur-md border-white/30 text-white hover:bg-white/20 hover:text-white">
-                  <a href="#search">Explore scholarships</a>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="border-white/25 bg-white/10 text-white backdrop-blur-md hover:border-white/40 hover:bg-white/20 hover:text-white"
+                >
+                  <a href="#search">{t("landing.heroCtaSecondary")}</a>
                 </Button>
               </div>
             </motion.div>
@@ -532,33 +616,33 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== TRUST SIGNALS ===================== */}
-      <section className="mx-auto mt-16 max-w-7xl px-4 sm:px-6">
+      <section aria-label={t("landing.trustAria")} className="mx-auto mt-16 w-[min(100%-1.5rem,80rem)]">
         <div className="grid gap-5 md:grid-cols-3">
           {TRUST_SIGNALS.map((item, idx) => (
             <motion.div
               key={item.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
-              className="rounded-2xl border border-border bg-white p-6 shadow-card hover:shadow-lg hover:-translate-y-1 transition-all"
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.5, delay: idx * 0.08, ease: [0.25, 1, 0.5, 1] }}
+              className="hover-lift rounded-2xl border border-border bg-surface p-6 shadow-elev-2 hover:border-primary/30 hover:shadow-elev-3"
             >
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <item.icon className="h-6 w-6" />
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <item.icon className="h-6 w-6" aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-bold text-ink">{item.title}</h3>
-              <p className="mt-2 text-sm text-muted leading-relaxed">{item.copy}</p>
+              <h3 className="text-h4 text-ink">{item.title}</h3>
+              <p className="mt-2 text-small text-muted">{item.copy}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
       {/* ===================== IMPACT ===================== */}
-      <section id="impact" className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section id="impact" aria-labelledby="impact-title" className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <SectionHeader
-          eyebrow="Our Impact"
-          title="A community growing in real time"
-          subtitle="Every number below updates from live applications and placements."
+          eyebrow={t("landing.impactEyebrow")}
+          title={t("landing.impactTitle")}
+          subtitle={t("landing.impactSubtitle")}
         />
         <div className="grid gap-8 lg:grid-cols-2 items-center">
           <motion.div
@@ -568,71 +652,77 @@ const LandingPage = () => {
             transition={{ duration: 0.6 }}
             className="overflow-hidden rounded-3xl shadow-card"
           >
-            <img src={impactPublicImage} alt="Students celebrating an academic milestone" className="h-full w-full object-cover" loading="lazy" />
+            <img src={impactPublicImage} alt={t("landing.impactImageAlt")} className="h-full w-full object-cover" loading="lazy" />
           </motion.div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard value={stats.activeScholarships} label="Active Scholarships" live icon={Award} />
-            <StatCard value={stats.studentsPlaced} label="Students Placed" icon={GraduationCap} />
-            <StatCard value={stats.totalApplicants} label="Applicants Onboarded" icon={Users} />
-            <StatCard value={45} label="Partner Organizations" icon={Globe2} />
+            <StatCard value={stats.activeScholarships} label={t("landing.statActiveScholarships")} live icon={Award} />
+            <StatCard value={stats.studentsPlaced} label={t("landing.statStudentsPlaced")} icon={GraduationCap} />
+            <StatCard value={stats.totalApplicants} label={t("landing.statApplicants")} icon={Users} />
+            <StatCard value={45} label={t("landing.statPartners")} icon={Globe2} />
           </div>
         </div>
       </section>
 
       {/* ===================== SEARCH ===================== */}
-      <section id="search" className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section id="search" aria-labelledby="search-title" className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <SectionHeader
-          eyebrow="Quick Search"
-          title="Find your match in 10 seconds"
-          subtitle="Filter scholarships by where you're from, where you are in school, and what you want to study. No account needed."
+          eyebrow={t("landing.searchEyebrow")}
+          title={t("landing.searchTitle")}
+          subtitle={t("landing.searchSubtitle")}
         />
 
         <Card className="overflow-hidden">
           <div className="grid lg:grid-cols-5">
-            <div className="lg:col-span-2 hidden lg:block">
-              <img src={searchImage} alt="A student exploring scholarships" className="h-full w-full object-cover" loading="lazy" />
+            <div className="relative lg:col-span-2 hidden lg:block">
+              <img
+                src={searchImage}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-surface/40" aria-hidden="true" />
             </div>
-            <form onSubmit={handleSubmit} className="lg:col-span-3 p-6 sm:p-8 space-y-5">
+            <form onSubmit={handleSubmit} className="lg:col-span-3 p-6 sm:p-8 space-y-5" aria-labelledby="search-title">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="country">Country of origin</Label>
+                  <Label htmlFor="country">{t("landing.searchCountryLabel")}</Label>
                   <select
                     id="country"
-                    className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className={SELECT_CLS}
                     value={selection.country}
                     onChange={(e) => setSelection((s) => ({ ...s, country: e.target.value }))}
                   >
-                    <option value="">Any country</option>
+                    <option value="">{t("landing.searchCountryAny")}</option>
                     {filters.countries.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="grade">Current grade</Label>
+                  <Label htmlFor="grade">{t("landing.searchGradeLabel")}</Label>
                   <select
                     id="grade"
-                    className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className={SELECT_CLS}
                     value={selection.grade}
                     onChange={(e) => setSelection((s) => ({ ...s, grade: e.target.value }))}
                   >
-                    <option value="">Any level</option>
+                    <option value="">{t("landing.searchGradeAny")}</option>
                     {filters.grades.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="field">Desired field</Label>
+                  <Label htmlFor="field">{t("landing.searchFieldLabel")}</Label>
                   <select
                     id="field"
-                    className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className={SELECT_CLS}
                     value={selection.field}
                     onChange={(e) => setSelection((s) => ({ ...s, field: e.target.value }))}
                   >
-                    <option value="">Any field</option>
+                    <option value="">{t("landing.searchFieldAny")}</option>
                     {filters.fields.map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </div>
               </div>
               <Button type="submit" size="lg" disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Searching…" : <>Search scholarships <Search className="h-4 w-4" /></>}
+                {loading ? t("landing.searching") : <>{t("landing.searchSubmit")} <Search className="h-4 w-4" aria-hidden="true" /></>}
               </Button>
             </form>
           </div>
@@ -642,7 +732,7 @@ const LandingPage = () => {
         {(searched || loading) && (
           <div className="mt-8" aria-live="polite">
             {resultsLabel && (
-              <div className="mb-4 text-sm font-semibold text-muted">{resultsLabel}</div>
+              <div className="mb-4 text-small font-semibold text-muted">{resultsLabel}</div>
             )}
             {results.length > 0 && (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -650,8 +740,8 @@ const LandingPage = () => {
               </div>
             )}
             {!loading && searched && results.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border bg-white p-8 text-center text-sm text-muted">
-                Try widening your filters — many scholarships accept applicants from multiple countries and fields.
+              <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-small text-muted shadow-elev-1">
+                {t("landing.searchEmpty")}
               </div>
             )}
           </div>
@@ -659,31 +749,36 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== HOW IT WORKS ===================== */}
-      <section id="how" className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section id="how" aria-labelledby="how-title" className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <SectionHeader
-          eyebrow="How It Works"
-          title="Three steps to your next opportunity"
-          subtitle="Built lean for slow networks: every step works on a basic phone."
+          eyebrow={t("landing.howEyebrow")}
+          title={t("landing.howTitle")}
+          subtitle={t("landing.howSubtitle")}
         />
         <div className="grid gap-6 md:grid-cols-3">
           {HOW_STEPS.map((step, idx) => (
             <motion.div
               key={step.title}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.15 }}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-white shadow-card hover:shadow-xl transition-all"
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.55, delay: idx * 0.12, ease: [0.25, 1, 0.5, 1] }}
+              className="group hover-lift relative overflow-hidden rounded-2xl border border-border bg-surface shadow-elev-2 hover:border-primary/30 hover:shadow-elev-3"
             >
               <div className="aspect-[4/3] overflow-hidden">
-                <img src={step.image} alt={step.alt} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <img
+                  src={step.image}
+                  alt={step.alt}
+                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                  loading="lazy"
+                />
               </div>
               <div className="p-6">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white font-extrabold">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-extrabold tracking-tight ring-4 ring-primary/15">
                   {idx + 1}
                 </span>
-                <h3 className="mt-4 text-xl font-bold text-ink">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted leading-relaxed">{step.copy}</p>
+                <h3 className="mt-4 text-h4 text-ink">{step.title}</h3>
+                <p className="mt-2 text-small text-muted">{step.copy}</p>
               </div>
             </motion.div>
           ))}
@@ -691,37 +786,37 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== ABOUT ===================== */}
-      <section id="about" className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section id="about" aria-labelledby="about-title" className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <SectionHeader
-          eyebrow="About the Hub"
-          title="Bridging brilliant minds with the opportunities they deserve"
-          subtitle="ScholarshipZone was built for the students the world too often overlooks — and the institutions that want to find them."
+          eyebrow={t("landing.aboutEyebrow")}
+          title={t("landing.aboutTitle")}
+          subtitle={t("landing.aboutSubtitle")}
         />
 
         {/* Mission + Vision */}
         <div className="grid gap-6 md:grid-cols-2 mb-16">
           {[
-            { img: missionImage, tag: "Our Mission", icon: Target, title: "Turn potential into placement.", copy: "We exist to dismantle the barriers between displaced, low-income, and underserved students and the scholarships that can change their lives. Verified opportunities. Plain-language guidance. Zero gatekeeping." },
-            { img: visionImage, tag: "Our Vision", icon: Eye, title: "A world where talent — not geography — decides who gets to study.", copy: "A future in which every refugee camp, rural school, and urban under-resourced classroom is one tap away from a fair shot at higher education." },
+            { img: missionImage, tag: t("landing.missionTag"), icon: Target, title: t("landing.missionTitle"), copy: t("landing.missionCopy") },
+            { img: visionImage,  tag: t("landing.visionTag"),  icon: Eye,    title: t("landing.visionTitle"),  copy: t("landing.visionCopy") },
           ].map((item, idx) => (
             <motion.article
               key={item.tag}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
-              className="group overflow-hidden rounded-2xl border border-border bg-white shadow-card hover:shadow-xl transition-all"
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.55, delay: idx * 0.08, ease: [0.25, 1, 0.5, 1] }}
+              className="group hover-lift overflow-hidden rounded-2xl border border-border bg-surface shadow-elev-2 hover:border-primary/30 hover:shadow-elev-3"
             >
               <div className="aspect-[16/9] overflow-hidden">
-                <img src={item.img} alt={item.tag} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                <img src={item.img} alt="" className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]" loading="lazy" />
               </div>
               <div className="p-6 sm:p-8">
                 <div className="flex items-center gap-2">
-                  <item.icon className="h-5 w-5 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-primary-dark">{item.tag}</span>
+                  <item.icon className="h-5 w-5 text-primary" aria-hidden="true" />
+                  <span className="text-caption font-bold uppercase tracking-widest text-primary-dark">{item.tag}</span>
                 </div>
-                <h3 className="mt-3 text-xl sm:text-2xl font-bold text-ink leading-tight">{item.title}</h3>
-                <p className="mt-3 text-sm sm:text-base text-muted leading-relaxed">{item.copy}</p>
+                <h3 className="mt-3 text-h3 text-ink">{item.title}</h3>
+                <p className="mt-3 text-body text-muted">{item.copy}</p>
               </div>
             </motion.article>
           ))}
@@ -729,22 +824,22 @@ const LandingPage = () => {
 
         {/* What we do */}
         <div className="mb-16">
-          <h3 className="mb-8 text-center text-2xl font-extrabold text-ink">Four moves, one outcome: students enrolled.</h3>
+          <h3 className="mb-8 text-center text-h3 text-ink">{t("landing.whatWeDoHeading")}</h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {WHAT_WE_DO.map((item, idx) => (
               <motion.div
                 key={item.title}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: idx * 0.08 }}
-                className="rounded-xl border border-border bg-white p-5 shadow-card hover:shadow-lg hover:border-primary/50 transition-all"
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.4, delay: idx * 0.06, ease: [0.25, 1, 0.5, 1] }}
+                className="hover-lift rounded-2xl border border-border bg-surface p-5 shadow-elev-1 hover:border-primary/40 hover:shadow-elev-3"
               >
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="h-5 w-5" />
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <h4 className="mt-4 text-base font-bold text-ink">{item.title}</h4>
-                <p className="mt-2 text-sm text-muted leading-relaxed">{item.copy}</p>
+                <h4 className="mt-4 text-h5 text-ink">{item.title}</h4>
+                <p className="mt-2 text-small text-muted">{item.copy}</p>
               </motion.div>
             ))}
           </div>
@@ -752,21 +847,21 @@ const LandingPage = () => {
 
         {/* Why us */}
         <div>
-          <h3 className="mb-8 text-center text-2xl font-extrabold text-ink">Built lean. Trusted by scholars. Loved by partners.</h3>
+          <h3 className="mb-8 text-center text-h3 text-ink">{t("landing.whyUsHeading")}</h3>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {WHY_US.map((item, idx) => (
               <motion.div
                 key={item.num}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: idx * 0.05 }}
-                className="relative rounded-xl border border-border bg-white p-6 shadow-card hover:shadow-lg transition-all"
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.4, delay: idx * 0.04, ease: [0.25, 1, 0.5, 1] }}
+                className="hover-lift relative rounded-2xl border border-border bg-surface p-6 shadow-elev-1 hover:border-primary/40 hover:shadow-elev-3"
               >
-                <span className="absolute top-4 right-4 text-3xl font-extrabold text-primary/10">{item.num}</span>
-                <Check className="h-6 w-6 text-primary" />
-                <h4 className="mt-3 text-base font-bold text-ink">{item.title}</h4>
-                <p className="mt-2 text-sm text-muted leading-relaxed">{item.copy}</p>
+                <span className="pointer-events-none absolute top-4 right-5 text-h2 font-extrabold text-primary/10 select-none" aria-hidden="true">{item.num}</span>
+                <Check className="h-6 w-6 text-primary" aria-hidden="true" />
+                <h4 className="mt-3 text-h5 text-ink">{item.title}</h4>
+                <p className="mt-2 text-small text-muted">{item.copy}</p>
               </motion.div>
             ))}
           </div>
@@ -774,35 +869,35 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== CONTACT ===================== */}
-      <section id="contact" className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section id="contact" aria-labelledby="contact-title" className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <SectionHeader
-          eyebrow="Get in Touch"
-          title="Questions, partnerships, or a scholarship to list?"
-          subtitle="Tell us a little about you and we'll route your message to the right person. We reply within one working day."
+          eyebrow={t("landing.contactEyebrow")}
+          title={t("landing.contactTitle")}
+          subtitle={t("landing.contactSubtitle")}
         />
 
         <div className="grid gap-8 lg:grid-cols-5">
           {/* Info */}
           <aside className="lg:col-span-2 space-y-4">
-            <div className="overflow-hidden rounded-2xl shadow-card">
-              <img src={contactImage} alt="Scholarship support team" className="h-48 w-full object-cover" loading="lazy" />
+            <div className="overflow-hidden rounded-2xl shadow-elev-2">
+              <img src={contactImage} alt="" className="h-48 w-full object-cover" loading="lazy" />
             </div>
             {[
-              { icon: Mail, label: "Email", value: "hello@scholarshipzone.org", href: "mailto:hello@scholarshipzone.org" },
-              { icon: Phone, label: "Partner support", value: "WhatsApp & direct support during onboarding" },
-              { icon: MapPin, label: "Office", value: "Nairobi, Kenya · East Africa & global" },
-              { icon: Clock, label: "Hours", value: "Mon — Fri, 09:00 — 17:00 EAT" },
+              { icon: Mail,  label: t("landing.contactEmailLabel"),   value: "hello@scholarshipzone.org", href: "mailto:hello@scholarshipzone.org" },
+              { icon: Phone, label: t("landing.contactPartnerLabel"), value: t("landing.contactPartnerValue") },
+              { icon: MapPin, label: t("landing.contactOfficeLabel"), value: t("landing.contactOfficeValue") },
+              { icon: Clock, label: t("landing.contactHoursLabel"),   value: t("landing.contactHoursValue") },
             ].map((item) => (
-              <div key={item.label} className="flex gap-4 rounded-xl border border-border bg-white p-4 shadow-card">
-                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="h-5 w-5" />
+              <div key={item.label} className="flex gap-4 rounded-2xl border border-border bg-surface p-4 shadow-elev-1">
+                <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-ink">{item.label}</div>
+                  <div className="text-small font-bold text-ink">{item.label}</div>
                   {item.href ? (
-                    <a href={item.href} className="text-sm text-primary hover:underline break-all">{item.value}</a>
+                    <a href={item.href} className="text-small text-primary hover:underline break-all">{item.value}</a>
                   ) : (
-                    <div className="text-sm text-muted">{item.value}</div>
+                    <div className="text-small text-muted">{item.value}</div>
                   )}
                 </div>
               </div>
@@ -815,21 +910,21 @@ const LandingPage = () => {
               <form onSubmit={handleContactSubmit} className="space-y-5" noValidate>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="contact-name">Your name</Label>
+                    <Label htmlFor="contact-name">{t("landing.contactNameLabel")}</Label>
                     <Input
                       id="contact-name"
-                      placeholder="Jane Doe"
+                      placeholder={t("landing.contactNamePlaceholder")}
                       value={contact.name}
                       onChange={(e) => setContact((c) => ({ ...c, name: e.target.value }))}
                       required
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="contact-email">Email address</Label>
+                    <Label htmlFor="contact-email">{t("landing.contactEmailFieldLabel")}</Label>
                     <Input
                       id="contact-email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder={t("landing.contactEmailPlaceholder")}
                       value={contact.email}
                       onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
                       required
@@ -837,34 +932,34 @@ const LandingPage = () => {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="contact-topic">I'm reaching out about</Label>
+                  <Label htmlFor="contact-topic">{t("landing.contactTopicLabel")}</Label>
                   <select
                     id="contact-topic"
-                    className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className={SELECT_CLS}
                     value={contact.topic}
                     onChange={(e) => setContact((c) => ({ ...c, topic: e.target.value }))}
                   >
-                    <option value="general">General question</option>
-                    <option value="scholar">I'm a scholar / applicant</option>
-                    <option value="partner">Partnership or sponsorship</option>
-                    <option value="listing">Listing a scholarship</option>
-                    <option value="press">Press / media</option>
+                    <option value="general">{t("landing.contactTopicGeneral")}</option>
+                    <option value="scholar">{t("landing.contactTopicScholar")}</option>
+                    <option value="partner">{t("landing.contactTopicPartner")}</option>
+                    <option value="listing">{t("landing.contactTopicListing")}</option>
+                    <option value="press">{t("landing.contactTopicPress")}</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="contact-message">Your message</Label>
+                  <Label htmlFor="contact-message">{t("landing.contactMessageLabel")}</Label>
                   <textarea
                     id="contact-message"
                     rows={5}
-                    placeholder="Tell us what's on your mind…"
-                    className="flex w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-none"
+                    placeholder={t("landing.contactMessagePlaceholder")}
+                    className="flex w-full rounded-lg border border-border bg-surface px-3 py-2 text-small text-ink placeholder:text-muted shadow-elev-1 transition-colors focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 resize-none"
                     value={contact.message}
                     onChange={(e) => setContact((c) => ({ ...c, message: e.target.value }))}
                     required
                   />
                 </div>
                 <Button type="submit" size="lg" disabled={contactSending}>
-                  {contactSending ? "Sending…" : <>Send message <ArrowRight className="h-4 w-4" /></>}
+                  {contactSending ? t("landing.contactSending") : <>{t("landing.contactSend")} <ArrowRight className="h-4 w-4" /></>}
                 </Button>
               </form>
             </CardContent>
@@ -873,54 +968,68 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== CTA BAND ===================== */}
-      <section className="mx-auto mt-24 max-w-7xl px-4 sm:px-6">
+      <section aria-label={t("landing.ctaAria")} className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
           className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary-dark to-emerald-900 p-10 sm:p-16 text-center shadow-modal"
         >
-          <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0 opacity-10" aria-hidden="true">
             <div className="absolute top-0 left-0 h-64 w-64 rounded-full bg-white blur-3xl" />
             <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-accent blur-3xl" />
           </div>
           <div className="relative">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">
-              Ready to take the next step?
+            <h2 className="text-h1 text-white" style={{ textShadow: "0 2px 24px rgba(0,0,0,0.25)" }}>
+              {t("landing.ctaTitle")}
             </h2>
-            <p className="mt-4 text-base sm:text-lg text-white/90 max-w-xl mx-auto">
-              Create a free scholar profile to save matches, track deadlines, and apply with one click.
+            <p
+              className="mx-auto mt-4 max-w-[55ch] bg-gradient-to-r from-accent to-yellow-300 bg-clip-text font-semibold"
+              style={{
+                color: "transparent",
+                WebkitTextFillColor: "transparent",
+                fontSize: "var(--text-lead)",
+                lineHeight: 1.55,
+              }}
+            >
+              {t("landing.ctaCopy")}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" variant="accent">
-                <Link to="/signup/scholar">Join the Hub <ArrowRight className="h-4 w-4" /></Link>
+                <Link to="/signup/scholar">{t("landing.ctaPrimary")} <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="bg-white/10 backdrop-blur-md border-white/30 text-white hover:bg-white/20 hover:text-white">
-                <Link to="/login/scholar">I already have an account</Link>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="border-white/25 bg-white/10 text-white backdrop-blur-md hover:border-white/40 hover:bg-white/20 hover:text-white"
+              >
+                <Link to="/login/scholar">{t("landing.ctaSecondary")}</Link>
               </Button>
             </div>
           </div>
         </motion.div>
       </section>
+      </main>
 
       {/* ===================== FOOTER ===================== */}
-      <footer className="mx-auto mt-20 max-w-7xl px-4 sm:px-6 pb-10">
+      <footer className="mx-auto mt-20 w-[min(100%-1.5rem,80rem)] pb-10">
         <div className="border-t border-border pt-10">
-          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-            <Link to="/login/scholar" className="text-muted hover:text-primary font-medium">Scholar sign in</Link>
-            <Link to="/login/admin" className="text-muted hover:text-primary font-medium">Admin sign in</Link>
-            <Link to="/get-started" className="text-muted hover:text-primary font-medium">All portals</Link>
-            <Link to="/privacy" className="text-muted hover:text-primary font-medium">Privacy</Link>
-            <Link to="/terms" className="text-muted hover:text-primary font-medium">Terms</Link>
-            <Link to="/accessibility" className="text-muted hover:text-primary font-medium">Accessibility</Link>
+          <nav aria-label={t("landing.footerNavAria")} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-small">
+            <Link to="/login/scholar" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerScholar")}</Link>
+            <Link to="/login/admin" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerAdmin")}</Link>
+            <Link to="/get-started" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerPortals")}</Link>
+            <Link to="/privacy" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerPrivacy")}</Link>
+            <Link to="/terms" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerTerms")}</Link>
+            <Link to="/accessibility" className="text-muted hover:text-primary font-medium transition-colors">{t("landing.footerAccessibility")}</Link>
           </nav>
-          <div className="mt-8 text-center text-sm text-muted">
-            © {new Date().getFullYear()} ScholarshipZone. Built with care for scholars everywhere.
+          <div className="mt-8 text-center text-small text-muted">
+            {t("landing.footerCopy", { year: new Date().getFullYear() })}
           </div>
         </div>
       </footer>
-    </main>
+    </div>
   );
 };
 

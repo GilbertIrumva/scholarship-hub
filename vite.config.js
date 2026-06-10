@@ -91,5 +91,43 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  build: {
+    // T4.1 — split heavy vendor groups into stable, cacheable chunks so
+    // per-deploy hash churn is limited to chunks that actually changed.
+    // Keep zxcvbn-ts lazy via dynamic import (already done in T3.2).
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          // Recharts + its d3 deps dominate the admin dashboard chunk.
+          if (
+            id.includes('node_modules/recharts') ||
+            /node_modules\/(d3-[^/]+|victory-vendor|internmap|robust-predicates|delaunator)\//.test(id)
+          ) {
+            return 'vendor-recharts'
+          }
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) {
+            return 'vendor-react'
+          }
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'vendor-radix'
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons'
+          }
+          if (id.includes('node_modules/framer-motion/') || id.includes('node_modules/motion/')) {
+            return 'vendor-motion'
+          }
+          if (id.includes('node_modules/axios/')) {
+            return 'vendor-axios'
+          }
+          if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
+            return 'vendor-i18n'
+          }
+          return undefined
+        },
+      },
+    },
+  },
 })

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -59,11 +60,10 @@ const StatCard = ({ icon: Icon, label, value, note, accent = "bg-primary", trend
 // -----------------------------------------------------------------------------
 // Chart sample data — derive from dashboard.summary if available
 // -----------------------------------------------------------------------------
-const buildChartData = (summary) => {
+const buildChartData = (summary, days) => {
   // Synthesize a simple weekly trend from current counts
   const total = summary?.totalApplicants ?? 0;
   const base = Math.max(1, Math.round(total / 14));
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return days.map((day, idx) => ({
     day,
     applicants: Math.max(0, Math.round(base * (1 + Math.sin(idx) * 0.6 + idx * 0.1))),
@@ -71,10 +71,10 @@ const buildChartData = (summary) => {
   }));
 };
 
-const buildEducationData = (recent) => {
+const buildEducationData = (recent, unspecifiedLabel) => {
   const counts = {};
   (recent || []).forEach((a) => {
-    const key = a.education || "Unspecified";
+    const key = a.education || unspecifiedLabel;
     counts[key] = (counts[key] || 0) + 1;
   });
   return Object.entries(counts).map(([name, value]) => ({ name, value }));
@@ -84,19 +84,38 @@ const buildEducationData = (recent) => {
 // MAIN DASHBOARD CONTENT
 // =============================================================================
 const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) => {
+  const { t } = useTranslation();
   const applicantLoad = dashboard.summary.totalApplicants
     ? Math.min(Math.round((dashboard.summary.reviewQueue / dashboard.summary.totalApplicants) * 100), 100)
     : 0;
 
-  const chartData = useMemo(() => buildChartData(dashboard.summary), [dashboard.summary]);
-  const educationData = useMemo(() => buildEducationData(dashboard.recentApplicants), [dashboard.recentApplicants]);
+  const days = useMemo(
+    () => [
+      t("admin.dayMon"),
+      t("admin.dayTue"),
+      t("admin.dayWed"),
+      t("admin.dayThu"),
+      t("admin.dayFri"),
+      t("admin.daySat"),
+      t("admin.daySun"),
+    ],
+    [t]
+  );
+  const chartData = useMemo(() => buildChartData(dashboard.summary, days), [dashboard.summary, days]);
+  const educationData = useMemo(
+    () => buildEducationData(dashboard.recentApplicants, t("admin.unspecified")),
+    [dashboard.recentApplicants, t]
+  );
 
-  const summaryCards = [
-    { icon: Users, label: "Total Applicants", value: dashboard.summary.totalApplicants, note: "Active applicant records", accent: "bg-gradient-to-br from-primary to-emerald-700", trend: 12 },
-    { icon: BadgeCheck, label: "Graduate Profiles", value: dashboard.summary.graduateApplicants, note: "Postgraduate-ready candidates", accent: "bg-gradient-to-br from-accent to-orange-600", trend: 8 },
-    { icon: BarChart3, label: "Average Age", value: dashboard.summary.averageAge, note: "Average across the intake", accent: "bg-gradient-to-br from-sky-500 to-indigo-600" },
-    { icon: ShieldCheck, label: "Review Queue", value: dashboard.summary.reviewQueue, note: `${applicantLoad}% of intake pending`, accent: "bg-gradient-to-br from-rose-500 to-red-600", trend: -5 },
-  ];
+  const summaryCards = useMemo(
+    () => [
+      { icon: Users, label: t("admin.statTotalApplicants"), value: dashboard.summary.totalApplicants, note: t("admin.statTotalApplicantsNote"), accent: "bg-gradient-to-br from-primary to-emerald-700", trend: 12 },
+      { icon: BadgeCheck, label: t("admin.statGraduateProfiles"), value: dashboard.summary.graduateApplicants, note: t("admin.statGraduateProfilesNote"), accent: "bg-gradient-to-br from-accent to-orange-600", trend: 8 },
+      { icon: BarChart3, label: t("admin.statAverageAge"), value: dashboard.summary.averageAge, note: t("admin.statAverageAgeNote"), accent: "bg-gradient-to-br from-sky-500 to-indigo-600" },
+      { icon: ShieldCheck, label: t("admin.statReviewQueue"), value: dashboard.summary.reviewQueue, note: t("admin.statReviewQueueNote", { percent: applicantLoad }), accent: "bg-gradient-to-br from-rose-500 to-red-600", trend: -5 },
+    ],
+    [t, dashboard.summary, applicantLoad]
+  );
 
   return (
     <div className="space-y-6">
@@ -108,7 +127,7 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
       >
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Welcome back
+            {t("admin.welcomeBack")}
           </p>
           <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
             {dashboard.admin.name}
@@ -119,11 +138,11 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onOpenSettings}>
-            Credential Settings
+            {t("admin.credentialSettings")}
           </Button>
           <Button onClick={onRefresh} disabled={isRefreshing}>
             <Activity className="h-4 w-4" />
-            {isRefreshing ? "Refreshing…" : "Refresh data"}
+            {isRefreshing ? t("admin.refreshing") : t("admin.refreshData")}
           </Button>
         </div>
       </motion.div>
@@ -141,12 +160,12 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
-              <CardTitle className="text-lg">Applicant activity (last 7 days)</CardTitle>
-              <p className="mt-1 text-sm text-muted">New applicants vs. reviewed</p>
+              <CardTitle className="text-lg">{t("admin.applicantActivity")}</CardTitle>
+              <p className="mt-1 text-sm text-muted">{t("admin.applicantActivitySubtitle")}</p>
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-bold text-success">
               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              Live
+              {t("admin.live")}
             </span>
           </CardHeader>
           <CardContent>
@@ -170,8 +189,8 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
               </ResponsiveContainer>
             </div>
             <div className="mt-4 flex gap-6 text-xs">
-              <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /> Applicants</div>
-              <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-accent" /> Reviewed</div>
+              <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /> {t("admin.applicantsLegend")}</div>
+              <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-accent" /> {t("admin.reviewedLegend")}</div>
             </div>
           </CardContent>
         </Card>
@@ -179,27 +198,27 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
         {/* Queue pressure */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Queue pressure</CardTitle>
-            <p className="text-sm text-muted">Review backlog vs. intake</p>
+            <CardTitle className="text-lg">{t("admin.queuePressure")}</CardTitle>
+            <p className="text-sm text-muted">{t("admin.queuePressureSubtitle")}</p>
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
               <div className="flex items-end justify-between mb-2">
                 <span className="text-4xl font-extrabold text-ink">{applicantLoad}%</span>
-                <span className="text-xs font-semibold text-muted">{dashboard.summary.reviewQueue} pending</span>
+                <span className="text-xs font-semibold text-muted">{t("admin.reviewPending", { count: dashboard.summary.reviewQueue })}</span>
               </div>
               <Progress value={applicantLoad} />
               <p className="mt-2 text-xs text-muted">
-                Out of {dashboard.summary.totalApplicants} total applicants
+                {t("admin.outOfTotal", { count: dashboard.summary.totalApplicants })}
               </p>
             </div>
 
             <div className="rounded-xl border border-border bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted">Session</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted">{t("admin.session")}</p>
               <p className="mt-2 text-sm font-bold text-ink truncate">{dashboard.admin.email}</p>
               <p className="text-xs text-muted truncate">{dashboard.admin.department}</p>
               <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-bold text-success">
-                <ShieldCheck className="h-3 w-3" /> Verified
+                <ShieldCheck className="h-3 w-3" /> {t("admin.verified")}
               </div>
             </div>
           </CardContent>
@@ -212,12 +231,12 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle className="text-lg">Recent applicants</CardTitle>
-              <p className="mt-1 text-sm text-muted">Latest intake snapshot</p>
+              <CardTitle className="text-lg">{t("admin.recentApplicants")}</CardTitle>
+              <p className="mt-1 text-sm text-muted">{t("admin.recentApplicantsSubtitle")}</p>
             </div>
             <Button asChild variant="ghost" size="sm">
               <Link to="/admin/applicants">
-                View all <ArrowUpRight className="h-3.5 w-3.5" />
+                {t("admin.viewAll")} <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </CardHeader>
@@ -226,10 +245,10 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-bold uppercase tracking-wider text-muted">
-                    <th className="py-3 pr-4">Applicant</th>
-                    <th className="py-3 pr-4">Education</th>
-                    <th className="py-3 pr-4">Status</th>
-                    <th className="py-3 pr-4 text-right">Age</th>
+                    <th className="py-3 pr-4">{t("admin.thApplicant")}</th>
+                    <th className="py-3 pr-4">{t("admin.thEducation")}</th>
+                    <th className="py-3 pr-4">{t("admin.thStatus")}</th>
+                    <th className="py-3 pr-4 text-right">{t("admin.thAge")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,7 +273,7 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
                   ) : (
                     <tr>
                       <td colSpan={4} className="py-8 text-center text-sm text-muted">
-                        No recent applicants yet.
+                        {t("admin.noRecentApplicants")}
                       </td>
                     </tr>
                   )}
@@ -267,8 +286,8 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
         {/* Education breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Education breakdown</CardTitle>
-            <p className="text-sm text-muted">Recent intake by level</p>
+            <CardTitle className="text-lg">{t("admin.educationBreakdown")}</CardTitle>
+            <p className="text-sm text-muted">{t("admin.educationBreakdownSubtitle")}</p>
           </CardHeader>
           <CardContent>
             {educationData.length > 0 ? (
@@ -293,7 +312,7 @@ const AdminDashboard = ({ dashboard, isRefreshing, onOpenSettings, onRefresh }) 
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <GraduationCap className="h-10 w-10 text-muted/40" />
-                <p className="mt-3 text-sm text-muted">No data yet</p>
+                <p className="mt-3 text-sm text-muted">{t("admin.noData")}</p>
               </div>
             )}
           </CardContent>

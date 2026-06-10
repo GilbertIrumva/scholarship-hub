@@ -15,6 +15,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { SaveButton } from "./SaveButton";
@@ -38,8 +39,8 @@ import {
   getPublicFilters,
 } from "../../services/publicApi";
 
-const formatAmount = (amount, currency = "USD") => {
-  if (!amount) return "Amount on request";
+const formatAmount = (amount, currency = "USD", t) => {
+  if (!amount) return t("catalog.amountOnRequest");
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -51,10 +52,10 @@ const formatAmount = (amount, currency = "USD") => {
   }
 };
 
-const formatDeadline = (deadline) => {
-  if (!deadline) return "Rolling";
+const formatDeadline = (deadline, t) => {
+  if (!deadline) return t("catalog.rolling");
   const d = new Date(deadline);
-  if (Number.isNaN(d.getTime())) return "Rolling";
+  if (Number.isNaN(d.getTime())) return t("catalog.rolling");
   return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -71,6 +72,7 @@ const daysUntil = (deadline) => {
 };
 
 const ScholarshipCard = ({ scholarship }) => {
+  const { t } = useTranslation();
   const days = daysUntil(scholarship.deadline);
   const isUrgent = days !== null && days >= 0 && days <= 14;
   const isClosed = days !== null && days < 0;
@@ -89,12 +91,12 @@ const ScholarshipCard = ({ scholarship }) => {
           </h3>
           {isUrgent && !isClosed && (
             <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-dark">
-              {days === 0 ? "Today" : `${days}d left`}
+              {days === 0 ? t("catalog.todayBadge") : t("catalog.daysLeft", { count: days })}
             </span>
           )}
           {isClosed && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Closed
+              {t("catalog.closed")}
             </span>
           )}
         </div>
@@ -111,13 +113,13 @@ const ScholarshipCard = ({ scholarship }) => {
           <div className="flex items-center gap-1.5 text-muted">
             <DollarSign className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold text-ink">
-              {formatAmount(scholarship.amount, scholarship.currency)}
+              {formatAmount(scholarship.amount, scholarship.currency, t)}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-muted">
             <Calendar className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold text-ink">
-              {formatDeadline(scholarship.deadline)}
+              {formatDeadline(scholarship.deadline, t)}
             </span>
           </div>
         </div>
@@ -147,7 +149,7 @@ const ScholarshipCard = ({ scholarship }) => {
           <div className="flex items-center gap-2">
             <Button asChild className="flex-1">
               <Link to={`/scholar/scholarships/${scholarship._id || scholarship.id}`}>
-                View details
+                {t("catalog.viewDetails")}
               </Link>
             </Button>
             <SaveButton
@@ -163,6 +165,7 @@ const ScholarshipCard = ({ scholarship }) => {
 };
 
 const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
+  const { t } = useTranslation();
   if (!options || options.length === 0) return null;
   return (
     <div>
@@ -181,7 +184,7 @@ const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
               : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
           ].join(" ")}
         >
-          All
+          {t("common.all")}
         </button>
         {options.map((opt) => (
           <button
@@ -203,32 +206,39 @@ const FilterChips = ({ label, options, value, onChange, icon: Icon }) => {
   );
 };
 
-const SORT_OPTIONS = [
-  { value: "deadline-asc", label: "Deadline (soonest)" },
-  { value: "deadline-desc", label: "Deadline (latest)" },
-  { value: "amount-desc", label: "Award (highest)" },
-  { value: "amount-asc", label: "Award (lowest)" },
-  { value: "newest", label: "Recently added" },
-  { value: "title-asc", label: "Title (A–Z)" },
-];
-
-const DEADLINE_WINDOWS = [
-  { value: "", label: "Any time" },
-  { value: "7", label: "Next 7 days" },
-  { value: "30", label: "Next 30 days" },
-  { value: "90", label: "Next 90 days" },
-  { value: "180", label: "Next 6 months" },
-];
-
 const DEFAULT_SORT = "deadline-asc";
 
 // Helpers to read params from URLSearchParams with safe defaults.
 const readParam = (params, key, fallback = "") => params.get(key) || fallback;
 
 const ScholarshipsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const SORT_OPTIONS = useMemo(
+    () => [
+      { value: "deadline-asc", label: t("catalog.sortDeadlineAsc") },
+      { value: "deadline-desc", label: t("catalog.sortDeadlineDesc") },
+      { value: "amount-desc", label: t("catalog.sortAmountDesc") },
+      { value: "amount-asc", label: t("catalog.sortAmountAsc") },
+      { value: "newest", label: t("catalog.sortNewest") },
+      { value: "title-asc", label: t("catalog.sortTitleAsc") },
+    ],
+    [t]
+  );
+
+  const DEADLINE_WINDOWS = useMemo(
+    () => [
+      { value: "", label: t("catalog.deadlineAny") },
+      { value: "7", label: t("catalog.deadlineNext7") },
+      { value: "30", label: t("catalog.deadlineNext30") },
+      { value: "90", label: t("catalog.deadlineNext90") },
+      { value: "180", label: t("catalog.deadlineNext180") },
+    ],
+    [t]
+  );
 
   // Pull filter state from URL search params (single source of truth).
   const query = readParam(searchParams, "q");
@@ -339,7 +349,7 @@ const ScholarshipsPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          toast.error(err?.response?.data?.message || "Failed to load scholarships.");
+          toast.error(err?.response?.data?.message || t("catalog.loadFailed"));
           setItems([]);
           setTotal(0);
         }
@@ -373,16 +383,16 @@ const ScholarshipsPage = () => {
       const opt = DEADLINE_WINDOWS.find((d) => d.value === deadlineWithin);
       chips.push({
         key: "deadlineWithin",
-        label: opt?.label || `Within ${deadlineWithin} days`,
+        label: opt?.label || t("catalog.deadlineWithin", { count: Number(deadlineWithin) }),
         icon: Calendar,
       });
     }
     if (openOnly) {
-      chips.push({ key: "openOnly", label: "Open only", icon: Calendar });
+      chips.push({ key: "openOnly", label: t("catalog.openOnly"), icon: Calendar });
     }
     return chips;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [country, grade, field, minAmount, maxAmount, deadlineWithin, openOnly]);
+  }, [country, grade, field, minAmount, maxAmount, deadlineWithin, openOnly, t]);
 
   if (!sessionToken || !scholarProfile) {
     return <Navigate to="/login?role=scholar" replace />;
@@ -415,14 +425,14 @@ const ScholarshipsPage = () => {
   };
 
   const sortLabel =
-    SORT_OPTIONS.find((s) => s.value === (sort || DEFAULT_SORT))?.label || "Sort";
+    SORT_OPTIONS.find((s) => s.value === (sort || DEFAULT_SORT))?.label || t("catalog.sort");
 
   return (
     <DashboardLayout
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-      title="Browse scholarships"
-      subtitle="Discover funding opportunities matched to your journey"
+      title={t("catalog.pageTitle")}
+      subtitle={t("catalog.pageSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
@@ -435,15 +445,15 @@ const ScholarshipsPage = () => {
                 <Input
                   value={queryDraft}
                   onChange={(e) => setQueryDraft(e.target.value)}
-                  placeholder="Search by title, provider, or keyword..."
+                  placeholder={t("catalog.searchPlaceholder")}
                   className="pl-9"
-                  aria-label="Search scholarships"
+                  aria-label={t("catalog.searchAria")}
                 />
                 {queryDraft && (
                   <button
                     type="button"
                     onClick={() => setQueryDraft("")}
-                    aria-label="Clear search"
+                    aria-label={t("catalog.clearSearchAria")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -458,12 +468,12 @@ const ScholarshipsPage = () => {
                     <Button variant="outline" size="sm" className="gap-1.5">
                       <ArrowDownUp className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">{sortLabel}</span>
-                      <span className="sm:hidden">Sort</span>
+                      <span className="sm:hidden">{t("catalog.sort")}</span>
                       <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[14rem]">
-                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t("catalog.sortBy")}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioGroup
                       value={sort || DEFAULT_SORT}
@@ -485,7 +495,7 @@ const ScholarshipsPage = () => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="gap-1.5">
                       <SlidersHorizontal className="h-3.5 w-3.5" />
-                      More filters
+                      {t("catalog.moreFilters")}
                       {(minAmount || maxAmount || deadlineWithin || openOnly) && (
                         <Badge variant="default" className="ml-1 h-4 px-1.5 text-[10px]">
                           {[
@@ -503,34 +513,34 @@ const ScholarshipsPage = () => {
                     onCloseAutoFocus={(e) => e.preventDefault()}
                   >
                     <DropdownMenuLabel className="px-0 pb-2">
-                      Award amount
+                      {t("catalog.awardAmount")}
                     </DropdownMenuLabel>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
                         inputMode="numeric"
                         min={0}
-                        placeholder="Min"
+                        placeholder={t("catalog.amountMinPlaceholder")}
                         value={minDraft}
                         onChange={(e) => setMinDraft(e.target.value)}
-                        aria-label="Minimum award amount"
+                        aria-label={t("catalog.amountMinAria")}
                       />
-                      <span className="text-xs text-muted">to</span>
+                      <span className="text-xs text-muted">{t("catalog.amountTo")}</span>
                       <Input
                         type="number"
                         inputMode="numeric"
                         min={0}
-                        placeholder="Max"
+                        placeholder={t("catalog.amountMaxPlaceholder")}
                         value={maxDraft}
                         onChange={(e) => setMaxDraft(e.target.value)}
-                        aria-label="Maximum award amount"
+                        aria-label={t("catalog.amountMaxAria")}
                       />
                     </div>
 
                     <DropdownMenuSeparator className="my-3" />
 
                     <DropdownMenuLabel className="px-0 pb-2">
-                      Deadline window
+                      {t("catalog.deadlineWindow")}
                     </DropdownMenuLabel>
                     <div className="flex flex-wrap gap-1.5">
                       {DEADLINE_WINDOWS.map((opt) => {
@@ -564,7 +574,7 @@ const ScholarshipsPage = () => {
                         }
                         className="h-4 w-4 rounded border-border accent-primary"
                       />
-                      Only show open scholarships
+                      {t("catalog.openOnlyToggle")}
                     </label>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -576,7 +586,7 @@ const ScholarshipsPage = () => {
                     onClick={clearAll}
                     className="gap-1.5"
                   >
-                    <X className="h-3.5 w-3.5" /> Clear all
+                    <X className="h-3.5 w-3.5" /> {t("common.clearAll")}
                   </Button>
                 )}
               </div>
@@ -589,21 +599,21 @@ const ScholarshipsPage = () => {
           <CardContent className="p-5">
             <div className="grid gap-5 md:grid-cols-3">
               <FilterChips
-                label="Country"
+                label={t("catalog.filterCountry")}
                 icon={MapPin}
                 options={filterOptions.countries}
                 value={country}
                 onChange={(v) => setParam("country", v)}
               />
               <FilterChips
-                label="Grade"
+                label={t("catalog.filterGrade")}
                 icon={GraduationCap}
                 options={filterOptions.grades}
                 value={grade}
                 onChange={(v) => setParam("grade", v)}
               />
               <FilterChips
-                label="Field"
+                label={t("catalog.filterField")}
                 icon={Tag}
                 options={filterOptions.fields}
                 value={field}
@@ -617,7 +627,7 @@ const ScholarshipsPage = () => {
         {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Active:
+              {t("catalog.activeLabel")}
             </span>
             {activeChips.map((chip) => {
               const Icon = chip.icon;
@@ -647,12 +657,12 @@ const ScholarshipsPage = () => {
         ) : items.length === 0 ? (
           <EmptyState
             icon={Compass}
-            title="No scholarships found"
-            description="Try adjusting your search or clearing the filters to see more results."
+            title={t("catalog.emptyTitle")}
+            description={t("catalog.emptyDescription")}
             action={
               hasActiveFilters ? (
                 <Button variant="outline" size="sm" onClick={clearAll}>
-                  Clear filters
+                  {t("catalog.clearFilters")}
                 </Button>
               ) : undefined
             }
@@ -661,13 +671,13 @@ const ScholarshipsPage = () => {
           <>
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-muted">
-                Showing <span className="text-ink">{items.length}</span>
-                {total > items.length ? <> of {total}</> : null}{" "}
-                {total === 1 ? "scholarship" : "scholarships"}
+                {t("catalog.showingPrefix")} <span className="text-ink">{items.length}</span>
+                {total > items.length ? <> {t("catalog.ofTotal", { total })}</> : null}{" "}
+                {t("catalog.scholarshipsCount", { count: total })}
               </p>
               {sort && sort !== DEFAULT_SORT && (
                 <p className="text-xs text-muted">
-                  Sorted by <span className="font-semibold text-ink">{sortLabel}</span>
+                  {t("catalog.sortedBy")} <span className="font-semibold text-ink">{sortLabel}</span>
                 </p>
               )}
             </div>

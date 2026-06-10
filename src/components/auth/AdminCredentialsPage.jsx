@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   FileText,
   FileImage,
@@ -33,40 +34,49 @@ import {
 } from "../../services/adminAuth";
 import { CREDENTIAL_TYPES } from "../../services/credentials";
 
-const TYPE_LABELS = Object.fromEntries(
-  CREDENTIAL_TYPES.map((t) => [t.value, t.label])
-);
+// Map service API values → i18n keys (`credentials.type*`).
+const CREDENTIAL_TYPE_KEY = {
+  "secondary-certificate": "credentials.typeSecondaryCertificate",
+  transcript: "credentials.typeTranscript",
+  "national-id": "credentials.typeNationalId",
+  passport: "credentials.typePassport",
+  "language-test": "credentials.typeLanguageTest",
+  "recommendation-letter": "credentials.typeRecommendationLetter",
+  cv: "credentials.typeCv",
+  other: "credentials.typeOther",
+};
 
 const STATUS_META = {
   unverified: {
-    label: "Not reviewed",
+    labelKey: "credentials.statusUnverified",
     chip: "bg-slate-100 text-slate-600",
     icon: Clock,
   },
   pending: {
-    label: "Pending",
+    labelKey: "credentials.statusPending",
     chip: "bg-amber-100 text-amber-800",
     icon: Clock,
   },
   verified: {
-    label: "Verified",
+    labelKey: "credentials.statusVerified",
     chip: "bg-emerald-100 text-emerald-800",
     icon: CheckCircle2,
   },
   rejected: {
-    label: "Rejected",
+    labelKey: "credentials.statusRejected",
     chip: "bg-rose-100 text-rose-700",
     icon: AlertCircle,
   },
 };
 
-const STATUS_TABS = [
-  { id: "all", label: "All" },
-  { id: "unverified", label: "Not reviewed" },
-  { id: "pending", label: "Pending" },
-  { id: "verified", label: "Verified" },
-  { id: "rejected", label: "Rejected" },
-];
+const STATUS_TAB_IDS = ["all", "unverified", "pending", "verified", "rejected"];
+const STATUS_TAB_KEY = {
+  all: "common.all",
+  unverified: "credentials.statusUnverified",
+  pending: "credentials.statusPending",
+  verified: "credentials.statusVerified",
+  rejected: "credentials.statusRejected",
+};
 
 const formatBytes = (n) => {
   if (!Number.isFinite(n) || n <= 0) return "0 KB";
@@ -93,6 +103,7 @@ const FileIcon = ({ mimeType }) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const meta = STATUS_META[status] || STATUS_META.unverified;
   const Icon = meta.icon;
   return (
@@ -103,7 +114,7 @@ const StatusChip = ({ status }) => {
       ].join(" ")}
     >
       <Icon className="h-3 w-3" />
-      {meta.label}
+      {t(meta.labelKey)}
     </span>
   );
 };
@@ -117,6 +128,7 @@ const fetchWithAuth = async (url, sessionToken) => {
 };
 
 const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
+  const { t } = useTranslation();
   const [note, setNote] = useState(credential.verificationNote || "");
   const [submitting, setSubmitting] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
@@ -127,7 +139,7 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
 
   const submit = async (status) => {
     if (status === "rejected" && !note.trim()) {
-      toast.error("Please add a brief reason when rejecting.");
+      toast.error(t("admin.errRejectReason"));
       return;
     }
     setPendingStatus(status);
@@ -140,14 +152,14 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
       );
       toast.success(
         status === "verified"
-          ? "Credential verified."
+          ? t("adminCredentials.toastVerified")
           : status === "rejected"
-            ? "Credential rejected."
-            : "Status updated."
+            ? t("adminCredentials.toastRejected")
+            : t("adminCredentials.toastStatusUpdated")
       );
       onReviewed(updated);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update.");
+      toast.error(err?.response?.data?.message || t("adminCredentials.failedUpdate"));
     } finally {
       setSubmitting(false);
       setPendingStatus(null);
@@ -158,14 +170,14 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
     <div className="mt-4 rounded-xl border border-border bg-slate-50 p-4">
       <div className="grid gap-2">
         <Label htmlFor={`note-${credential.id}`} className="text-xs font-bold uppercase tracking-wider text-muted">
-          Reviewer note
+          {t("common.reviewerNote")}
         </Label>
         <textarea
           id={`note-${credential.id}`}
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 1000))}
           rows={2}
-          placeholder="Optional for verify · required for reject"
+          placeholder={t("admin.notePlaceholderReview")}
           className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
         <p className="text-[10px] text-muted text-right">{note.length}/1000</p>
@@ -182,7 +194,7 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
           ) : (
             <CheckCircle2 className="h-3.5 w-3.5" />
           )}
-          Verify
+          {t("admin.verify")}
         </Button>
         <Button
           size="sm"
@@ -195,7 +207,7 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
           ) : (
             <Clock className="h-3.5 w-3.5" />
           )}
-          Mark pending
+          {t("admin.markPending")}
         </Button>
         <Button
           size="sm"
@@ -209,7 +221,7 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
           ) : (
             <XCircle className="h-3.5 w-3.5" />
           )}
-          Reject
+          {t("admin.reject")}
         </Button>
       </div>
     </div>
@@ -217,6 +229,7 @@ const ReviewPanel = ({ credential, sessionToken, onReviewed }) => {
 };
 
 const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const downloadFile = async (e) => {
@@ -233,7 +246,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error("Could not download file.");
+      toast.error(t("adminCredentials.couldNotDownload"));
     }
   };
 
@@ -247,9 +260,12 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank", "noopener");
     } catch {
-      toast.error("Could not open file.");
+      toast.error(t("adminCredentials.couldNotOpen"));
     }
   };
+
+  const typeKey = CREDENTIAL_TYPE_KEY[credential.type];
+  const typeLabel = typeKey ? t(typeKey) : credential.type;
 
   return (
     <motion.div
@@ -271,7 +287,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
                     {credential.title}
                   </h3>
                   <p className="text-xs text-muted">
-                    {TYPE_LABELS[credential.type] || credential.type}
+                    {typeLabel}
                   </p>
                 </div>
                 <StatusChip status={credential.verificationStatus} />
@@ -281,7 +297,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs">
                   <User className="h-3.5 w-3.5 text-muted" />
                   <span className="font-semibold text-ink">
-                    {credential.scholar.name || "Unknown scholar"}
+                    {credential.scholar.name || t("adminCredentials.unknownScholar")}
                   </span>
                   {credential.scholar.email && (
                     <span className="text-muted">· {credential.scholar.email}</span>
@@ -300,7 +316,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
                 {credential.issuedYear && (
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    Issued {credential.issuedYear}
+                    {t("credentials.issuedPrefix", { year: credential.issuedYear })}
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1">
@@ -312,7 +328,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
               {credential.gradeConversion && (
                 <div className="mt-3 rounded-lg bg-primary/5 px-3 py-2 text-xs">
                   <span className="font-semibold text-primary-dark">
-                    Scholar's grade snapshot:
+                    {t("adminCredentials.gradeSnapshotPrefix")}
                   </span>{" "}
                   {credential.gradeConversion.systemId} grade{" "}
                   <span className="font-bold">{credential.gradeConversion.input}</span>{" "}
@@ -323,23 +339,23 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
 
               {credential.verificationNote && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  <span className="font-semibold">Note:</span> {credential.verificationNote}
+                  <span className="font-semibold">{t("admin.notePrefix")}</span> {credential.verificationNote}
                 </p>
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-muted">
-                  Uploaded {formatDate(credential.createdAt)}
+                  {t("adminCredentials.uploadedDate", { date: formatDate(credential.createdAt) })}
                   {credential.verifiedAt && (
-                    <> · Reviewed {formatDate(credential.verifiedAt)}</>
+                    <> · {t("adminCredentials.reviewedDate", { date: formatDate(credential.verifiedAt) })}</>
                   )}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" variant="ghost" onClick={previewFile}>
-                    <Eye className="h-3.5 w-3.5" /> View
+                    <Eye className="h-3.5 w-3.5" /> {t("common.view")}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={downloadFile}>
-                    <Download className="h-3.5 w-3.5" /> Download
+                    <Download className="h-3.5 w-3.5" /> {t("common.download")}
                   </Button>
                   <Button
                     size="sm"
@@ -347,7 +363,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
                     onClick={() => setExpanded((v) => !v)}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    {expanded ? "Close review" : "Review"}
+                    {expanded ? t("admin.closeReview") : t("admin.review")}
                   </Button>
                 </div>
               </div>
@@ -371,6 +387,7 @@ const CredentialRow = ({ credential, sessionToken, onReviewed }) => {
 };
 
 const AdminCredentialsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { sessionToken, adminDashboard, signOut } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -390,11 +407,11 @@ const AdminCredentialsPage = () => {
       const data = await listAdminCredentials(sessionToken, params);
       setCredentials(Array.isArray(data?.credentials) ? data.credentials : []);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to load credentials.");
+      toast.error(err?.response?.data?.message || t("adminCredentials.failedLoad"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, scholarFilter]);
+  }, [sessionToken, scholarFilter, t]);
 
   useEffect(() => {
     fetchAll();
@@ -439,13 +456,13 @@ const AdminCredentialsPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title="Academic credentials"
-      subtitle="Review and verify documents uploaded by scholars"
+      title={t("adminCredentials.pageTitle")}
+      subtitle={t("adminCredentials.pageSubtitle")}
       onSignOut={handleSignOut}
       actions={
         scholarFilter ? (
           <Button variant="outline" size="sm" onClick={clearScholarFilter}>
-            <ArrowLeft className="h-4 w-4" /> Clear scholar filter
+            <ArrowLeft className="h-4 w-4" /> {t("adminCredentials.clearScholarFilter")}
           </Button>
         ) : null
       }
@@ -457,10 +474,10 @@ const AdminCredentialsPage = () => {
               <User className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
               <div className="text-sm">
                 <p className="font-semibold text-primary-dark">
-                  Filtered by scholar
+                  {t("adminCredentials.filteredByScholar")}
                 </p>
                 <p className="text-muted">
-                  Showing only credentials uploaded by scholar{" "}
+                  {t("adminCredentials.filteredByScholarBody")}{" "}
                   <code className="rounded bg-white px-1.5 py-0.5 text-xs">
                     {scholarFilter}
                   </code>
@@ -469,7 +486,7 @@ const AdminCredentialsPage = () => {
                     to={`/admin/applicants/${scholarFilter}`}
                     className="font-semibold text-primary hover:underline"
                   >
-                    View applicant
+                    {t("adminCredentials.viewApplicant")}
                   </Link>
                 </p>
               </div>
@@ -483,18 +500,18 @@ const AdminCredentialsPage = () => {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted" />
               <span className="text-xs font-bold uppercase tracking-wider text-muted">
-                Status
+                {t("admin.statusLabel")}
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_TABS.map((tab) => {
-                const count = tab.id === "all" ? counts.all : counts[tab.id] || 0;
-                const active = statusFilter === tab.id;
+              {STATUS_TAB_IDS.map((id) => {
+                const count = id === "all" ? counts.all : counts[id] || 0;
+                const active = statusFilter === id;
                 return (
                   <button
-                    key={tab.id}
+                    key={id}
                     type="button"
-                    onClick={() => setStatusFilter(tab.id)}
+                    onClick={() => setStatusFilter(id)}
                     className={[
                       "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
                       active
@@ -502,7 +519,7 @@ const AdminCredentialsPage = () => {
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200",
                     ].join(" ")}
                   >
-                    {tab.label}
+                    {t(STATUS_TAB_KEY[id])}
                     <span
                       className={[
                         "rounded-full px-1.5 text-[10px] font-bold",
@@ -519,7 +536,7 @@ const AdminCredentialsPage = () => {
             <div className="flex items-center gap-2 pt-2">
               <Filter className="h-4 w-4 text-muted" />
               <span className="text-xs font-bold uppercase tracking-wider text-muted">
-                Document type
+                {t("admin.documentType")}
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -533,15 +550,16 @@ const AdminCredentialsPage = () => {
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200",
                 ].join(" ")}
               >
-                All
+                {t("common.all")}
               </button>
-              {CREDENTIAL_TYPES.map((t) => {
-                const active = typeFilter === t.value;
+              {CREDENTIAL_TYPES.map((type) => {
+                const active = typeFilter === type.value;
+                const k = CREDENTIAL_TYPE_KEY[type.value];
                 return (
                   <button
-                    key={t.value}
+                    key={type.value}
                     type="button"
-                    onClick={() => setTypeFilter(t.value)}
+                    onClick={() => setTypeFilter(type.value)}
                     className={[
                       "inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
                       active
@@ -549,7 +567,7 @@ const AdminCredentialsPage = () => {
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200",
                     ].join(" ")}
                   >
-                    {t.label}
+                    {k ? t(k) : type.label}
                   </button>
                 );
               })}
@@ -569,11 +587,10 @@ const AdminCredentialsPage = () => {
                 <ShieldCheck className="h-8 w-8" />
               </span>
               <h3 className="mt-4 text-lg font-bold text-ink">
-                No credentials uploaded yet
+                {t("adminCredentials.emptyTitle")}
               </h3>
               <p className="mt-1 max-w-md text-sm text-muted">
-                Scholars haven't uploaded any documents yet. They will appear
-                here as soon as they do.
+                {t("adminCredentials.emptyBody")}
               </p>
             </CardContent>
           </Card>
@@ -582,7 +599,7 @@ const AdminCredentialsPage = () => {
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <Filter className="h-8 w-8 text-muted/40" />
               <p className="mt-2 text-sm font-semibold text-muted">
-                No credentials match these filters.
+                {t("adminCredentials.filterEmpty")}
               </p>
             </CardContent>
           </Card>

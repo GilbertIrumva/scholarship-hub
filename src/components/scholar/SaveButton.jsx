@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useSavedScholarships } from "../../context/useSavedScholarships";
 
@@ -25,6 +26,7 @@ const SaveButton = ({
   onChange,
 }) => {
   const { isSaved, toggle } = useSavedScholarships();
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const saved = isSaved(scholarshipId);
 
@@ -59,7 +61,7 @@ const SaveButton = ({
         onClick={handleClick}
         disabled={busy}
         aria-pressed={saved}
-        aria-label={saved ? "Remove from saved" : "Save scholarship"}
+        aria-label={saved ? t("applications.removeFromSaved") : t("applications.saveScholarship")}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
           saved
@@ -77,7 +79,7 @@ const SaveButton = ({
             aria-hidden="true"
           />
         )}
-        <span>{saved ? "Saved" : "Save"}</span>
+        <span>{saved ? t("applications.saved") : t("applications.save")}</span>
       </button>
     );
   }
@@ -88,8 +90,8 @@ const SaveButton = ({
       onClick={handleClick}
       disabled={busy}
       aria-pressed={saved}
-      aria-label={saved ? "Remove from saved" : "Save scholarship"}
-      title={saved ? "Remove from saved" : "Save scholarship"}
+      aria-label={saved ? t("applications.removeFromSaved") : t("applications.saveScholarship")}
+      title={saved ? t("applications.removeFromSaved") : t("applications.saveScholarship")}
       className={cn(
         "grid place-items-center rounded-full border transition",
         sizeMap[size],

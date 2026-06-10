@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,31 +13,31 @@ import {
 import { Seo } from "../seo/Seo";
 
 // -----------------------------------------------------------------------------
-// Role definitions
+// Role definitions (built per render so they pick up the active locale)
 // -----------------------------------------------------------------------------
-const ROLES = [
+const buildRoles = (t) => [
   {
     id: "student",
     to: "/login?role=scholar",
     icon: GraduationCap,
-    title: "Join as a Student",
-    description: "Access learning resources, programs, and opportunities.",
+    title: t("roleLanding.roleStudentTitle"),
+    description: t("roleLanding.roleStudentDescription"),
     available: true,
   },
   {
     id: "admin",
     to: "/login?role=admin",
     icon: ShieldCheck,
-    title: "Join as an Admin",
-    description: "Manage users, content, and platform operations.",
+    title: t("roleLanding.roleAdminTitle"),
+    description: t("roleLanding.roleAdminDescription"),
     available: true,
   },
   {
     id: "mentor",
     to: null,
     icon: Users,
-    title: "Join as a Mentor",
-    description: "Guide scholars and review applications. Coming soon.",
+    title: t("roleLanding.roleMentorTitle"),
+    description: t("roleLanding.roleMentorDescription"),
     available: false,
   },
 ];
@@ -45,6 +46,7 @@ const ROLES = [
 // Reusable role card
 // -----------------------------------------------------------------------------
 const RoleCard = ({ role, selected, onSelect, onActivate, index }) => {
+  const { t } = useTranslation();
   const Icon = role.icon;
   const disabled = !role.available;
 
@@ -130,7 +132,7 @@ const RoleCard = ({ role, selected, onSelect, onActivate, index }) => {
 
       {disabled && (
         <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Soon
+          {t("roleLanding.soonBadge")}
         </span>
       )}
     </motion.button>
@@ -140,7 +142,9 @@ const RoleCard = ({ role, selected, onSelect, onActivate, index }) => {
 // -----------------------------------------------------------------------------
 // Hero illustration (inline SVG — modern, no external asset needed)
 // -----------------------------------------------------------------------------
-const HeroIllustration = () => (
+const HeroIllustration = () => {
+  const { t } = useTranslation();
+  return (
   <motion.svg
     initial={{ opacity: 0, scale: 0.95 }}
     animate={{ opacity: 1, scale: 1 }}
@@ -148,7 +152,7 @@ const HeroIllustration = () => (
     viewBox="0 0 480 360"
     className="w-full max-w-[460px] drop-shadow-2xl"
     role="img"
-    aria-label="Students collaborating illustration"
+    aria-label={t("roleLanding.heroImageAlt")}
   >
     <defs>
       <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
@@ -238,14 +242,17 @@ const HeroIllustration = () => (
       <circle cx="80" cy="180" r="3" fill="#ffffff" />
     </motion.g>
   </motion.svg>
-);
+  );
+};
 
 // -----------------------------------------------------------------------------
 // Main page
 // -----------------------------------------------------------------------------
 const RoleLandingPage = () => {
+  const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState(null);
   const navigate = useNavigate();
+  const roles = useMemo(() => buildRoles(t), [t]);
 
   const handleActivate = (role) => {
     if (role.available && role.to) {
@@ -256,8 +263,8 @@ const RoleLandingPage = () => {
   return (
     <main className="flex min-h-screen flex-col lg:flex-row">
       <Seo
-        title="Get started"
-        description="Choose your role on ScholarshipZone — applicant, partner organisation, or administrator — and start your journey."
+        title={t("roleLanding.seoTitle")}
+        description={t("roleLanding.seoDescription")}
         path="/get-started"
       />
       {/* ============================ LEFT: HERO ============================ */}
@@ -293,7 +300,7 @@ const RoleLandingPage = () => {
             className="hidden items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur-md transition-colors hover:bg-white/20 sm:inline-flex"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Back home
+            {t("roleLanding.backHome")}
           </Link>
         </header>
 
@@ -308,7 +315,7 @@ const RoleLandingPage = () => {
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-md"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Welcome aboard
+            {t("roleLanding.eyebrow")}
           </motion.span>
 
           <motion.h1
@@ -317,7 +324,7 @@ const RoleLandingPage = () => {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="mt-5 max-w-xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-[48px]"
           >
-            Join the Future of Learning
+            {t("roleLanding.heroTitle")}
           </motion.h1>
 
           <motion.p
@@ -326,8 +333,7 @@ const RoleLandingPage = () => {
             transition={{ delay: 0.4, duration: 0.5 }}
             className="mt-5 max-w-[500px] text-base leading-relaxed text-white/85 sm:text-lg"
           >
-            Connect with opportunities, learning resources, and a thriving
-            community.
+            {t("roleLanding.heroSubtitle")}
           </motion.p>
         </div>
       </section>
@@ -346,23 +352,23 @@ const RoleLandingPage = () => {
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-slate-900 lg:hidden"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Back home
+            {t("roleLanding.backHome")}
           </Link>
 
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            Join Platform
+            {t("roleLanding.panelTitle")}
           </h2>
           <p className="mt-2 text-sm text-slate-500">
-            Choose how you want to get started.
+            {t("roleLanding.panelSubtitle")}
           </p>
 
           {/* Role cards */}
           <div
             role="radiogroup"
-            aria-label="Choose your role"
+            aria-label={t("roleLanding.chooseRoleAria")}
             className="mt-7 flex flex-col gap-4"
           >
-            {ROLES.map((role, idx) => (
+            {roles.map((role, idx) => (
               <RoleCard
                 key={role.id}
                 role={role}
@@ -378,7 +384,7 @@ const RoleLandingPage = () => {
           <motion.button
             type="button"
             onClick={() => {
-              const role = ROLES.find((r) => r.id === selectedId);
+              const role = roles.find((r) => r.id === selectedId);
               if (role) handleActivate(role);
             }}
             disabled={!selectedId}
@@ -394,17 +400,17 @@ const RoleLandingPage = () => {
                 : "cursor-not-allowed bg-slate-100 text-slate-400",
             ].join(" ")}
           >
-            Continue <ArrowRight className="h-4 w-4" />
+            {t("roleLanding.continue")} <ArrowRight className="h-4 w-4" />
           </motion.button>
 
           {/* Existing-account footer */}
           <p className="mt-6 text-center text-sm text-slate-500">
-            Already have an account?{" "}
+            {t("roleLanding.existingAccount")}{" "}
             <Link
               to="/login/scholar"
               className="font-semibold text-[#059669] hover:text-[#047857]"
             >
-              Sign in
+              {t("common.signIn")}
             </Link>
           </p>
         </motion.div>

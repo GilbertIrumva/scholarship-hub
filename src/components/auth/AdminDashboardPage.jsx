@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import AdminDashboard from "./AdminDashboard";
 import AdminVisaSnapshot from "./AdminVisaSnapshot";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
 
 const AdminDashboardPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     adminDashboard,
@@ -39,8 +41,8 @@ const AdminDashboardPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard.admin}
-      title="Dashboard Overview"
-      subtitle="Operations console for admissions"
+      title={t("admin.dashboardTitle")}
+      subtitle={t("admin.dashboardSubtitle")}
       onSignOut={handleSignOut}
     >
       <AdminDashboard

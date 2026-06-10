@@ -1,0 +1,72 @@
+# T4.4 — Automated dependency updates.
+#
+# Two npm ecosystems (root SPA + project/ backend) plus GitHub Actions itself.
+# Patch + minor bumps are grouped into one PR per ecosystem per week to keep
+# review load reasonable; major bumps come through one-PR-per-package so the
+# breaking-change surface stays isolated.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Africa/Kigali"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      frontend-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Stay on React 19. Cross-major bumps are explicit decisions, not
+      # weekly automation.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      # Tailwind v4 — pin to v4 line; v5 will need an audit.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: "/project"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Africa/Kigali"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    groups:
+      backend-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Mongoose majors need manual schema review.
+      - dependency-name: "mongoose"
+        update-types: ["version-update:semver-major"]
+      # Express 5 is current; gate any v6 jump.
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Africa/Kigali"
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci

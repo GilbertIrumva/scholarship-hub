@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ShieldAlert, ShieldCheck, ShieldQuestion, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -38,6 +39,7 @@ export const PasswordStrengthMeter = React.forwardRef(function PasswordStrengthM
   { password, userInputs = [], onEvaluate, minScore = 2, debounceMs = 500, className },
   _ref,
 ) {
+  const { t } = useTranslation();
   const [state, setState] = React.useState({
     score: 0,
     label: '',
@@ -145,12 +147,14 @@ export const PasswordStrengthMeter = React.forwardRef(function PasswordStrengthM
     <div className={cn('mt-2 space-y-2 text-xs', className)} aria-live="polite">
       <div className="flex items-center justify-between gap-2">
         <span className={cn('font-medium', labelTone)}>
-          {state.label || 'Checking…'}
+          {state.label
+            ? t(`passwordMeter.strength.${state.score}`, { defaultValue: state.label })
+            : t('passwordMeter.checking')}
         </span>
         {state.checking && (
           <span className="inline-flex items-center gap-1 text-muted">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-            Checking…
+            {t('passwordMeter.checking')}
           </span>
         )}
       </div>
@@ -161,7 +165,7 @@ export const PasswordStrengthMeter = React.forwardRef(function PasswordStrengthM
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={state.percent}
-        aria-label="Password strength"
+        aria-label={t('passwordMeter.barLabel')}
       >
         <div
           className={cn('h-full transition-all duration-300', barTone)}
@@ -173,20 +177,21 @@ export const PasswordStrengthMeter = React.forwardRef(function PasswordStrengthM
         <p className="inline-flex items-start gap-1.5 text-red-600">
           <ShieldAlert className="mt-[2px] h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>
-            Found in <strong>{state.count.toLocaleString()}</strong>{' '}
-            known data breach{state.count === 1 ? '' : 'es'}. Please pick a
-            different password.
+            {t('passwordMeter.breached', {
+              count: state.count,
+              formattedCount: state.count.toLocaleString(),
+            })}
           </span>
         </p>
       ) : state.breachError ? (
         <p className="inline-flex items-start gap-1.5 text-muted">
           <ShieldQuestion className="mt-[2px] h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>Could not reach the breach-check service. Sign-up will still proceed.</span>
+          <span>{t('passwordMeter.breachError')}</span>
         </p>
       ) : !state.checking && meetsMin ? (
         <p className="inline-flex items-start gap-1.5 text-emerald-600">
           <ShieldCheck className="mt-[2px] h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>Not found in any known data breach.</span>
+          <span>{t('passwordMeter.notBreached')}</span>
         </p>
       ) : null}
 

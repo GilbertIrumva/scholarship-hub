@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   KeyRound,
@@ -33,7 +34,7 @@ const statusStyles = {
   idle: "border-emerald-200 bg-emerald-50 text-emerald-800",
 };
 
-const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
+const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting, t }) => {
   const [name, setName] = useState(scholar.name || "");
   const [email, setEmail] = useState(scholar.email || "");
   const [password, setPassword] = useState("");
@@ -50,15 +51,15 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedName) {
-      setRowError("Name is required.");
+      setRowError(t("settings.errRowName"));
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setRowError("Enter a valid email.");
+      setRowError(t("settings.errRowEmailInvalid"));
       return;
     }
     if (password.trim() && password.trim().length < 8) {
-      setRowError("Password must be at least 8 characters.");
+      setRowError(t("settings.errRowPasswordMin"));
       return;
     }
 
@@ -72,7 +73,7 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Remove scholar account for ${scholar.email}?`)) return;
+    if (!window.confirm(t("settings.removeConfirm", { email: scholar.email }))) return;
     await onDelete(scholar.id);
   };
 
@@ -84,8 +85,8 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
             <UserRound size={18} />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">Scholar #{scholar.id}</p>
-            <p className="text-sm font-semibold text-emerald-900">{scholar.name || "Unnamed"}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-500">{t("settings.scholarRowEyebrow", { id: scholar.id })}</p>
+            <p className="text-sm font-semibold text-emerald-900">{scholar.name || t("settings.scholarRowUnnamed")}</p>
           </div>
         </div>
         <button
@@ -95,31 +96,31 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
           className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Trash2 size={14} />
-          Remove
+          {t("settings.removeScholar")}
         </button>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">Name</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">{t("settings.rowFieldName")}</span>
           <input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} />
         </label>
         <label className="block">
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">
-            <Mail size={12} /> Email
+            <Mail size={12} /> {t("settings.rowFieldEmail")}
           </span>
           <input className={inputClass} value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
         <label className="block sm:col-span-2">
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">
-            <KeyRound size={12} /> New Password
+            <KeyRound size={12} /> {t("settings.rowFieldNewPassword")}
           </span>
           <input
             className={inputClass}
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Leave empty to keep current password"
+            placeholder={t("settings.rowPasswordKeep")}
           />
         </label>
       </div>
@@ -127,7 +128,10 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
       {rowError ? <p className="mt-3 text-sm text-emerald-600">{rowError}</p> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-500">
-        <span>Application: {scholar.applicationId ? `#${scholar.applicationId}` : "Not linked"}</span>
+        <span>
+          {t("settings.rowApplicationPrefix")}
+          {scholar.applicationId ? `#${scholar.applicationId}` : t("settings.rowApplicationNotLinked")}
+        </span>
         <button
           type="button"
           onClick={handleSave}
@@ -135,7 +139,7 @@ const ScholarRow = ({ scholar, onSave, onDelete, isSubmitting }) => {
           className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500 bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Save size={14} />
-          Save
+          {t("settings.saveButton")}
         </button>
       </div>
     </article>
@@ -154,8 +158,27 @@ const CredentialSettings = ({
   onUpdateScholar,
   onDeleteScholar,
 }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState(() => createFormState(settings));
   const [errors, setErrors] = useState({});
+
+  const featureCards = useMemo(() => [
+    {
+      title: t("settings.featureAdminTitle"),
+      text: t("settings.featureAdminText"),
+      icon: <ShieldCheck size={16} className="text-emerald-600" />,
+    },
+    {
+      title: t("settings.featurePrimaryScholarTitle"),
+      text: t("settings.featurePrimaryScholarText"),
+      icon: <UserRound size={16} className="text-emerald-600" />,
+    },
+    {
+      title: t("settings.featureAllScholarsTitle"),
+      text: t("settings.featureAllScholarsText"),
+      icon: <Users size={16} className="text-emerald-600" />,
+    },
+  ], [t]);
 
   useEffect(() => {
     if (onLoadScholars) onLoadScholars();
@@ -174,27 +197,27 @@ const CredentialSettings = ({
     const scholarEmail = form.scholarEmail.trim().toLowerCase();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!form.adminName.trim()) nextErrors.adminName = "Admin name is required.";
-    if (!adminEmail) nextErrors.adminEmail = "Admin email is required.";
-    else if (!emailPattern.test(adminEmail)) nextErrors.adminEmail = "Enter a valid admin email.";
+    if (!form.adminName.trim()) nextErrors.adminName = t("settings.errAdminNameRequired");
+    if (!adminEmail) nextErrors.adminEmail = t("settings.errAdminEmailRequired");
+    else if (!emailPattern.test(adminEmail)) nextErrors.adminEmail = t("settings.errAdminEmailInvalid");
     else if (!adminEmail.endsWith("@schooladmin.com"))
-      nextErrors.adminEmail = "Admin email must use @schooladmin.com.";
+      nextErrors.adminEmail = t("settings.errAdminEmailDomain");
 
-    if (!form.adminDepartment.trim()) nextErrors.adminDepartment = "Department is required.";
-    if (!form.adminDepartmentCode.trim()) nextErrors.adminDepartmentCode = "Department code is required.";
-    if (!form.adminTwoFactorCode.trim()) nextErrors.adminTwoFactorCode = "2FA code is required.";
+    if (!form.adminDepartment.trim()) nextErrors.adminDepartment = t("settings.errDepartmentRequired");
+    if (!form.adminDepartmentCode.trim()) nextErrors.adminDepartmentCode = t("settings.errDepartmentCodeRequired");
+    if (!form.adminTwoFactorCode.trim()) nextErrors.adminTwoFactorCode = t("settings.err2faRequired");
     if (form.adminPassword.trim() && form.adminPassword.trim().length < 8)
-      nextErrors.adminPassword = "Use at least 8 characters.";
+      nextErrors.adminPassword = t("settings.errPasswordMin");
 
-    if (!form.scholarName.trim()) nextErrors.scholarName = "Scholar name is required.";
-    if (!scholarEmail) nextErrors.scholarEmail = "Scholar email is required.";
-    else if (!emailPattern.test(scholarEmail)) nextErrors.scholarEmail = "Enter a valid scholar email.";
+    if (!form.scholarName.trim()) nextErrors.scholarName = t("settings.errScholarNameRequired");
+    if (!scholarEmail) nextErrors.scholarEmail = t("settings.errScholarEmailRequired");
+    else if (!emailPattern.test(scholarEmail)) nextErrors.scholarEmail = t("settings.errScholarEmailInvalid");
 
     if (form.scholarPassword.trim() && form.scholarPassword.trim().length < 8)
-      nextErrors.scholarPassword = "Use at least 8 characters.";
+      nextErrors.scholarPassword = t("settings.errPasswordMin");
 
     if (adminEmail && scholarEmail && adminEmail === scholarEmail)
-      nextErrors.scholarEmail = "Scholar email must be different from the admin email.";
+      nextErrors.scholarEmail = t("settings.errScholarEmailDuplicate");
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -231,7 +254,7 @@ const CredentialSettings = ({
   const statusType = status?.type || "idle";
   const statusMessage =
     status?.message ||
-    "Update either account here. Leave password fields blank to keep the current passwords.";
+    t("settings.statusIdleMessage");
 
   const scholarsStatusType = scholarsStatus?.type || "idle";
 
@@ -244,32 +267,16 @@ const CredentialSettings = ({
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.28em] text-emerald-700 shadow-sm">
                 <Sparkles size={14} />
-                Protected settings
+                {t("settings.credEyebrow")}
               </div>
-              <h2 className="mt-5 text-2xl font-black tracking-tight text-emerald-950">Credential Control</h2>
+              <h2 className="mt-5 text-2xl font-black tracking-tight text-emerald-950">{t("settings.credTitle")}</h2>
               <p className="mt-3 text-sm leading-6 text-emerald-600">
-                Manage both admin and scholar access from one page without dropping back to the terminal.
+                {t("settings.credSubtitle")}
               </p>
             </div>
 
             <div className="mt-8 space-y-3">
-              {[
-                {
-                  title: "Admin identity",
-                  text: "Update the protected administrator account, department, and 2FA values.",
-                  icon: <ShieldCheck size={16} className="text-emerald-600" />,
-                },
-                {
-                  title: "Primary scholar",
-                  text: "Control the default student sign-in account from the same interface.",
-                  icon: <UserRound size={16} className="text-emerald-600" />,
-                },
-                {
-                  title: "All scholars",
-                  text: "Inspect and update every registered scholar account directly below.",
-                  icon: <Users size={16} className="text-emerald-600" />,
-                },
-              ].map((item) => (
+              {featureCards.map((item) => (
                 <article key={item.title} className="rounded-3xl border border-emerald-200/70 bg-white/80 p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
                     {item.icon}
@@ -281,11 +288,11 @@ const CredentialSettings = ({
             </div>
 
             <div className="mt-8 rounded-[28px] border border-emerald-300/50 bg-emerald-50 p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Update behavior</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">{t("settings.updateBehaviorTitle")}</p>
               <div className="mt-4 space-y-3 text-sm text-emerald-900/90">
-                <p>Changes are written to the backend immediately after save.</p>
-                <p>New passwords are hashed automatically before storage.</p>
-                <p>Updated credentials apply on the next sign-in attempt.</p>
+                <p>{t("settings.updateBehavior1")}</p>
+                <p>{t("settings.updateBehavior2")}</p>
+                <p>{t("settings.updateBehavior3")}</p>
               </div>
             </div>
 
@@ -295,19 +302,19 @@ const CredentialSettings = ({
               className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-300 bg-white px-5 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50"
             >
               <ArrowLeft size={16} />
-              Back to Dashboard
+              {t("settings.backToDashboard")}
             </button>
           </div>
         </aside>
 
         <div className="px-6 py-6 sm:px-8 lg:px-10 lg:py-8">
           <header className="border-b border-emerald-950/10 pb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.34em] text-emerald-700">Credential Management</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.34em] text-emerald-700">{t("settings.credManagementEyebrow")}</p>
             <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight text-emerald-950 sm:text-5xl">
-              Manage admin and scholar access
+              {t("settings.credManagementTitle")}
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-emerald-600 sm:text-lg">
-              Update the live admin and scholar accounts here. Password fields are optional and only change the stored credentials when you enter a new value.
+              {t("settings.credManagementSubtitle")}
             </p>
           </header>
 
@@ -319,14 +326,14 @@ const CredentialSettings = ({
                     <ShieldCheck size={18} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-500">Admin Access</p>
-                    <h3 className="mt-1 text-2xl font-black tracking-tight text-emerald-950">Protected administrator account</h3>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-500">{t("settings.adminAccessEyebrow")}</p>
+                    <h3 className="mt-1 text-2xl font-black tracking-tight text-emerald-950">{t("settings.adminAccessTitle")}</h3>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <label className="block sm:col-span-2">
-                    <span className="text-sm font-semibold text-emerald-700">Admin Name</span>
+                    <span className="text-sm font-semibold text-emerald-700">{t("settings.fieldAdminName")}</span>
                     <input className={inputClass} name="adminName" value={form.adminName} onChange={handleChange} />
                     {errors.adminName ? <p className="mt-2 text-sm text-emerald-600">{errors.adminName}</p> : null}
                   </label>
@@ -334,26 +341,26 @@ const CredentialSettings = ({
                   <label className="block sm:col-span-2">
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                       <Mail size={14} />
-                      Admin Email
+                      {t("settings.fieldAdminEmail")}
                     </span>
                     <input className={inputClass} name="adminEmail" value={form.adminEmail} onChange={handleChange} />
                     {errors.adminEmail ? <p className="mt-2 text-sm text-emerald-600">{errors.adminEmail}</p> : null}
                   </label>
 
                   <label className="block sm:col-span-2">
-                    <span className="text-sm font-semibold text-emerald-700">Department</span>
+                    <span className="text-sm font-semibold text-emerald-700">{t("settings.fieldDepartment")}</span>
                     <input className={inputClass} name="adminDepartment" value={form.adminDepartment} onChange={handleChange} />
                     {errors.adminDepartment ? <p className="mt-2 text-sm text-emerald-600">{errors.adminDepartment}</p> : null}
                   </label>
 
                   <label className="block">
-                    <span className="text-sm font-semibold text-emerald-700">Department Code</span>
+                    <span className="text-sm font-semibold text-emerald-700">{t("settings.fieldDepartmentCode")}</span>
                     <input className={inputClass} name="adminDepartmentCode" value={form.adminDepartmentCode} onChange={handleChange} />
                     {errors.adminDepartmentCode ? <p className="mt-2 text-sm text-emerald-600">{errors.adminDepartmentCode}</p> : null}
                   </label>
 
                   <label className="block">
-                    <span className="text-sm font-semibold text-emerald-700">2FA Code</span>
+                    <span className="text-sm font-semibold text-emerald-700">{t("settings.fieldTwoFactorCode")}</span>
                     <input className={inputClass} name="adminTwoFactorCode" value={form.adminTwoFactorCode} onChange={handleChange} />
                     {errors.adminTwoFactorCode ? <p className="mt-2 text-sm text-emerald-600">{errors.adminTwoFactorCode}</p> : null}
                   </label>
@@ -361,7 +368,7 @@ const CredentialSettings = ({
                   <label className="block sm:col-span-2">
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                       <KeyRound size={14} />
-                      New Admin Password
+                      {t("settings.fieldNewAdminPassword")}
                     </span>
                     <input
                       className={inputClass}
@@ -369,7 +376,7 @@ const CredentialSettings = ({
                       type="password"
                       value={form.adminPassword}
                       onChange={handleChange}
-                      placeholder="Leave empty to keep the current password"
+                      placeholder={t("settings.passwordKeepCurrent")}
                     />
                     {errors.adminPassword ? <p className="mt-2 text-sm text-emerald-600">{errors.adminPassword}</p> : null}
                   </label>
@@ -382,14 +389,14 @@ const CredentialSettings = ({
                     <UserRound size={18} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-500">Scholar Access</p>
-                    <h3 className="mt-1 text-2xl font-black tracking-tight text-emerald-950">Primary scholar sign-in account</h3>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-500">{t("settings.scholarAccessEyebrow")}</p>
+                    <h3 className="mt-1 text-2xl font-black tracking-tight text-emerald-950">{t("settings.scholarAccessTitle")}</h3>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-4">
                   <label className="block">
-                    <span className="text-sm font-semibold text-emerald-700">Scholar Name</span>
+                    <span className="text-sm font-semibold text-emerald-700">{t("settings.fieldScholarName")}</span>
                     <input className={inputClass} name="scholarName" value={form.scholarName} onChange={handleChange} />
                     {errors.scholarName ? <p className="mt-2 text-sm text-emerald-600">{errors.scholarName}</p> : null}
                   </label>
@@ -397,7 +404,7 @@ const CredentialSettings = ({
                   <label className="block">
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                       <Mail size={14} />
-                      Scholar Email
+                      {t("settings.fieldScholarEmail")}
                     </span>
                     <input className={inputClass} name="scholarEmail" value={form.scholarEmail} onChange={handleChange} />
                     {errors.scholarEmail ? <p className="mt-2 text-sm text-emerald-600">{errors.scholarEmail}</p> : null}
@@ -406,7 +413,7 @@ const CredentialSettings = ({
                   <label className="block">
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
                       <KeyRound size={14} />
-                      New Scholar Password
+                      {t("settings.fieldNewScholarPassword")}
                     </span>
                     <input
                       className={inputClass}
@@ -414,7 +421,7 @@ const CredentialSettings = ({
                       type="password"
                       value={form.scholarPassword}
                       onChange={handleChange}
-                      placeholder="Leave empty to keep the current password"
+                      placeholder={t("settings.passwordKeepCurrent")}
                     />
                     {errors.scholarPassword ? <p className="mt-2 text-sm text-emerald-600">{errors.scholarPassword}</p> : null}
                   </label>
@@ -428,7 +435,7 @@ const CredentialSettings = ({
 
             <div className="flex flex-col gap-3 border-t border-emerald-950/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-emerald-500">
-                Changes are written to the local backend immediately and apply to the next sign-in attempt.
+                {t("settings.footerNote")}
               </p>
               <button
                 type="submit"
@@ -436,7 +443,7 @@ const CredentialSettings = ({
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-500 bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Save size={16} />
-                {isSubmitting ? "Saving Changes..." : "Save Credential Changes"}
+                {isSubmitting ? t("settings.savingChanges") : t("settings.saveCredentialChanges")}
               </button>
             </div>
           </form>
@@ -444,12 +451,12 @@ const CredentialSettings = ({
           <section className="mt-10">
             <div className="flex flex-wrap items-end justify-between gap-3 border-b border-emerald-950/10 pb-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.34em] text-emerald-700">All scholar accounts</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.34em] text-emerald-700">{t("settings.allScholarsEyebrow")}</p>
                 <h2 className="mt-3 text-2xl font-black tracking-tight text-emerald-950 sm:text-3xl">
-                  Credential access for every scholar
+                  {t("settings.allScholarsTitle")}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm text-emerald-600">
-                  Update names, emails, or reset passwords for any scholar account. Removing an account revokes its sign-in access immediately.
+                  {t("settings.allScholarsSubtitle")}
                 </p>
               </div>
               <button
@@ -459,7 +466,7 @@ const CredentialSettings = ({
                 className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCcw size={14} />
-                Refresh list
+                {t("settings.refreshList")}
               </button>
             </div>
 
@@ -480,11 +487,12 @@ const CredentialSettings = ({
                     onSave={onUpdateScholar}
                     onDelete={onDeleteScholar}
                     isSubmitting={isSubmitting}
+                    t={t}
                   />
                 ))
               ) : (
                 <p className="rounded-3xl border border-emerald-200/70 bg-white p-5 text-sm text-emerald-600">
-                  No scholar accounts found. Use the refresh button after registering scholars.
+                  {t("settings.noScholars")}
                 </p>
               )}
             </div>

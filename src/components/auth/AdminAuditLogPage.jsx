@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   CheckCircle2,
@@ -33,14 +34,18 @@ const formatDate = (iso) => {
   }
 };
 
-const OUTCOMES = [
-  { key: "", label: "All outcomes" },
-  { key: "success", label: "Success" },
-  { key: "failure", label: "Failure" },
-];
-
 const AdminAuditLogPage = () => {
+  const { t } = useTranslation();
   const { sessionToken, adminDashboard, signOut } = useAuth();
+
+  const OUTCOMES = useMemo(
+    () => [
+      { key: "", label: t("adminAudit.outcomeAll") },
+      { key: "success", label: t("adminAudit.outcomeSuccess") },
+      { key: "failure", label: t("adminAudit.outcomeFailure") },
+    ],
+    [t],
+  );
 
   const [items, setItems] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
@@ -71,12 +76,12 @@ const AdminAuditLogPage = () => {
         setItems((prev) => (mode === "more" ? [...prev, ...entries] : entries));
         setNextCursor(data?.nextCursor || null);
       } catch {
-        toast.error("Could not load audit log.");
+        toast.error(t("adminAudit.couldNotLoad"));
       } finally {
         stateSetter(false);
       }
     },
-    [sessionToken, params, nextCursor]
+    [sessionToken, params, nextCursor, t]
   );
 
   useEffect(() => {
@@ -102,8 +107,8 @@ const AdminAuditLogPage = () => {
   return (
     <DashboardLayout
       role="admin"
-      title="Audit log"
-      subtitle="Every security-relevant action that touched the system."
+      title={t("adminAudit.pageTitle")}
+      subtitle={t("adminAudit.pageSubtitle")}
       onSignOut={signOut}
     >
       <Card className="border-slate-200/80">
@@ -114,11 +119,11 @@ const AdminAuditLogPage = () => {
           >
             <div className="space-y-1.5 sm:col-span-1">
               <label htmlFor="filter-action" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Action
+                {t("adminAudit.filterAction")}
               </label>
               <Input
                 id="filter-action"
-                placeholder="e.g. admin.sign-in"
+                placeholder={t("adminAudit.filterActionPlaceholder")}
                 value={pendingFilters.action}
                 onChange={(e) =>
                   setPendingFilters((p) => ({ ...p, action: e.target.value }))
@@ -127,11 +132,11 @@ const AdminAuditLogPage = () => {
             </div>
             <div className="space-y-1.5 sm:col-span-1">
               <label htmlFor="filter-actor" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Actor email
+                {t("adminAudit.filterActor")}
               </label>
               <Input
                 id="filter-actor"
-                placeholder="admin@example.com"
+                placeholder={t("adminAudit.filterActorPlaceholder")}
                 value={pendingFilters.actorEmail}
                 onChange={(e) =>
                   setPendingFilters((p) => ({ ...p, actorEmail: e.target.value }))
@@ -140,7 +145,7 @@ const AdminAuditLogPage = () => {
             </div>
             <div className="space-y-1.5 sm:col-span-1">
               <label htmlFor="filter-outcome" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Outcome
+                {t("adminAudit.filterOutcome")}
               </label>
               <select
                 id="filter-outcome"
@@ -160,7 +165,7 @@ const AdminAuditLogPage = () => {
             <div className="flex flex-wrap items-end gap-2 sm:col-span-1">
               <Button type="submit" className="gap-1.5">
                 <Filter className="h-4 w-4" />
-                Apply
+                {t("admin.apply")}
               </Button>
               <Button
                 type="button"
@@ -169,7 +174,7 @@ const AdminAuditLogPage = () => {
                 className="gap-1.5"
               >
                 <X className="h-4 w-4" />
-                Clear
+                {t("admin.clear")}
               </Button>
               <Button
                 type="button"
@@ -178,7 +183,7 @@ const AdminAuditLogPage = () => {
                 className="gap-1.5"
               >
                 <RefreshCcw className="h-4 w-4" />
-                Refresh
+                {t("admin.refresh")}
               </Button>
             </div>
           </form>
@@ -187,23 +192,23 @@ const AdminAuditLogPage = () => {
             {loading ? (
               <div className="flex items-center justify-center gap-2 p-10 text-sm text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading entries…
+                {t("admin.loadingEntries")}
               </div>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-slate-500">
                 <ScrollText className="h-8 w-8 text-slate-300" />
-                No audit entries match these filters.
+                {t("adminAudit.noEntries")}
               </div>
             ) : (
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2 text-left">When</th>
-                    <th className="px-3 py-2 text-left">Action</th>
-                    <th className="px-3 py-2 text-left">Actor</th>
-                    <th className="px-3 py-2 text-left">Target</th>
-                    <th className="px-3 py-2 text-left">Outcome</th>
-                    <th className="px-3 py-2 text-left">IP</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thWhen")}</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thAction")}</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thActor")}</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thTarget")}</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thOutcome")}</th>
+                    <th className="px-3 py-2 text-left">{t("adminAudit.thIp")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -218,7 +223,7 @@ const AdminAuditLogPage = () => {
                       <td className="px-3 py-2 text-slate-700">
                         <div className="font-semibold">{entry.actor?.email || "—"}</div>
                         <div className="text-xs text-slate-500">
-                          {entry.actor?.kind || "anonymous"}
+                          {entry.actor?.kind || t("adminAudit.actorAnonymous")}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-slate-700">
@@ -228,12 +233,12 @@ const AdminAuditLogPage = () => {
                         {entry.outcome === "failure" ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">
                             <ShieldAlert className="h-3 w-3" />
-                            failure
+                            {t("adminAudit.outcomeFailureShort")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                             <CheckCircle2 className="h-3 w-3" />
-                            success
+                            {t("adminAudit.outcomeSuccessShort")}
                           </span>
                         )}
                       </td>
@@ -254,7 +259,7 @@ const AdminAuditLogPage = () => {
                 className="gap-1.5"
               >
                 {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {loadingMore ? "Loading…" : "Load more"}
+                {loadingMore ? t("admin.loadingMore") : t("admin.loadMore")}
               </Button>
             </div>
           )}

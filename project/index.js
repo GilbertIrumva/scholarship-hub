@@ -8,20 +8,21 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const pino = require('pino');
 const pinoHttp = require('pino-http');
 const multer = require('multer');
 const otplib = require('otplib');
 const QRCode = require('qrcode');
 
 const { connectDb } = require('./db/connect');
-const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session, VerificationToken, AuditLog, Notification } = require('./db/models');
+const { Admin, Scholar, Application, Scholarship, ScholarshipApplication, ContactMessage, AcademicCredential, TravelDocument, VisaWorkflow, Session, VerificationToken, AuditLog, Notification, Metric } = require('./db/models');
 const { sendEmail } = require('./mailer');
 const { validate } = require('./lib/validate');
 const { audit } = require('./lib/audit');
 const { notify, notifyAdmins } = require('./lib/notify');
 const { rankScholarships, scoreScholarship } = require('./lib/matching');
 const { preferredBackend, backendFor } = require('./lib/storage');
+const { logger } = require('./lib/logger');
+const { captureException } = require('./lib/observability');
 const {
     AdminSignInSchema,
     AdminVerifySchema,
@@ -39,31 +40,16 @@ const {
     TwoFactorEnableSchema,
     TwoFactorDisableSchema,
     TwoFactorChallengeSchema,
+    WebVitalsSchema,
 } = require('./lib/schemas');
 
 // ---------------------------------------------------------------------------
 // Logging — structured JSON in production, pretty-printed in dev.
+// The pino instance itself lives in ./lib/logger.js so library modules
+// (audit.js, notify.js, observability.js, etc.) can share it without a
+// circular dependency on index.js.
 // ---------------------------------------------------------------------------
 const IS_PROD = process.env.NODE_ENV === 'production';
-const logger = pino({
-    level: process.env.LOG_LEVEL || (IS_PROD ? 'info' : 'debug'),
-    redact: {
-        paths: [
-            'req.headers.authorization',
-            'req.headers.cookie',
-            'req.body.password',
-            'req.body.verificationCode',
-            'req.body.departmentCode',
-            'req.body.twoFactorCode',
-            'req.body.totpCode',
-            'req.body.backupCode',
-        ],
-        censor: '[redacted]',
-    },
-    ...(IS_PROD ? {} : {
-        transport: { target: 'pino-pretty', options: { translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' } },
-    }),
-});
 
 const app = express();
 
@@ -99,19 +85,82 @@ app.use(cors({
     credentials: true,
 }));
 
+// T4.2 \u2014 Request correlation id. Accept an inbound X-Request-Id (so
+// upstream proxies / clients can propagate their own trace id) when it
+// looks safe; otherwise mint a fresh UUID. The value is mirrored back on
+// the response so users can quote it in support tickets, attached to
+// `req.id` for pino-http, and forwarded to Sentry via captureException.
+const REQUEST_ID_HEADER = 'x-request-id';
+const REQUEST_ID_RE = /^[a-zA-Z0-9_-]{8,128}$/;
+app.use((req, res, next) => {
+    const inbound = req.headers[REQUEST_ID_HEADER];
+    const id = typeof inbound === 'string' && REQUEST_ID_RE.test(inbound)
+        ? inbound
+        : crypto.randomUUID();
+    req.id = id;
+    res.setHeader('X-Request-Id', id);
+    next();
+});
+
 app.use(pinoHttp({
     logger,
+    // T4.2 \u2014 emit `requestId` on every log line and let pino-http reuse
+    // the value we attach below in the request-id middleware.
+    genReqId: (req) => req.id,
+    customProps: (req) => ({ requestId: req.id }),
     customLogLevel: (_req, res, err) => {
         if (err || res.statusCode >= 500) return 'error';
         if (res.statusCode >= 400) return 'warn';
         return 'info';
     },
-    // Quiet healthchecks in the request log.
-    autoLogging: { ignore: (req) => req.url === '/healthz' || req.url === '/readyz' },
+    // Quiet healthchecks + telemetry pings in the request log.
+    autoLogging: {
+        ignore: (req) =>
+            req.url === '/healthz' ||
+            req.url === '/readyz' ||
+            req.url === '/api/health' ||
+            req.url === '/api/ready' ||
+            req.url === '/api/_metrics/web-vitals',
+    },
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+
+// ---------------------------------------------------------------------------
+// T4.3 — Inflight request tracking + graceful-shutdown state.
+//
+// `inflightRequests` is incremented on every incoming request and decremented
+// when the response finishes (or the socket closes). The graceful shutdown
+// loop polls this counter so we know when it's safe to call `server.close()`.
+//
+// `shuttingDown` flips to true on SIGTERM/SIGINT. While true:
+//   • /readyz starts returning 503 so load balancers stop sending traffic.
+//   • New requests still complete (we don't want partial writes).
+// ---------------------------------------------------------------------------
+let inflightRequests = 0;
+let shuttingDown = false;
+
+app.use((req, res, next) => {
+    inflightRequests += 1;
+    // Liveness/readiness probes shouldn't count against drain — orchestrators
+    // poll them constantly and we never want them to delay shutdown.
+    const isProbe =
+        req.url === '/healthz' ||
+        req.url === '/readyz' ||
+        req.url === '/api/health' ||
+        req.url === '/api/ready';
+    if (isProbe) inflightRequests -= 1;
+    let settled = isProbe;
+    const release = () => {
+        if (settled) return;
+        settled = true;
+        inflightRequests = Math.max(0, inflightRequests - 1);
+    };
+    res.on('finish', release);
+    res.on('close', release);
+    next();
+});
 
 // ---------------------------------------------------------------------------
 // Rate limiters — protect auth + write endpoints from brute force / abuse.
@@ -145,6 +194,18 @@ const apiLimiter = IS_TEST ? noopLimiter : rateLimit({
     message: { message: 'Too many requests. Please slow down and try again shortly.' },
 });
 app.use('/api/', apiLimiter);
+
+// T4.1 — Looser limiter for the web-vitals telemetry endpoint. A single page
+// load can fire 5 metrics (CLS/LCP/INP/TTFB/FCP), and SPAs may navigate
+// repeatedly, so we allow a higher cap. Still capped to deter abuse.
+const metricsLimiter = IS_TEST ? noopLimiter : rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 240,                     // ~16/min per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipFailedRequests: true,
+    message: { message: 'Telemetry rate limit reached.' },
+});
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -1396,17 +1457,111 @@ app.delete('/api/auth/sessions', requireAuthenticatedSession, async (req, res, n
 });
 
 // ----- Health probes (used by load balancers / orchestrators) ------------
-app.get('/healthz', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
-app.get('/readyz', async (_req, res) => {
+//
+// T4.3 — `/healthz` is LIVENESS only: returns 200 as long as the process is
+// up and the event loop responds. NEVER touches the DB; never returns 503.
+// `/readyz` is READINESS: probes MongoDB via `db.admin().ping()` AND the
+// active storage backend. Returns 503 if any dependency is unhealthy so
+// load balancers stop sending traffic.
+//
+// Aliases `/api/health` + `/api/ready` are mounted for orchestrators that
+// require API-prefixed paths.
+const livenessHandler = (_req, res) => res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    pid: process.pid,
+    shuttingDown: Boolean(shuttingDown),
+});
+
+const readinessHandler = async (_req, res) => {
+    const checks = { db: 'unknown', storage: 'unknown' };
+    let allOk = true;
+    const mongoose = require('mongoose');
+
+    // 1) MongoDB — readyState first (cheap), then a real ping if connected.
     try {
-        const mongoose = require('mongoose');
-        // 1 = connected, 2 = connecting
         const ready = mongoose.connection.readyState === 1;
-        if (!ready) return res.status(503).json({ status: 'not-ready', db: 'disconnected' });
-        return res.json({ status: 'ready', db: 'connected' });
+        if (!ready) {
+            checks.db = 'disconnected';
+            allOk = false;
+        } else if (typeof mongoose.connection.db?.admin === 'function') {
+            await mongoose.connection.db.admin().ping();
+            checks.db = 'connected';
+        } else {
+            checks.db = 'connected';
+        }
     } catch (err) {
-        return res.status(503).json({ status: 'not-ready', error: err.message });
+        checks.db = `error: ${(err && err.message) || 'unknown'}`;
+        allOk = false;
     }
+
+    // 2) Storage backend — probe the active backend (local always healthy;
+    //    S3 returns false from isConfigured() if its env vars are missing).
+    try {
+        const backend = preferredBackend();
+        const ok = typeof backend.isConfigured === 'function' ? backend.isConfigured() : true;
+        checks.storage = ok ? (backend.name || 'ok') : 'misconfigured';
+        if (!ok) allOk = false;
+    } catch (err) {
+        checks.storage = `error: ${(err && err.message) || 'unknown'}`;
+        allOk = false;
+    }
+
+    // 3) During graceful shutdown we proactively fail readiness so the LB
+    //    drains us before the close window expires.
+    if (shuttingDown) {
+        allOk = false;
+        checks.shuttingDown = true;
+    }
+
+    return res.status(allOk ? 200 : 503).json({
+        status: allOk ? 'ready' : 'not-ready',
+        checks,
+        inflight: inflightRequests,
+        uptime: process.uptime(),
+    });
+};
+
+app.get('/healthz', livenessHandler);
+app.get('/api/health', livenessHandler);
+app.get('/readyz', readinessHandler);
+app.get('/api/ready', readinessHandler);
+
+// T4.1 — Anonymous Core Web Vitals ingestion. Browsers POST one tiny JSON
+// document per metric (CLS / LCP / INP / TTFB / FCP) using sendBeacon.
+// Guarantees:
+//   • Always returns 2xx on validation success even if the DB write fails
+//     (telemetry must never break the SPA — this is a fire-and-forget pipe).
+//   • Rate-limited per IP via metricsLimiter (noop in NODE_ENV=test).
+//   • Skips DB writes when NODE_ENV=test so existing tests don't need a
+//     Metric collection unless they opt in.
+//   • UA + IP are truncated; path is stripped of query string + fragment.
+app.post('/api/_metrics/web-vitals', metricsLimiter, validate(WebVitalsSchema), async (req, res) => {
+    const payload = req.body;
+    const sanitisedPath = typeof payload.path === 'string'
+        ? payload.path.split('?')[0].split('#')[0].slice(0, 256)
+        : null;
+    const userAgent = (req.headers['user-agent'] || '').toString().slice(0, 256) || null;
+    const ip = ((req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim() || null);
+    const ipTruncated = ip ? ip.slice(0, 64) : null;
+
+    if (!IS_TEST) {
+        // Fire-and-forget — never await, never surface DB errors to the client.
+        Metric.create({
+            name: payload.name,
+            value: payload.value,
+            rating: payload.rating || 'unknown',
+            navigationType: payload.navigationType || null,
+            path: sanitisedPath,
+            userAgent,
+            ip: ipTruncated,
+        }).catch((err) => {
+            // Log at debug level only — we don't want noisy alerts from telemetry.
+            logger.debug({ err: err.message, metric: payload.name }, 'web-vitals write failed');
+        });
+    }
+
+    return res.status(202).json({ ok: true });
 });
 
 // ----- Public (no auth) endpoints for the marketing landing page ---------
@@ -1551,7 +1706,7 @@ app.post('/api/public/contact', contactLimiter, validate(ContactMessageSchema), 
             ipAddress: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString(),
             userAgent: (req.headers['user-agent'] || '').toString().slice(0, 500),
         });
-        console.log('[contact] New message stored', { id: doc._id.toString(), email });
+        (req.log || logger).info({ contactMessageId: doc._id.toString(), email }, 'contact message stored');
 
         // Fan-out in-app notification to every admin so they see a new message
         // without polling the inbox. Fire-and-forget — failures never block the response.
@@ -4221,7 +4376,7 @@ const listNotifications = async (recipient, query) => {
     const filter = { 'recipient.kind': recipient.kind, 'recipient.id': recipient.id };
     if (query.unreadOnly) filter.readAt = null;
     const items = await Notification.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(query.limit)
         .lean();
     const unread = await Notification.countDocuments({
@@ -4379,8 +4534,7 @@ app.post('/api/scholarships/catalog', requireAdminSession, async (req, res, next
                     );
                 }
             } catch (err) {
-                // eslint-disable-next-line no-console
-                console.warn('[scholarship.new] fan-out failed:', err && err.message);
+                logger.warn({ err: err && err.message }, 'scholarship.new fan-out failed');
             }
         })();
 
@@ -4416,23 +4570,43 @@ app.post('/api/scholarships', async (req, res, next) => {
 app.use((err, req, res, _next) => {
     // req.log is attached by pino-http; falls back to the global logger.
     const log = req.log || logger;
-    log.error({ err: { message: err.message, stack: err.stack }, url: req.url }, 'Unhandled error');
+    const requestId = req.id;
+    log.error(
+        { err: { message: err.message, stack: err.stack }, url: req.url, requestId },
+        'Unhandled error',
+    );
+
+    // T4.2 \u2014 forward to the configured error sink (Sentry when SENTRY_DSN
+    // is set; no-op otherwise). Always include the request id so the entry
+    // can be correlated with the structured log line above.
+    captureException(err, {
+        requestId,
+        route: req.originalUrl || req.url,
+        principal: req.principal
+            ? { kind: req.principal.kind, id: req.principal.account?._id }
+            : (req.admin
+                ? { kind: 'admin', id: req.admin._id }
+                : (req.scholar ? { kind: 'scholar', id: req.scholar._id } : undefined)),
+        tags: { method: req.method },
+    });
+
     if (res.headersSent) return;
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(413).json({ message: 'File is too large (max 10 MB).' });
+            return res.status(413).json({ message: 'File is too large (max 10 MB).', requestId });
         }
-        return res.status(400).json({ message: err.message });
+        return res.status(400).json({ message: err.message, requestId });
     }
     if (err && /Only PDF or image/.test(err.message || '')) {
-        return res.status(400).json({ message: err.message });
+        return res.status(400).json({ message: err.message, requestId });
     }
     if (err && /CORS/.test(err.message || '')) {
-        return res.status(403).json({ message: 'CORS: origin not allowed.' });
+        return res.status(403).json({ message: 'CORS: origin not allowed.', requestId });
     }
     // Never leak stack traces or internal messages to clients in production.
     res.status(500).json({
         message: IS_PROD ? 'Internal server error.' : (err.message || 'Internal server error.'),
+        requestId,
     });
 });
 
@@ -4441,10 +4615,66 @@ app.use((err, req, res, _next) => {
 // ---------------------------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
+// T4.3 — `startServer()` returns the HTTP server handle so the graceful
+// shutdown helper can call `server.close()` to stop accepting new sockets
+// while letting in-flight requests drain.
+let httpServer = null;
+
 const startServer = () => {
-    app.listen(PORT, () => {
+    httpServer = app.listen(PORT, () => {
         logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'ScholarshipZone API listening');
     });
+    return httpServer;
+};
+
+// T4.3 — Graceful shutdown.
+//
+// Flow (triggered on SIGTERM / SIGINT, or via the exported helper from a
+// supervisor):
+//   1. Flip `shuttingDown = true` so /readyz starts returning 503 (the LB
+//      drains us within its probe cycle, typically 5-15s).
+//   2. Call `server.close()` so no new sockets are accepted.
+//   3. Poll `inflightRequests` until it hits 0, then close Mongoose.
+//   4. If the 25s grace timer expires first, log the holdout count and
+//      force-exit so we don't block a Kubernetes pod from terminating.
+//
+// Tests do NOT register signal handlers (see `if (require.main === module)`
+// below) so vitest's own SIGTERM doesn't trigger this path.
+const SHUTDOWN_GRACE_MS = Number(process.env.SHUTDOWN_GRACE_MS || 25_000);
+const SHUTDOWN_POLL_MS = 100;
+
+const gracefulShutdown = async (reason = 'shutdown') => {
+    if (shuttingDown) return; // idempotent
+    shuttingDown = true;
+    logger.info({ reason, inflight: inflightRequests }, 'graceful shutdown requested');
+
+    if (httpServer) {
+        httpServer.close((err) => {
+            if (err) logger.warn({ err: err.message }, 'http server close error');
+        });
+    }
+
+    const deadline = Date.now() + SHUTDOWN_GRACE_MS;
+    while (inflightRequests > 0 && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, SHUTDOWN_POLL_MS));
+    }
+    if (inflightRequests > 0) {
+        logger.warn({ inflight: inflightRequests }, 'shutdown grace timer elapsed with requests still in flight');
+    }
+
+    try {
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.connection.close(false);
+            logger.info('mongoose connection closed');
+        }
+    } catch (err) {
+        logger.warn({ err: err.message }, 'mongoose close error');
+    }
+
+    logger.info({ reason }, 'shutdown complete');
+    // Allow last log line to flush before exiting under PID 1 (Docker).
+    setTimeout(() => process.exit(0), 50).unref();
 };
 
 const logMongoStartupFailure = (err) => {
@@ -4475,6 +4705,13 @@ if (require.main === module) {
             logMongoStartupFailure(err);
             startServer();
         });
+
+    // T4.3 — Register graceful-shutdown signal handlers ONLY in the
+    // standalone-process branch. Tests import this file and we must NOT
+    // intercept vitest's own SIGTERM. `once()` so a second Ctrl+C still
+    // hard-kills the process (escape hatch).
+    process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 module.exports = {
@@ -4482,4 +4719,5 @@ module.exports = {
     logger,
     connectDb,
     startServer,
+    gracefulShutdown,
 };

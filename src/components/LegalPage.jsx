@@ -1,116 +1,55 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Seo } from "./seo/Seo";
 
-const LEGAL_CONTENT = {
-  privacy: {
-    title: "Privacy Policy",
-    intro:
-      "ScholarshipZone collects only the information needed to help scholars discover opportunities, manage applications, and contact support.",
-    sections: [
-      {
-        heading: "What we collect",
-        body:
-          "We may collect contact details, profile information, application data, and support messages that scholars or partner institutions choose to submit.",
-      },
-      {
-        heading: "How we use it",
-        body:
-          "Information is used to power scholarship discovery, application workflows, account access, partner coordination, and user support. We do not sell scholar data to advertising or data brokerage services.",
-      },
-      {
-        heading: "Data access",
-        body:
-          "Access is limited to the teams and partner workflows that need it to deliver the platform. Sensitive operations should be protected with appropriate operational safeguards.",
-      },
-    ],
-  },
-  terms: {
-    title: "Terms of Use",
-    intro:
-      "ScholarshipZone is intended to help scholars, institutions, and partners discover and manage scholarship opportunities responsibly.",
-    sections: [
-      {
-        heading: "Using the platform",
-        body:
-          "Users should provide accurate information, respect other applicants and partner institutions, and avoid misuse of application or messaging flows.",
-      },
-      {
-        heading: "Scholarship listings",
-        body:
-          "We work to keep listings accurate and current, but scholarship terms, deadlines, and eligibility remain subject to the issuing institution or sponsor.",
-      },
-      {
-        heading: "Service updates",
-        body:
-          "We may improve, update, or refine the platform over time to improve reliability, accessibility, and partner workflows.",
-      },
-    ],
-  },
-  accessibility: {
-    title: "Accessibility Statement",
-    intro:
-      "ScholarshipZone aims to be usable across low-bandwidth environments, mobile devices, and a wide range of assistive needs.",
-    sections: [
-      {
-        heading: "Design approach",
-        body:
-          "We prioritize readable typography, keyboard-accessible controls, clear navigation, and lightweight pages that load on slower networks.",
-      },
-      {
-        heading: "Ongoing improvements",
-        body:
-          "Accessibility is part of our product work. We review issues, refine interfaces, and improve interaction patterns as the platform evolves.",
-      },
-      {
-        heading: "Need help?",
-        body:
-          "If you encounter an accessibility barrier, contact hello@scholarshipzone.org and we will review it as quickly as possible.",
-      },
-    ],
-  },
-};
+const VARIANT_KEYS = ["privacy", "terms", "accessibility"];
+const SECTION_KEYS = ["one", "two", "three"];
 
 const LegalPage = ({ variant }) => {
-  const content = LEGAL_CONTENT[variant] || LEGAL_CONTENT.privacy;
+  const { t } = useTranslation();
+  const safeVariant = VARIANT_KEYS.includes(variant) ? variant : "privacy";
   const legalPath =
-    variant === "terms"
+    safeVariant === "terms"
       ? "/terms"
-      : variant === "accessibility"
+      : safeVariant === "accessibility"
       ? "/accessibility"
       : "/privacy";
 
+  const title = t(`legal.${safeVariant}.title`);
+  const intro = t(`legal.${safeVariant}.intro`);
+
   return (
     <main className="landing">
-      <Seo
-        title={content.title}
-        description={content.intro}
-        path={legalPath}
-      />
+      <Seo title={title} description={intro} path={legalPath} />
       <div className="landing__container">
         <section className="landing__section" aria-labelledby="legal-heading">
           <header className="landing__section-head">
-            <span className="landing__section-eyebrow">ScholarshipZone</span>
+            <span className="landing__section-eyebrow">{t("common.appName")}</span>
             <h1 id="legal-heading" className="landing__section-title">
-              {content.title}
+              {title}
             </h1>
-            <p className="landing__section-sub">{content.intro}</p>
+            <p className="landing__section-sub">{intro}</p>
           </header>
 
           <div className="landing__cards" style={{ width: "min(960px, 100%)" }}>
-            {content.sections.map((section) => (
-              <article key={section.heading} className="landing__card">
-                <h2 className="landing__card-title">{section.heading}</h2>
-                <p className="landing__card-desc">{section.body}</p>
+            {SECTION_KEYS.map((key) => (
+              <article key={key} className="landing__card">
+                <h2 className="landing__card-title">
+                  {t(`legal.${safeVariant}.sections.${key}.heading`)}
+                </h2>
+                <p className="landing__card-desc">
+                  {t(`legal.${safeVariant}.sections.${key}.body`)}
+                </p>
               </article>
             ))}
           </div>
 
           <div className="landing__hero-ctas" style={{ marginTop: 24 }}>
             <Link to="/" className="landing__btn landing__btn--primary">
-              Back to home
+              {t("common.backToHome")}
             </Link>
             <a href="mailto:hello@scholarshipzone.org" className="landing__btn landing__btn--ghost">
-              Contact support
+              {t("legal.contactSupport")}
             </a>
           </div>
         </section>

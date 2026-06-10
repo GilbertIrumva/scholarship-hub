@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,39 +42,36 @@ import { ThemeToggle } from "../ui/theme-toggle";
 import { Seo } from "../seo/Seo";
 import CommandPalette from "./CommandPalette";
 
-const ADMIN_NAV = [
-  { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/admin/applicants", label: "Applicants", icon: Users },
-  { to: "/admin/credentials", label: "Credentials", icon: FolderArchive },
-  { to: "/admin/visa-tracker", label: "Visa tracker", icon: Plane },
-  { to: "/admin/messages", label: "Messages", icon: Mail },
-  { to: "/admin/audit-log", label: "Audit log", icon: ScrollText },
-  { to: "/admin/settings", label: "Settings", icon: KeyRound },
+// Nav item shapes — labels are resolved from i18n at render time.
+const ADMIN_NAV_ITEMS = [
+  { to: "/admin", key: "sidebarOverview", icon: LayoutDashboard, end: true },
+  { to: "/admin/applicants", key: "sidebarApplicants", icon: Users },
+  { to: "/admin/credentials", key: "sidebarCredentials", icon: FolderArchive },
+  { to: "/admin/visa-tracker", key: "sidebarVisaTracker", icon: Plane },
+  { to: "/admin/messages", key: "sidebarMessages", icon: Mail },
+  { to: "/admin/audit-log", key: "sidebarAuditLog", icon: ScrollText },
+  { to: "/admin/settings", key: "sidebarSettings", icon: KeyRound },
 ];
 
-const SCHOLAR_NAV = [
-  { to: "/scholar", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass },
-  { to: "/scholar/saved", label: "Saved", icon: Heart },
-  { to: "/scholar/applications", label: "My applications", icon: FileText },
-  { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive },
-  { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane },
-  { to: "/scholar/visa-tracker", label: "Visa tracker", icon: ClipboardCheck },
+const SCHOLAR_NAV_ITEMS = [
+  { to: "/scholar", key: "sidebarOverview", icon: LayoutDashboard, end: true },
+  { to: "/scholar/scholarships", key: "sidebarBrowse", icon: Compass },
+  { to: "/scholar/saved", key: "sidebarSaved", icon: Heart },
+  { to: "/scholar/applications", key: "sidebarApplications", icon: FileText },
+  { to: "/scholar/credentials", key: "sidebarAcademicCredentials", icon: FolderArchive },
+  { to: "/scholar/travel-docs", key: "sidebarTravelDocs", icon: Plane },
+  { to: "/scholar/visa-tracker", key: "sidebarMyVisaTracker", icon: ClipboardCheck },
 ];
 
-const ROLE_CONFIG = {
+const ROLE_STYLES = {
   admin: {
-    brand: "Admin Console",
     icon: ShieldCheck,
-    nav: ADMIN_NAV,
     accent: "bg-gradient-to-br from-primary-dark to-emerald-900",
     accentText: "text-primary-dark",
     accentLight: "bg-primary/10",
   },
   scholar: {
-    brand: "Scholar",
     icon: GraduationCap,
-    nav: SCHOLAR_NAV,
     accent: "bg-primary",
     accentText: "text-primary",
     accentLight: "bg-primary/10",
@@ -111,8 +108,13 @@ const DashboardLayout = ({
   const [unread, setUnread] = useState(0);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef(null);
-  const cfg = ROLE_CONFIG[role];
-  const Icon = cfg.icon;
+  const styles = ROLE_STYLES[role];
+  const Icon = styles.icon;
+  const brandLabel = role === "admin" ? t("layout.brandAdmin") : t("layout.brandScholar");
+  const navItems = useMemo(
+    () => (role === "admin" ? ADMIN_NAV_ITEMS : SCHOLAR_NAV_ITEMS),
+    [role]
+  );
 
   // Poll the unified notification feed for both scholars and admins.
   useEffect(() => {
@@ -198,7 +200,7 @@ const DashboardLayout = ({
 
   const notifCount = unread;
 
-  const initials = (user?.name || "User")
+  const initials = (user?.name || t("layout.userFallback"))
     .split(" ")
     .map((p) => p[0])
     .filter(Boolean)
@@ -218,7 +220,7 @@ const DashboardLayout = ({
         <Link to="/" className="flex items-center font-extrabold text-ink">
           <img
             src="/logo.png"
-            alt="ScholarshipZone"
+            alt={t("layout.logoAlt")}
             className="h-24 w-auto object-contain"
           />
         </Link>
@@ -226,7 +228,7 @@ const DashboardLayout = ({
           type="button"
           onClick={() => setSidebarOpen(false)}
           className="lg:hidden grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-slate-100"
-          aria-label="Close sidebar"
+          aria-label={t("layout.closeSidebar")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -234,17 +236,17 @@ const DashboardLayout = ({
 
       {/* Role pill */}
       <div className="px-5 pt-5">
-        <div className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider", cfg.accentLight, cfg.accentText)}>
+        <div className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider", styles.accentLight, styles.accentText)}>
           <Icon className="h-3.5 w-3.5" />
-          {cfg.brand}
+          {brandLabel}
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 p-4 pt-4">
         <ul className="space-y-1">
-          {cfg.nav.map((item) => (
-            <li key={item.label}>
+          {navItems.map((item) => (
+            <li key={item.key + item.to}>
               <NavLink
                 to={item.to}
                 end={item.end}
@@ -253,19 +255,19 @@ const DashboardLayout = ({
                   cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                     isActive
-                      ? cn("text-white", cfg.accent)
+                      ? cn("text-white", styles.accent)
                       : "text-muted hover:bg-slate-100 hover:text-ink"
                   )
                 }
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                {t(`layout.${item.key}`)}
               </NavLink>
             </li>
           ))}
         </ul>
 
-        <div className="mt-8 px-3 text-xs font-bold uppercase tracking-wider text-muted">Quick links</div>
+        <div className="mt-8 px-3 text-xs font-bold uppercase tracking-wider text-muted">{t("layout.quickLinks")}</div>
         <ul className="mt-2 space-y-1">
           <li>
             <Link
@@ -273,7 +275,7 @@ const DashboardLayout = ({
               onClick={() => setSidebarOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-muted hover:bg-slate-100 hover:text-ink transition-colors"
             >
-              <Home className="h-4 w-4" /> Public site
+              <Home className="h-4 w-4" /> {t("layout.publicSite")}
             </Link>
           </li>
         </ul>
@@ -283,10 +285,10 @@ const DashboardLayout = ({
       <div className="p-4 border-t border-border space-y-3">
         <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
           <Avatar className="h-9 w-9 shrink-0">
-            <AvatarFallback className={cfg.accent}>{initials}</AvatarFallback>
+            <AvatarFallback className={styles.accent}>{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-ink">{user?.name || "User"}</p>
+            <p className="truncate text-sm font-bold text-ink">{user?.name || t("layout.userFallback")}</p>
             <p className="truncate text-xs text-muted">{user?.email || ""}</p>
           </div>
         </div>
@@ -297,7 +299,7 @@ const DashboardLayout = ({
           className="w-full justify-center"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {t("layout.signOut")}
         </Button>
       </div>
     </div>
@@ -306,7 +308,7 @@ const DashboardLayout = ({
   return (
     <div className="min-h-screen bg-background">
       <Seo
-        title={role === "admin" ? "Admin console" : "Scholar dashboard"}
+        title={role === "admin" ? t("layout.pageAdminTitle") : t("layout.pageScholarTitle")}
         noindex
       />
       <CommandPalette role={role} />
@@ -347,7 +349,7 @@ const DashboardLayout = ({
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden grid h-9 w-9 place-items-center rounded-lg border border-border text-ink hover:bg-slate-100"
-            aria-label="Open sidebar"
+            aria-label={t("layout.openSidebar")}
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -370,10 +372,10 @@ const DashboardLayout = ({
                 );
               }}
               className="hidden md:inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              aria-label="Open command palette"
+              aria-label={t("layout.openCommandPalette")}
             >
               <Search className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Quick actions…</span>
+              <span>{t("layout.quickActions")}</span>
               <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-muted">
                 <span className="text-xs">⌘</span>K
               </kbd>
@@ -389,7 +391,7 @@ const DashboardLayout = ({
                   if (!notifOpen) handleNotifLoad();
                 }}
                 className="hidden sm:grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-slate-100 hover:text-ink relative"
-                aria-label={`Notifications (${notifCount} new)`}
+                aria-label={t("layout.notificationsAria", { count: notifCount })}
                 aria-expanded={notifOpen}
               >
                 <Bell className="h-4 w-4" />

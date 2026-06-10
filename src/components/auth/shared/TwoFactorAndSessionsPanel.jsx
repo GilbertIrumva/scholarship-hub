@@ -6,6 +6,7 @@
 //
 // Calls the T3.4 backend at /api/auth/2fa/* and /api/auth/sessions/*.
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   Copy,
@@ -31,20 +32,20 @@ import {
 
 // ---------- helpers ---------------------------------------------------------
 
-const copyToClipboard = async (text, label) => {
+const copyToClipboard = async (text, label, t) => {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard.`);
+    toast.success(t("settings.toastCopiedClipboard", { label }));
   } catch {
-    toast.error("Clipboard unavailable. Copy manually.");
+    toast.error(t("settings.toastClipboardFail"));
   }
 };
 
-const downloadBackupCodes = (codes) => {
+const downloadBackupCodes = (codes, t) => {
   const blob = new Blob(
     [
-      "ScholarshipZone — Two-factor backup codes",
-      "Keep these safe. Each code can be used only once.",
+      t("settings.backupFileTitle"),
+      t("settings.backupFileSubtitle"),
       "",
       ...codes,
       "",
@@ -69,10 +70,10 @@ const formatDate = (value) => {
 };
 
 // Lightweight UA → short label parser. Best-effort only.
-const summariseUserAgent = (ua) => {
-  if (!ua) return "Unknown device";
-  let device = "Desktop";
-  if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = "Mobile";
+const summariseUserAgent = (ua, t) => {
+  if (!ua) return t("settings.unknownDevice");
+  let device = t("settings.deviceDesktop");
+  if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = t("settings.deviceMobile");
   let browser = "Browser";
   if (/Edg\//i.test(ua)) browser = "Edge";
   else if (/Chrome\//i.test(ua)) browser = "Chrome";
@@ -89,28 +90,28 @@ const summariseUserAgent = (ua) => {
 
 // ---------- subcomponents ---------------------------------------------------
 
-const BackupCodesList = ({ codes }) => (
+const BackupCodesList = ({ codes, t }) => (
   <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
     <div className="mb-3 flex items-center justify-between gap-3">
       <p className="text-sm font-semibold text-emerald-900">
-        Save these backup codes
+        {t("settings.backupCodesSaveTitle")}
       </p>
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => copyToClipboard(codes.join("\n"), "Backup codes")}
+          onClick={() => copyToClipboard(codes.join("\n"), t("settings.labelBackupCodes"), t)}
           className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
         >
           <Copy className="h-3.5 w-3.5" />
-          Copy
+          {t("settings.copy")}
         </button>
         <button
           type="button"
-          onClick={() => downloadBackupCodes(codes)}
+          onClick={() => downloadBackupCodes(codes, t)}
           className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
         >
           <Download className="h-3.5 w-3.5" />
-          Download
+          {t("settings.download")}
         </button>
       </div>
     </div>
@@ -125,8 +126,7 @@ const BackupCodesList = ({ codes }) => (
       ))}
     </ul>
     <p className="mt-3 text-xs text-emerald-800/80">
-      Each code may be used only once. We will not show them again — store them
-      somewhere safe (password manager, printed copy, etc.).
+      {t("settings.backupCodesNote")}
     </p>
   </div>
 );
@@ -134,6 +134,7 @@ const BackupCodesList = ({ codes }) => (
 // ---------- main panel ------------------------------------------------------
 
 const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) => {
+  const { t } = useTranslation();
   // 2FA status
   const [status, setStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -168,7 +169,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       const data = await getTwoFactorStatus(sessionToken);
       setStatus(data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to load 2FA status.");
+      toast.error(err.response?.data?.message || t("settings.toastUnable2faStatus"));
     } finally {
       setLoadingStatus(false);
     }
@@ -180,7 +181,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       const data = await listSessions(sessionToken);
       setSessions(data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to load sessions.");
+      toast.error(err.response?.data?.message || t("settings.toastUnableSessions"));
     } finally {
       setLoadingSessions(false);
     }
@@ -202,7 +203,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       setIssuedBackupCodes(null);
       setEnrollCode("");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to start 2FA setup.");
+      toast.error(err.response?.data?.message || t("settings.toastUnable2faSetup"));
     } finally {
       setEnrolling(false);
     }
@@ -211,7 +212,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
   const confirmEnrollment = async (e) => {
     e?.preventDefault?.();
     if (!/^\d{6}$/.test(enrollCode.trim())) {
-      toast.error("Enter the 6-digit code from your authenticator app.");
+      toast.error(t("settings.toast6DigitRequired"));
       return;
     }
     setEnrolling(true);
@@ -220,10 +221,10 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       setIssuedBackupCodes(result.backupCodes);
       setSetupData(null);
       setEnrollCode("");
-      toast.success("Two-factor authentication enabled.");
+      toast.success(t("settings.toast2faEnabled"));
       refreshStatus();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Code did not match. Try again.");
+      toast.error(err.response?.data?.message || t("settings.toastCodeMismatch"));
     } finally {
       setEnrolling(false);
     }
@@ -233,11 +234,11 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
   const handleDisable = async (e) => {
     e?.preventDefault?.();
     if (!disableForm.password) {
-      toast.error("Confirm your password to disable 2FA.");
+      toast.error(t("settings.toastConfirmPassword"));
       return;
     }
     if (!disableForm.totpCode && !disableForm.backupCode) {
-      toast.error("Provide a current authenticator or backup code.");
+      toast.error(t("settings.toastProvideCode"));
       return;
     }
     setDisabling(true);
@@ -247,12 +248,12 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
         ...(disableForm.totpCode ? { totpCode: disableForm.totpCode.trim() } : {}),
         ...(disableForm.backupCode ? { backupCode: disableForm.backupCode.trim() } : {}),
       });
-      toast.success("Two-factor authentication disabled.");
+      toast.success(t("settings.toast2faDisabled"));
       setDisableForm({ password: "", totpCode: "", backupCode: "" });
       setShowDisable(false);
       refreshStatus();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to disable 2FA.");
+      toast.error(err.response?.data?.message || t("settings.toastUnableDisable2fa"));
     } finally {
       setDisabling(false);
     }
@@ -262,7 +263,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
   const handleRegenerate = async (e) => {
     e?.preventDefault?.();
     if (!/^\d{6}$/.test(regenCode.trim())) {
-      toast.error("Enter your current 6-digit authenticator code.");
+      toast.error(t("settings.toastEnterCurrentTotp"));
       return;
     }
     setRegenBusy(true);
@@ -270,10 +271,10 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       const result = await regenerateBackupCodes(sessionToken, regenCode.trim());
       setIssuedBackupCodes(result.backupCodes);
       setRegenCode("");
-      toast.success("New backup codes generated. Old codes are now invalid.");
+      toast.success(t("settings.toastNewBackupGenerated"));
       refreshStatus();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to regenerate codes.");
+      toast.error(err.response?.data?.message || t("settings.toastUnableRegen"));
     } finally {
       setRegenBusy(false);
     }
@@ -284,7 +285,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
     setSessionBusyId(id);
     try {
       const result = await revokeSession(sessionToken, id);
-      toast.success("Session signed out.");
+      toast.success(t("settings.toastSessionSignedOut"));
       if (result.revokedCurrent) {
         // The current session was wiped — force a hard reload back to login.
         window.location.href = "/login";
@@ -292,7 +293,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       }
       refreshSessions();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to revoke session.");
+      toast.error(err.response?.data?.message || t("settings.toastUnableRevoke"));
     } finally {
       setSessionBusyId("");
     }
@@ -304,12 +305,12 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
       const result = await revokeOtherSessions(sessionToken);
       toast.success(
         result.deletedCount === 0
-          ? "No other sessions to sign out."
-          : `Signed out ${result.deletedCount} other session${result.deletedCount === 1 ? "" : "s"}.`,
+          ? t("settings.toastNoOtherSessions")
+          : t("settings.toastSignedOutOther", { count: result.deletedCount }),
       );
       refreshSessions();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to revoke other sessions.");
+      toast.error(err.response?.data?.message || t("settings.toastUnableRevokeOther"));
     } finally {
       setRevokingOthers(false);
     }
@@ -324,15 +325,16 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
           <div>
             <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              Two-factor authentication
+              {t("settings.twoFactorTitle")}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              Add a one-time code from an authenticator app on every
-              {principalKind === "admin" ? " admin" : ""} sign-in.
+              {principalKind === "admin"
+                ? t("settings.twoFactorSubtitleAdmin")
+                : t("settings.twoFactorSubtitleScholar")}
             </p>
           </div>
           <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            {loadingStatus ? "…" : status?.enabled ? "Enabled" : "Disabled"}
+            {loadingStatus ? t("settings.statusLoading") : status?.enabled ? t("settings.statusEnabled") : t("settings.statusDisabled")}
           </div>
         </header>
 
@@ -349,7 +351,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             ) : (
               <ShieldCheck className="h-4 w-4" />
             )}
-            Set up two-factor authentication
+            {t("settings.setupCta")}
           </button>
         )}
 
@@ -358,32 +360,24 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             <div className="grid gap-5 sm:grid-cols-[auto,1fr] sm:items-start">
               <img
                 src={setupData.qrDataUrl}
-                alt="Scan this QR code with your authenticator app"
+                alt={t("settings.qrAlt")}
                 className="h-44 w-44 rounded-xl border border-slate-200 bg-white p-2"
               />
               <div className="space-y-2 text-sm text-slate-700">
-                <p>
-                  Scan the QR code with{" "}
-                  <span className="font-semibold">
-                    Google Authenticator, 1Password, Authy
-                  </span>{" "}
-                  or any TOTP-compatible app.
-                </p>
-                <p className="text-slate-500">
-                  Can&apos;t scan? Enter this secret manually:
-                </p>
+                <p>{t("settings.scanInstruction")}</p>
+                <p className="text-slate-500">{t("settings.cantScan")}</p>
                 <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs">
                   <span className="flex-1 break-all">{setupData.secret}</span>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard(setupData.secret, "Secret")}
+                    onClick={() => copyToClipboard(setupData.secret, t("settings.labelSecret"), t)}
                     className="rounded-md p-1 text-slate-500 hover:bg-white hover:text-slate-900"
-                    title="Copy secret"
+                    title={t("settings.copySecret")}
                   >
                     <Copy className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="text-xs text-slate-500">Issuer: {issuer}</p>
+                <p className="text-xs text-slate-500">{t("settings.issuerLabel", { issuer })}</p>
               </div>
             </div>
 
@@ -393,7 +387,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             >
               <label className="flex-1">
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Enter the 6-digit code to confirm
+                  {t("settings.confirmCodeLabel")}
                 </span>
                 <input
                   type="text"
@@ -401,7 +395,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   autoComplete="one-time-code"
                   value={enrollCode}
                   onChange={(e) => setEnrollCode(e.target.value)}
-                  placeholder="123 456"
+                  placeholder={t("settings.confirmCodePlaceholder")}
                   className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-wider focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 />
               </label>
@@ -412,7 +406,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {enrolling ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Verify &amp; enable
+                  {t("settings.verifyEnable")}
                 </button>
                 <button
                   type="button"
@@ -422,7 +416,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   }}
                   className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
-                  Cancel
+                  {t("settings.cancel")}
                 </button>
               </div>
             </form>
@@ -431,13 +425,13 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
 
         {issuedBackupCodes && (
           <div className="space-y-4">
-            <BackupCodesList codes={issuedBackupCodes} />
+            <BackupCodesList codes={issuedBackupCodes} t={t} />
             <button
               type="button"
               onClick={() => setIssuedBackupCodes(null)}
               className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
-              I&apos;ve saved them
+              {t("settings.savedCodes")}
             </button>
           </div>
         )}
@@ -446,13 +440,12 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
         {status?.enabled && !issuedBackupCodes && (
           <div className="space-y-5">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-900">
-              <p className="font-semibold">Two-factor is active for this account.</p>
+              <p className="font-semibold">{t("settings.twoFactorActive")}</p>
               <p className="mt-1 text-emerald-800/90">
-                Backup codes remaining:{" "}
-                <span className="font-semibold">
-                  {status.backupCodesRemaining}
-                </span>{" "}
-                / {status.backupCodesTotal}
+                {t("settings.backupCodesRemaining", {
+                  remaining: status.backupCodesRemaining,
+                  total: status.backupCodesTotal,
+                })}
               </p>
             </div>
 
@@ -462,7 +455,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             >
               <label className="flex-1">
                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Regenerate backup codes (requires current authenticator code)
+                  {t("settings.regenerateLabel")}
                 </span>
                 <input
                   type="text"
@@ -470,7 +463,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   autoComplete="one-time-code"
                   value={regenCode}
                   onChange={(e) => setRegenCode(e.target.value)}
-                  placeholder="123 456"
+                  placeholder={t("settings.confirmCodePlaceholder")}
                   className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-wider focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 />
               </label>
@@ -480,7 +473,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {regenBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                Generate new codes
+                {t("settings.generateNew")}
               </button>
             </form>
 
@@ -491,7 +484,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                 className="inline-flex items-center gap-2 rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
               >
                 <ShieldOff className="h-4 w-4" />
-                Disable two-factor authentication
+                {t("settings.disableCta")}
               </button>
             ) : (
               <form
@@ -499,13 +492,12 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                 className="space-y-3 rounded-xl border border-rose-200 bg-rose-50/40 p-4"
               >
                 <p className="text-sm text-rose-800">
-                  Disabling 2FA weakens your account security. Confirm your
-                  password and provide a current authenticator or backup code.
+                  {t("settings.disableWarning")}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="sm:col-span-2">
                     <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Current password
+                      {t("settings.currentPassword")}
                     </span>
                     <input
                       type="password"
@@ -519,7 +511,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   </label>
                   <label>
                     <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Authenticator code
+                      {t("settings.authCode")}
                     </span>
                     <input
                       type="text"
@@ -529,13 +521,13 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                       onChange={(e) =>
                         setDisableForm((f) => ({ ...f, totpCode: e.target.value }))
                       }
-                      placeholder="123 456"
+                      placeholder={t("settings.confirmCodePlaceholder")}
                       className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-wider focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
                     />
                   </label>
                   <label>
                     <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Or backup code
+                      {t("settings.orBackupCode")}
                     </span>
                     <input
                       type="text"
@@ -543,7 +535,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                       onChange={(e) =>
                         setDisableForm((f) => ({ ...f, backupCode: e.target.value }))
                       }
-                      placeholder="xxxx-xxxx"
+                      placeholder={t("settings.backupCodePlaceholder")}
                       className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
                     />
                   </label>
@@ -555,7 +547,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                     className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {disabling ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldOff className="h-4 w-4" />}
-                    Disable 2FA
+                    {t("settings.disable2fa")}
                   </button>
                   <button
                     type="button"
@@ -565,7 +557,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                     }}
                     className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
                   >
-                    Cancel
+                    {t("settings.cancel")}
                   </button>
                 </div>
               </form>
@@ -580,11 +572,10 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
           <div>
             <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
               <Smartphone className="h-5 w-5 text-emerald-600" />
-              Active sessions
+              {t("settings.sessionsTitle")}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              Devices currently signed in to your account. Revoke any you
-              don&apos;t recognise.
+              {t("settings.sessionsSubtitle")}
             </p>
           </div>
           <button
@@ -594,17 +585,17 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {revokingOthers ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-            Sign out other devices
+            {t("settings.signOutOthers")}
           </button>
         </header>
 
         {loadingSessions ? (
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading sessions…
+            {t("settings.sessionsLoading")}
           </div>
         ) : sessions.length === 0 ? (
-          <p className="text-sm text-slate-500">No active sessions found.</p>
+          <p className="text-sm text-slate-500">{t("settings.noSessions")}</p>
         ) : (
           <ul className="divide-y divide-slate-200">
             {sessions.map((s) => (
@@ -614,16 +605,18 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
               >
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    {summariseUserAgent(s.userAgent)}
+                    {summariseUserAgent(s.userAgent, t)}
                     {s.current && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                        This device
+                        {t("settings.thisDevice")}
                       </span>
                     )}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-slate-500">
-                    {s.ipAddress || "Unknown IP"} · Last seen{" "}
-                    {formatDate(s.lastUsedAt || s.updatedAt || s.createdAt)}
+                    {t("settings.ipLastSeen", {
+                      ip: s.ipAddress || t("settings.unknownIp"),
+                      when: formatDate(s.lastUsedAt || s.updatedAt || s.createdAt),
+                    })}
                   </p>
                 </div>
                 <button
@@ -637,7 +630,7 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
                   ) : (
                     <Trash2 className="h-3.5 w-3.5" />
                   )}
-                  Revoke
+                  {t("settings.revoke")}
                 </button>
               </li>
             ))}

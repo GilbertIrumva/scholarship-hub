@@ -15,6 +15,7 @@
  *   });
  */
 const { AuditLog } = require('../db/models');
+const { logger } = require('./logger');
 
 const audit = (req, {
     action,
@@ -35,9 +36,8 @@ const audit = (req, {
     };
     // Fire and forget — never block the request.
     AuditLog.create(payload).catch((err) => {
-        const log = req?.log || console;
-        log.warn?.({ err: err.message, action }, '[audit] write failed') ||
-            console.warn('[audit] write failed', err.message, action);
+        const log = req?.log || logger;
+        log.warn({ err: err.message, action, requestId: req?.id }, 'audit write failed');
     });
 };
 

@@ -11,7 +11,7 @@ import axios from "axios";
 axios.defaults.withCredentials = true;
 
 let refreshInFlight = null;
-let getToken = () => null;
+let _getToken = () => null;
 let setToken = () => {};
 let onRefreshed = () => {};
 let onLogout = () => {};
@@ -33,7 +33,7 @@ const refreshOnce = () => {
 let interceptorId = null;
 
 export const installAxiosAuthInterceptor = (opts = {}) => {
-  if (opts.getToken) getToken = opts.getToken;
+  if (opts.getToken) _getToken = opts.getToken;
   if (opts.setToken) setToken = opts.setToken;
   if (opts.onRefreshed) onRefreshed = opts.onRefreshed;
   if (opts.onLogout) onLogout = opts.onLogout;

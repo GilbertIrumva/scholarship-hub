@@ -37,6 +37,17 @@ i18n
     returnEmptyString: false,
   });
 
+// Keep <html lang="…"> in sync with the active language so assistive
+// technologies, browsers, and search engines pick up the correct locale.
+// Strip any region suffix (e.g. "fr-CA" → "fr") to match our resources.
+const syncHtmlLang = (lng) => {
+  if (typeof document === "undefined") return;
+  const base = String(lng || "en").split("-")[0];
+  document.documentElement.lang = base;
+};
+syncHtmlLang(i18n.language);
+i18n.on("languageChanged", syncHtmlLang);
+
 export function changeLanguage(lng) {
   return i18n.changeLanguage(lng);
 }

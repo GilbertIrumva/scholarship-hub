@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
   Eye,
@@ -22,20 +23,18 @@ import { Seo } from "../seo/Seo";
 // -----------------------------------------------------------------------------
 // Hero copy per role
 // -----------------------------------------------------------------------------
-const HERO = {
+const buildHero = (t) => ({
   scholar: {
-    headline: "Welcome Back",
-    subtitle: "Sign in to keep learning.",
-    eyebrow: "Sign in",
+    headline: t("auth.loginHeroHeadline"),
+    subtitle: t("auth.loginHeroSubtitleScholar"),
+    eyebrow: t("auth.loginEyebrow"),
   },
   admin: {
-    headline: "Welcome Back",
-    subtitle: "Secure access to your console.",
-    eyebrow: "Admin sign in",
+    headline: t("auth.loginHeroHeadline"),
+    subtitle: t("auth.loginHeroSubtitleAdmin"),
+    eyebrow: t("auth.loginAdminEyebrow"),
   },
-};
-
-const ROLE_LABEL = { scholar: "Student", admin: "Admin" };
+});
 
 // -----------------------------------------------------------------------------
 // Reusable input
@@ -49,6 +48,7 @@ const Field = ({
   rightAdornment,
   ...inputProps
 }) => {
+  const { t } = useTranslation();
   const [show, setShow] = useState(false);
   const inputType = showToggle ? (show ? "text" : "password") : type;
 
@@ -82,7 +82,7 @@ const Field = ({
             type="button"
             tabIndex={-1}
             onClick={() => setShow((s) => !s)}
-            aria-label={show ? "Hide password" : "Show password"}
+            aria-label={show ? t("auth.passwordHide") : t("auth.passwordShow")}
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -100,30 +100,38 @@ const Field = ({
 // -----------------------------------------------------------------------------
 // Role indicator row
 // -----------------------------------------------------------------------------
-const RoleIndicator = ({ verb, role, onChange }) => (
-  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-    <span className="inline-flex items-center gap-1.5 text-slate-600">
-      {role === "admin" ? (
-        <ShieldCheck className="h-4 w-4 text-[#059669]" />
-      ) : (
-        <GraduationCap className="h-4 w-4 text-[#059669]" />
-      )}
-      {verb} as <span className="font-bold text-slate-900">{ROLE_LABEL[role]}</span>
-    </span>
-    <button
-      type="button"
-      onClick={onChange}
-      className="text-sm font-semibold text-[#059669] underline-offset-4 transition-colors hover:text-[#047857] hover:underline"
-    >
-      Change account type
-    </button>
-  </div>
-);
+const RoleIndicator = ({ verb, role, onChange }) => {
+  const { t } = useTranslation();
+  const roleLabel =
+    role === "admin"
+      ? t("auth.accountTypeAdmin")
+      : t("auth.accountTypeStudent");
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className="inline-flex items-center gap-1.5 text-slate-600">
+        {role === "admin" ? (
+          <ShieldCheck className="h-4 w-4 text-[#059669]" />
+        ) : (
+          <GraduationCap className="h-4 w-4 text-[#059669]" />
+        )}
+        {verb} <span className="font-bold text-slate-900">{roleLabel}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onChange}
+        className="text-sm font-semibold text-[#059669] underline-offset-4 transition-colors hover:text-[#047857] hover:underline"
+      >
+        {t("auth.changeAccountType")}
+      </button>
+    </div>
+  );
+};
 
 // =============================================================================
 // MAIN PAGE
 // =============================================================================
 const LoginPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { signInAsScholar, completeScholar2fa, signInAdminDirect, isSubmitting } = useAuth();
@@ -156,16 +164,16 @@ const LoginPage = () => {
   const validate = () => {
     const next = {};
     const email = form.email.trim().toLowerCase();
-    if (!email) next.email = "Email is required.";
+    if (!email) next.email = t("auth.emailRequired");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      next.email = "Enter a valid email.";
+      next.email = t("auth.emailInvalid");
     else if (role === "admin" && !email.endsWith("@schooladmin.com"))
-      next.email = "Admin email must use @schooladmin.com.";
+      next.email = t("auth.emailAdminDomain");
 
-    if (!form.password) next.password = "Password is required.";
+    if (!form.password) next.password = t("auth.passwordRequired");
 
     if (role === "admin" && !form.accessCode.trim())
-      next.accessCode = "Admin access code is required.";
+      next.accessCode = t("auth.loginAccessCodeRequired");
 
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -174,7 +182,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) {
-      toast.error("Please correct the highlighted fields.");
+      toast.error(t("auth.fixHighlightedFields"));
       return;
     }
 
@@ -184,13 +192,13 @@ const LoginPage = () => {
         password: form.password,
       });
       if (result.ok) {
-        toast.success("Welcome back!");
+        toast.success(t("auth.loginToastWelcomeBack"));
         navigate("/scholar");
       } else if (result.requires2fa && result.challengeId) {
         // Pause the sign-in flow until the scholar submits a TOTP / backup
         // code. The credentials are not retained — only the challengeId.
         setTwoFactor({ challengeId: result.challengeId, useBackup: false, code: "" });
-        toast("Enter the 6-digit code from your authenticator app.", { icon: "🔐" });
+        toast(t("auth.loginToastEnter2fa"), { icon: "🔐" });
       } else {
         toast.error(result.message);
       }
@@ -201,7 +209,7 @@ const LoginPage = () => {
         accessCode: form.accessCode.trim(),
       });
       if (result.ok) {
-        toast.success("Welcome back, Admin.");
+        toast.success(t("auth.loginToastWelcomeAdmin"));
         navigate("/admin");
       } else {
         toast.error(result.message);
@@ -216,8 +224,8 @@ const LoginPage = () => {
     if (!raw) {
       toast.error(
         twoFactor.useBackup
-          ? "Enter one of your backup codes."
-          : "Enter the 6-digit code from your authenticator app.",
+          ? t("auth.twoFactorErrorBackupRequired")
+          : t("auth.twoFactorErrorAppRequired"),
       );
       return;
     }
@@ -226,7 +234,7 @@ const LoginPage = () => {
       : { challengeId: twoFactor.challengeId, totpCode: raw };
     const result = await completeScholar2fa(payload);
     if (result.ok) {
-      toast.success("Welcome back!");
+      toast.success(t("auth.loginToastWelcomeBack"));
       setTwoFactor(null);
       navigate("/scholar");
     } else {
@@ -239,13 +247,13 @@ const LoginPage = () => {
     setForm((f) => ({ ...f, password: "" }));
   };
 
-  const hero = HERO[role];
+  const hero = buildHero(t)[role];
 
   return (
     <>
       <Seo
-        title="Sign in"
-        description="Sign in to ScholarshipZone to continue your application, track deadlines, and manage your scholar profile."
+        title={t("auth.loginSeoTitle")}
+        description={t("auth.loginSeoDescription")}
         path="/login"
       />
       <AuthShell
@@ -264,24 +272,24 @@ const LoginPage = () => {
             >
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Two-factor authentication
+                {t("auth.twoFactorBadge")}
               </div>
               <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-                Verify it&apos;s you
+                {t("auth.twoFactorTitle")}
               </h2>
               <p className="mt-1.5 text-sm text-slate-500">
                 {twoFactor.useBackup
-                  ? "Enter one of the backup codes you saved when you enabled 2FA."
-                  : "Open your authenticator app and enter the 6-digit code."}
+                  ? t("auth.twoFactorSubtitleBackup")
+                  : t("auth.twoFactorSubtitleApp")}
               </p>
 
               <form className="mt-6 space-y-5" onSubmit={handleTwoFactorSubmit} noValidate>
                 <Field
                   id="two-factor-code"
                   name="twoFactorCode"
-                  label={twoFactor.useBackup ? "Backup code" : "Authentication code"}
+                  label={twoFactor.useBackup ? t("auth.twoFactorBackupLabel") : t("auth.twoFactorAppLabel")}
                   icon={twoFactor.useBackup ? KeyRound : ShieldCheck}
-                  placeholder={twoFactor.useBackup ? "xxxx-xxxx" : "123 456"}
+                  placeholder={twoFactor.useBackup ? t("auth.twoFactorBackupPlaceholder") : t("auth.twoFactorAppPlaceholder")}
                   autoComplete="one-time-code"
                   value={twoFactor.code}
                   onChange={(e) =>
@@ -303,11 +311,11 @@ const LoginPage = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Verifying…
+                      {t("auth.twoFactorVerifying")}
                     </>
                   ) : (
                     <>
-                      Verify <ArrowRight className="h-4 w-4" />
+                      {t("auth.twoFactorVerify")} <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </motion.button>
@@ -321,15 +329,15 @@ const LoginPage = () => {
                     className="font-semibold text-[#059669] hover:text-[#047857]"
                   >
                     {twoFactor.useBackup
-                      ? "Use authenticator code instead"
-                      : "Use a backup code"}
+                      ? t("auth.twoFactorUseApp")
+                      : t("auth.twoFactorUseBackup")}
                   </button>
                   <button
                     type="button"
                     onClick={cancelTwoFactor}
                     className="font-medium text-slate-500 hover:text-slate-700"
                   >
-                    Cancel
+                    {t("auth.twoFactorCancel")}
                   </button>
                 </div>
               </form>
@@ -343,25 +351,25 @@ const LoginPage = () => {
             transition={{ duration: 0.2 }}
           >
             <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Sign In
+              {t("auth.loginFormTitle")}
             </h2>
             <p className="mt-1.5 text-sm text-slate-500">
-              Enter your credentials.
+              {t("auth.loginFormSubtitle")}
             </p>
 
             <RoleIndicator
-              verb="Logging in"
+              verb={t("auth.loginVerbAs")}
               role={role}
               onChange={() => setModalOpen(true)}
             />
 
             {role === "scholar" && (
               <div className="mt-6 space-y-4">
-                <GoogleButton label="Sign in with Google" returnTo="/scholar" />
+                <GoogleButton label={t("auth.loginGoogleLabel")} returnTo="/scholar" />
                 <div className="flex items-center gap-3">
                   <span className="h-px flex-1 bg-slate-200" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    or
+                    {t("auth.orDivider")}
                   </span>
                   <span className="h-px flex-1 bg-slate-200" />
                 </div>
@@ -373,10 +381,12 @@ const LoginPage = () => {
                 id="login-email"
                 name="email"
                 type="email"
-                label="Email"
+                label={t("auth.loginEmailLabel")}
                 icon={Mail}
                 placeholder={
-                  role === "admin" ? "name@schooladmin.com" : "you@example.com"
+                  role === "admin"
+                    ? t("auth.loginEmailPlaceholderAdmin")
+                    : t("auth.loginEmailPlaceholderScholar")
                 }
                 autoComplete="email"
                 value={form.email}
@@ -387,10 +397,10 @@ const LoginPage = () => {
               <Field
                 id="login-password"
                 name="password"
-                label="Password"
+                label={t("auth.loginPasswordLabel")}
                 icon={Lock}
                 showToggle
-                placeholder="••••••••"
+                placeholder={t("auth.loginPasswordPlaceholder")}
                 autoComplete="current-password"
                 value={form.password}
                 onChange={onChange}
@@ -401,9 +411,9 @@ const LoginPage = () => {
                 <Field
                   id="login-access"
                   name="accessCode"
-                  label="Access Code"
+                  label={t("auth.loginAccessCodeLabel")}
                   icon={KeyRound}
-                  placeholder="Department or 2FA code"
+                  placeholder={t("auth.loginAccessCodePlaceholder")}
                   autoComplete="one-time-code"
                   value={form.accessCode}
                   onChange={onChange}
@@ -420,21 +430,21 @@ const LoginPage = () => {
                     onChange={onChange}
                     className="h-4 w-4 rounded border-slate-300 text-[#059669] focus:ring-[#059669]"
                   />
-                  Remember Me
+                  {t("auth.rememberMe")}
                 </label>
                 {role === "admin" ? (
                   <a
                     href="mailto:security@schooladmin.com?subject=Admin%20Access%20Recovery"
                     className="font-semibold text-[#059669] hover:text-[#047857]"
                   >
-                    Forgot?
+                    {t("auth.forgot")}
                   </a>
                 ) : (
                   <Link
                     to="/forgot-password"
                     className="font-semibold text-[#059669] hover:text-[#047857]"
                   >
-                    Forgot?
+                    {t("auth.forgot")}
                   </Link>
                 )}
               </div>
@@ -453,22 +463,22 @@ const LoginPage = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in…
+                    {t("auth.loginSubmitting")}
                   </>
                 ) : (
                   <>
-                    Sign In <ArrowRight className="h-4 w-4" />
+                    {t("auth.loginSubmit")} <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </motion.button>
 
               <p className="text-center text-sm text-slate-500">
-                New here?{" "}
+                {t("auth.loginNewHere")}{" "}
                 <Link
                   to="/signup"
                   className="font-semibold text-[#059669] hover:text-[#047857]"
                 >
-                  Create account
+                  {t("auth.loginCreateAccount")}
                 </Link>
               </p>
             </form>

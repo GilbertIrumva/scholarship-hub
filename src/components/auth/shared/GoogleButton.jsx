@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { buildGoogleStartUrl } from "../../../services/oauth";
 
 // Official Google "G" mark — vendored as an inline SVG so we do not pull in
@@ -43,12 +44,14 @@ const GoogleGlyph = ({ className = "h-5 w-5" }) => (
  *   - disabled?: bool — externally lock the button (e.g. while another flow is mid-flight)
  */
 const GoogleButton = ({
-  label = "Continue with Google",
+  label,
   returnTo = "/scholar",
   className = "",
   disabled = false,
 }) => {
+  const { t } = useTranslation();
   const [redirecting, setRedirecting] = useState(false);
+  const resolvedLabel = label ?? t("auth.googleDefaultLabel");
 
   const handleClick = () => {
     if (disabled || redirecting) return;
@@ -69,17 +72,17 @@ const GoogleButton = ({
       ]
         .filter(Boolean)
         .join(" ")}
-      aria-label={label}
+      aria-label={resolvedLabel}
     >
       {redirecting ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" />
-          Redirecting…
+          {t("auth.googleRedirecting")}
         </>
       ) : (
         <>
           <GoogleGlyph className="h-5 w-5" />
-          {label}
+          {resolvedLabel}
         </>
       )}
     </button>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Compass,
   FileText,
@@ -38,25 +39,25 @@ import { useTheme } from "../../context/useTheme";
 import { listAdminApplicants } from "../../services/adminAuth";
 import { searchPublicScholarships } from "../../services/publicApi";
 
-const NAV_GROUPS = {
+const NAV_GROUPS_RAW = {
   admin: [
-    { to: "/admin", label: "Overview", icon: LayoutDashboard, keywords: "home dashboard" },
-    { to: "/admin/applicants", label: "Applicants", icon: Users, keywords: "scholars users people" },
-    { to: "/admin/credentials", label: "Credentials", icon: FolderArchive, keywords: "documents transcripts" },
-    { to: "/admin/visa-tracker", label: "Visa tracker", icon: Plane, keywords: "travel embassy" },
-    { to: "/admin/messages", label: "Messages", icon: Mail, keywords: "inbox contact email" },
-    { to: "/admin/audit-log", label: "Audit log", icon: ScrollText, keywords: "history activity" },
-    { to: "/admin/settings", label: "Settings", icon: KeyRound, keywords: "account profile password" },
+    { to: "/admin", labelKey: "commandPalette.navOverview", icon: LayoutDashboard, keywords: "home dashboard" },
+    { to: "/admin/applicants", labelKey: "commandPalette.navApplicants", icon: Users, keywords: "scholars users people" },
+    { to: "/admin/credentials", labelKey: "commandPalette.navCredentials", icon: FolderArchive, keywords: "documents transcripts" },
+    { to: "/admin/visa-tracker", labelKey: "commandPalette.navVisaTracker", icon: Plane, keywords: "travel embassy" },
+    { to: "/admin/messages", labelKey: "commandPalette.navMessages", icon: Mail, keywords: "inbox contact email" },
+    { to: "/admin/audit-log", labelKey: "commandPalette.navAuditLog", icon: ScrollText, keywords: "history activity" },
+    { to: "/admin/settings", labelKey: "commandPalette.navSettings", icon: KeyRound, keywords: "account profile password" },
   ],
   scholar: [
-    { to: "/scholar", label: "Overview", icon: LayoutDashboard, keywords: "home dashboard" },
-    { to: "/scholar/scholarships", label: "Browse scholarships", icon: Compass, keywords: "search find opportunities" },
-    { to: "/scholar/saved", label: "Saved scholarships", icon: Heart, keywords: "watchlist bookmarks favorites" },
-    { to: "/scholar/applications", label: "My applications", icon: FileText, keywords: "submissions" },
-    { to: "/scholar/credentials", label: "Academic credentials", icon: FolderArchive, keywords: "transcripts documents" },
-    { to: "/scholar/travel-docs", label: "Travel documents", icon: Plane, keywords: "passport visa" },
-    { to: "/scholar/visa-tracker", label: "Visa tracker", icon: ShieldCheck, keywords: "embassy status" },
-    { to: "/scholar/profile", label: "Profile", icon: User, keywords: "account settings me" },
+    { to: "/scholar", labelKey: "commandPalette.navOverview", icon: LayoutDashboard, keywords: "home dashboard" },
+    { to: "/scholar/scholarships", labelKey: "commandPalette.navBrowse", icon: Compass, keywords: "search find opportunities" },
+    { to: "/scholar/saved", labelKey: "commandPalette.navSaved", icon: Heart, keywords: "watchlist bookmarks favorites" },
+    { to: "/scholar/applications", labelKey: "commandPalette.navApplications", icon: FileText, keywords: "submissions" },
+    { to: "/scholar/credentials", labelKey: "commandPalette.navAcademicCredentials", icon: FolderArchive, keywords: "transcripts documents" },
+    { to: "/scholar/travel-docs", labelKey: "commandPalette.navTravelDocs", icon: Plane, keywords: "passport visa" },
+    { to: "/scholar/visa-tracker", labelKey: "commandPalette.navVisaTracker", icon: ShieldCheck, keywords: "embassy status" },
+    { to: "/scholar/profile", labelKey: "commandPalette.navProfile", icon: User, keywords: "account settings me" },
   ],
 };
 
@@ -69,6 +70,7 @@ const NAV_GROUPS = {
  *  - Quick actions: toggle theme, sign out, go home
  */
 const CommandPalette = ({ role = "scholar" }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { sessionToken, signOut } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -182,7 +184,10 @@ const CommandPalette = ({ role = "scholar" }) => {
     [navigate]
   );
 
-  const navItems = useMemo(() => NAV_GROUPS[role] || NAV_GROUPS.scholar, [role]);
+  const navItems = useMemo(() => {
+    const base = NAV_GROUPS_RAW[role] || NAV_GROUPS_RAW.scholar;
+    return base.map((item) => ({ ...item, label: t(item.labelKey) }));
+  }, [role, t]);
 
   const handleToggleTheme = useCallback(() => {
     setOpen(false);
@@ -197,37 +202,38 @@ const CommandPalette = ({ role = "scholar" }) => {
   const handleSignOut = useCallback(() => {
     setOpen(false);
     signOut?.();
-    toast.success("Signed out");
+    toast.success(t("commandPalette.signedOut"));
     navigate("/login");
-  }, [navigate, signOut]);
+  }, [navigate, signOut, t]);
 
+  const trimmed = query.trim();
   const searchHeading =
     role === "admin"
-      ? query.trim().length >= 2
-        ? `Applicants matching "${query.trim()}"`
-        : "Search applicants"
-      : query.trim().length >= 2
-      ? `Scholarships matching "${query.trim()}"`
-      : "Search scholarships";
+      ? trimmed.length >= 2
+        ? t("commandPalette.applicantsMatching", { query: trimmed })
+        : t("commandPalette.searchApplicants")
+      : trimmed.length >= 2
+      ? t("commandPalette.scholarshipsMatching", { query: trimmed })
+      : t("commandPalette.searchScholarships");
 
   return (
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      label={role === "admin" ? "Admin command palette" : "Scholar command palette"}
+      label={role === "admin" ? t("commandPalette.adminLabel") : t("commandPalette.scholarLabel")}
     >
       <CommandInput
         placeholder={
           role === "admin"
-            ? "Type a command, search applicants…"
-            : "Type a command, search scholarships…"
+            ? t("commandPalette.placeholderAdmin")
+            : t("commandPalette.placeholderScholar")
         }
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>
-          {searching ? "Searching…" : "No results found."}
+          {searching ? t("commandPalette.searching") : t("commandPalette.noResults")}
         </CommandEmpty>
 
         {results.length > 0 && (
@@ -246,7 +252,7 @@ const CommandPalette = ({ role = "scholar" }) => {
                       <span className="ml-2 text-xs text-muted">{item.subtitle}</span>
                     )}
                   </span>
-                  <CommandShortcut>Enter</CommandShortcut>
+                  <CommandShortcut>{t("commandPalette.shortcutEnter")}</CommandShortcut>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -254,7 +260,7 @@ const CommandPalette = ({ role = "scholar" }) => {
           </>
         )}
 
-        <CommandGroup heading="Navigation">
+        <CommandGroup heading={t("commandPalette.headingNav")}>
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -272,15 +278,15 @@ const CommandPalette = ({ role = "scholar" }) => {
 
         <CommandSeparator />
 
-        <CommandGroup heading="Quick actions">
+        <CommandGroup heading={t("commandPalette.headingQuickActions")}>
           <CommandItem value="home landing" onSelect={() => go("/")}>
             <Home />
-            <span className="flex-1">Go to home page</span>
+            <span className="flex-1">{t("commandPalette.goHome")}</span>
           </CommandItem>
           {role === "scholar" && (
             <CommandItem value="inbox notifications" onSelect={() => go("/scholar/notifications")}>
               <Inbox />
-              <span className="flex-1">Notifications</span>
+              <span className="flex-1">{t("commandPalette.notifications")}</span>
             </CommandItem>
           )}
           <CommandItem
@@ -289,17 +295,17 @@ const CommandPalette = ({ role = "scholar" }) => {
           >
             {resolvedTheme === "dark" ? <Sun /> : <Moon />}
             <span className="flex-1">
-              Switch to {resolvedTheme === "dark" ? "light" : "dark"} mode
+              {resolvedTheme === "dark" ? t("commandPalette.switchToLight") : t("commandPalette.switchToDark")}
             </span>
-            <CommandShortcut>{theme === "system" ? "System" : theme}</CommandShortcut>
+            <CommandShortcut>{theme === "system" ? t("commandPalette.shortcutSystem") : theme}</CommandShortcut>
           </CommandItem>
           <CommandItem value="theme system auto" onSelect={handleSystemTheme}>
             <Settings />
-            <span className="flex-1">Use system theme</span>
+            <span className="flex-1">{t("commandPalette.useSystemTheme")}</span>
           </CommandItem>
           <CommandItem value="sign out logout" onSelect={handleSignOut}>
             <LogOut />
-            <span className="flex-1">Sign out</span>
+            <span className="flex-1">{t("commandPalette.signOut")}</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

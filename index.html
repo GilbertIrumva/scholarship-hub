@@ -47,6 +47,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!--
+      Inter variable — primary UI typeface (Stripe/Linear class).
+      Manrope kept as a fallback for any legacy hardcoded references.
+      `display=swap` avoids FOIT; the variable axis keeps the request lean.
+    -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@500;600;700;800&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Manrope:wght@500;600;700;800&display=swap"
+    />
+    <!--
       Theme pre-paint — runs before React mounts so the page never
       flashes the wrong theme. Mirrors the logic in
       src/context/ThemeContext.jsx. Safe to ship inline.

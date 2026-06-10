@@ -27,7 +27,7 @@ export default function LanguageSwitcher({ variant = "default", className = "" }
         role="group"
         aria-label={t("nav.language")}
         className={cn(
-          "inline-flex items-center gap-0.5 rounded-full bg-slate-100 p-0.5 text-xs font-bold",
+          "inline-flex items-center gap-0.5 rounded-full bg-surface-2 p-0.5 text-xs font-bold ring-1 ring-border/60",
           className
         )}
       >
@@ -38,9 +38,9 @@ export default function LanguageSwitcher({ variant = "default", className = "" }
             onClick={() => handle(l.code)}
             aria-pressed={current === l.code}
             className={cn(
-              "rounded-full px-2.5 py-1 transition-colors",
+              "rounded-full px-2.5 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
               current === l.code
-                ? "bg-white text-ink shadow-sm"
+                ? "bg-surface text-ink shadow-elev-1"
                 : "text-muted hover:text-ink"
             )}
           >
@@ -56,7 +56,7 @@ export default function LanguageSwitcher({ variant = "default", className = "" }
       role="group"
       aria-label={t("nav.language")}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-border bg-white p-1 text-sm font-bold shadow-sm",
+        "inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1 text-sm font-bold shadow-elev-1",
         className
       )}
     >
@@ -68,9 +68,9 @@ export default function LanguageSwitcher({ variant = "default", className = "" }
           onClick={() => handle(l.code)}
           aria-pressed={current === l.code}
           className={cn(
-            "rounded-full px-3 py-1 transition-colors",
+            "rounded-full px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
             current === l.code
-              ? "bg-primary text-white"
+              ? "bg-primary text-primary-foreground shadow-elev-1"
               : "text-muted hover:text-ink"
           )}
         >

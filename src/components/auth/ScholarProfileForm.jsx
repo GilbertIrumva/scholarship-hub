@@ -1,20 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Camera, Loader2, Save, Trash2, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const FIELDS = [
-  { name: "name", label: "Full name", type: "text", required: true },
-  { name: "contact", label: "Contact / phone", type: "text" },
-  { name: "age", label: "Age", type: "number" },
-  { name: "gender", label: "Gender", type: "text" },
-  { name: "dateOfBirth", label: "Date of birth", type: "date" },
-  { name: "nationality", label: "Nationality", type: "text" },
-  { name: "status", label: "Marital status", type: "text" },
-  { name: "education", label: "Education", type: "text" },
-  { name: "address", label: "Address", type: "text", fullWidth: true },
+const FIELD_DEFS = [
+  { name: "name", labelKey: "profile.formFieldFullName", type: "text", required: true },
+  { name: "contact", labelKey: "profile.formFieldContact", type: "text" },
+  { name: "age", labelKey: "profile.formFieldAge", type: "number" },
+  { name: "gender", labelKey: "profile.formFieldGender", type: "text" },
+  { name: "dateOfBirth", labelKey: "profile.formFieldDateOfBirth", type: "date" },
+  { name: "nationality", labelKey: "profile.formFieldNationality", type: "text" },
+  { name: "status", labelKey: "profile.formFieldMaritalStatus", type: "text" },
+  { name: "education", labelKey: "profile.formFieldEducation", type: "text" },
+  { name: "address", labelKey: "profile.formFieldAddress", type: "text", fullWidth: true },
 ];
 
 const buildInitialState = (application) => ({
@@ -33,9 +34,15 @@ const buildInitialState = (application) => ({
 });
 
 const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState(() => buildInitialState(application));
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+
+  const fields = useMemo(
+    () => FIELD_DEFS.map((f) => ({ ...f, label: t(f.labelKey) })),
+    [t]
+  );
 
   useEffect(() => {
     setForm(buildInitialState(application));
@@ -51,7 +58,7 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      setError("Photo must be smaller than 2 MB.");
+      setError(t("profile.errorPhotoTooLarge"));
       return;
     }
     const reader = new FileReader();
@@ -69,7 +76,7 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      setError("Name is required.");
+      setError(t("profile.errorNameRequired"));
       return;
     }
     const payload = {
@@ -91,7 +98,7 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
                 {form.photo ? (
                   <img
                     src={form.photo}
-                    alt="Preview"
+                    alt={t("profile.photoPreviewAlt")}
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -102,15 +109,15 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-primary">
-                  Edit profile
+                  {t("profile.formEyebrow")}
                 </p>
                 <h3 className="mt-1 text-xl font-extrabold text-ink tracking-tight">
-                  Update your details
+                  {t("profile.formHeading")}
                 </h3>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-slate-50">
                     <Camera className="h-3.5 w-3.5" />
-                    Upload photo
+                    {t("profile.uploadPhoto")}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -126,7 +133,7 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
                       className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-danger shadow-sm transition hover:bg-danger/5"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Remove
+                      {t("profile.removePhoto")}
                     </button>
                   )}
                 </div>
@@ -135,14 +142,14 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
             {onCancel && (
               <Button variant="outline" size="sm" type="button" onClick={onCancel}>
                 <X className="h-3.5 w-3.5" />
-                Cancel
+                {t("profile.cancelButton")}
               </Button>
             )}
           </div>
 
           {/* Fields */}
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {FIELDS.map((field) => (
+            {fields.map((field) => (
               <div
                 key={field.name}
                 className={`space-y-1.5 ${field.fullWidth ? "sm:col-span-2" : ""}`}
@@ -163,13 +170,13 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
             ))}
 
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="pf-bio">About you</Label>
+              <Label htmlFor="pf-bio">{t("profile.formFieldAbout")}</Label>
               <textarea
                 id="pf-bio"
                 name="bio"
                 value={form.bio}
                 onChange={handleChange}
-                placeholder="Tell us a bit about yourself, your goals, and what you're studying…"
+                placeholder={t("profile.aboutPlaceholder")}
                 className="flex min-h-[110px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
@@ -185,19 +192,19 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
           <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-5">
             {onCancel && (
               <Button variant="outline" type="button" onClick={onCancel}>
-                Cancel
+                {t("profile.cancelButton")}
               </Button>
             )}
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving…
+                  {t("profile.saving")}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save profile
+                  {t("profile.saveProfile")}
                 </>
               )}
             </Button>

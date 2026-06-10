@@ -1,0 +1,69 @@
+# T4.3 — Local production-like stack.
+#
+# Brings up:
+#   • mongo   — MongoDB 7 with a persistent named volume.
+#   • api     — The ScholarshipZone API built from project/Dockerfile.
+#
+# Usage:
+#   docker compose up --build
+#   docker compose down       # stop, keep volumes
+#   docker compose down -v    # stop AND drop the mongo volume
+#
+# The API expects MONGODB_URI to point at the compose-internal hostname
+# `mongo`. All other env vars come from project/.env (gitignored). Copy
+# project/.env.example -> project/.env and fill in the required secrets
+# (TRAVEL_DOC_SECRET, OAUTH_STATE_SECRET, etc.) before bringing the stack up.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    build:
+      context: ./project
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./project/.env
+    environment:
+      # Override whatever's in .env so the API talks to the compose mongo.
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB_NAME: scholarshipzone
+      NODE_ENV: production
+      PORT: "3000"
+    volumes:
+      # Persist user-uploaded credentials & travel docs across rebuilds.
+      # Swap for an S3/R2 backend in real production (see STORAGE_BACKEND).
+      - api-uploads:/app/uploads
+    # Compose-level health check mirrors the Dockerfile one; the LB / k8s
+    # probe should use /readyz which returns 503 during shutdown.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # T4.3 — Give the container enough time to drain in-flight requests
+    # before docker sends SIGKILL. Matches SHUTDOWN_GRACE_MS default of 25s
+    # plus a small buffer.
+    stop_grace_period: 30s
+
+volumes:
+  mongo-data:
+  api-uploads:

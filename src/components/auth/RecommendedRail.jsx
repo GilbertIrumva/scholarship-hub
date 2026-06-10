@@ -14,18 +14,18 @@ import { Button } from "@/components/ui/button";
 import { SaveButton } from "../scholar/SaveButton";
 import { fetchRecommendations } from "../../services/scholarship";
 
-const formatDeadline = (deadline) => {
-  if (!deadline) return "Rolling deadline";
+const formatDeadline = (deadline, t) => {
+  if (!deadline) return t("recommendations.rollingDeadline");
   try {
     const date = new Date(deadline);
-    if (Number.isNaN(date.getTime())) return "Open";
+    if (Number.isNaN(date.getTime())) return t("recommendations.open");
     return date.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
   } catch {
-    return "Open";
+    return t("recommendations.open");
   }
 };
 
@@ -56,7 +56,7 @@ const RecommendedRail = ({ sessionToken }) => {
       })
       .catch(() => {
         if (cancelled) return;
-        setError(t("recommendations.findingFits"));
+        setError(t("recommendations.errorLoad"));
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -135,7 +135,7 @@ const RecommendedRail = ({ sessionToken }) => {
                   >
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="text-sm font-bold text-ink leading-snug line-clamp-2">
-                      {s.title || "Untitled scholarship"}
+                      {s.title || t("recommendations.untitledScholarship")}
                     </h4>
                     {entry.matchPercent > 0 && (
                       <span
@@ -152,7 +152,7 @@ const RecommendedRail = ({ sessionToken }) => {
                   )}
                   <div className="flex items-center gap-1.5 text-xs text-slate-600">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    {formatDeadline(s.deadline)}
+                    {formatDeadline(s.deadline, t)}
                   </div>
                   {Array.isArray(entry.reasons) && entry.reasons.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1.5">

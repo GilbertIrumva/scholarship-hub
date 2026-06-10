@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -37,15 +38,24 @@ import {
 } from "../../services/travelDocs";
 import { listMyApplications } from "../../services/applications";
 
-const TYPE_LABELS = Object.fromEntries(
-  TRAVEL_DOC_TYPES.map((t) => [t.value, t.label])
-);
+const TRAVEL_TYPE_LABEL_KEYS = {
+  passport: "travelDocs.typePassport",
+  visa: "travelDocs.typeVisa",
+  "travel-insurance": "travelDocs.typeTravelInsurance",
+  vaccination: "travelDocs.typeVaccination",
+  "other-travel": "travelDocs.typeOtherTravel",
+};
+
+const travelTypeLabel = (t, value, fallback) =>
+  TRAVEL_TYPE_LABEL_KEYS[value]
+    ? t(TRAVEL_TYPE_LABEL_KEYS[value])
+    : fallback || value;
 
 const STATUS_META = {
-  unverified: { label: "Not reviewed", chip: "bg-slate-100 text-slate-600", icon: Clock },
-  pending: { label: "Pending review", chip: "bg-amber-100 text-amber-800", icon: Clock },
-  verified: { label: "Verified", chip: "bg-emerald-100 text-emerald-800", icon: CheckCircle2 },
-  rejected: { label: "Rejected", chip: "bg-rose-100 text-rose-700", icon: AlertCircle },
+  unverified: { labelKey: "travelDocs.statusUnverified", chip: "bg-slate-100 text-slate-600", icon: Clock },
+  pending: { labelKey: "travelDocs.statusPending", chip: "bg-amber-100 text-amber-800", icon: Clock },
+  verified: { labelKey: "travelDocs.statusVerified", chip: "bg-emerald-100 text-emerald-800", icon: CheckCircle2 },
+  rejected: { labelKey: "travelDocs.statusRejected", chip: "bg-rose-100 text-rose-700", icon: AlertCircle },
 };
 
 const formatBytes = (n) => {
@@ -81,6 +91,7 @@ const FileIcon = ({ mimeType }) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const meta = STATUS_META[status] || STATUS_META.unverified;
   const Icon = meta.icon;
   return (
@@ -91,12 +102,13 @@ const StatusChip = ({ status }) => {
       ].join(" ")}
     >
       <Icon className="h-3 w-3" />
-      {meta.label}
+      {t(meta.labelKey)}
     </span>
   );
 };
 
 const UploadForm = ({ sessionToken, onUploaded }) => {
+  const { t } = useTranslation();
   const fileRef = useRef(null);
   const [file, setFile] = useState(null);
   const [type, setType] = useState(TRAVEL_DOC_TYPES[0].value);
@@ -120,11 +132,11 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      toast.error("Please choose a file to upload.");
+      toast.error(t("travelDocs.errorChooseFile"));
       return;
     }
     if (!title.trim()) {
-      toast.error("Please give this document a short title.");
+      toast.error(t("travelDocs.errorNeedTitle"));
       return;
     }
     setSubmitting(true);
@@ -138,11 +150,11 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
         issuedDate: issuedDate || undefined,
         expiryDate: expiryDate || undefined,
       });
-      toast.success(`Uploaded "${document.title}"`);
+      toast.success(t("travelDocs.uploadedToast", { title: document.title }));
       reset();
       onUploaded(document);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Upload failed. Try again.");
+      toast.error(err?.response?.data?.message || t("travelDocs.uploadFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -153,17 +165,16 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Upload className="h-5 w-5 text-primary" />
-          Add a travel document
+          {t("travelDocs.uploadCardTitle")}
         </CardTitle>
         <p className="text-sm text-muted">
-          PDFs or images (JPG, PNG, WEBP, HEIC), up to 10 MB. Document numbers
-          are encrypted at rest with AES-256.
+          {t("travelDocs.uploadCardHint")}
         </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="td-file">Document file</Label>
+            <Label htmlFor="td-file">{t("travelDocs.fileLabel")}</Label>
             <Input
               ref={fileRef}
               id="td-file"
@@ -181,27 +192,27 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="td-type">Type</Label>
+              <Label htmlFor="td-type">{t("travelDocs.typeLabel")}</Label>
               <select
                 id="td-type"
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="h-10 w-full rounded-md border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                {TRAVEL_DOC_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                {TRAVEL_DOC_TYPES.map((tt) => (
+                  <option key={tt.value} value={tt.value}>
+                    {travelTypeLabel(t, tt.value, tt.label)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="td-title">Short title</Label>
+              <Label htmlFor="td-title">{t("travelDocs.titleLabel")}</Label>
               <Input
                 id="td-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder='e.g. "Nigerian passport"'
+                placeholder={t("travelDocs.titlePlaceholder")}
                 maxLength={200}
                 required
               />
@@ -210,22 +221,22 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="td-country">Issuing country code</Label>
+              <Label htmlFor="td-country">{t("travelDocs.countryLabel")}</Label>
               <Input
                 id="td-country"
                 value={country}
                 onChange={(e) => setCountry(e.target.value.toUpperCase().slice(0, 3))}
-                placeholder="NG, US, GB..."
+                placeholder={t("travelDocs.countryPlaceholder")}
                 maxLength={3}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="td-number">Document number (encrypted)</Label>
+              <Label htmlFor="td-number">{t("travelDocs.documentNumberLabel")}</Label>
               <Input
                 id="td-number"
                 value={documentNumber}
                 onChange={(e) => setDocumentNumber(e.target.value)}
-                placeholder="A12345678"
+                placeholder={t("travelDocs.documentNumberPlaceholder")}
                 maxLength={60}
               />
             </div>
@@ -233,7 +244,7 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="td-issued">Issued date</Label>
+              <Label htmlFor="td-issued">{t("travelDocs.issuedDateLabel")}</Label>
               <Input
                 id="td-issued"
                 type="date"
@@ -242,7 +253,7 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="td-expiry">Expiry date</Label>
+              <Label htmlFor="td-expiry">{t("travelDocs.expiryDateLabel")}</Label>
               <Input
                 id="td-expiry"
                 type="date"
@@ -254,16 +265,16 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={reset} disabled={submitting}>
-              Clear
+              {t("common.clear")}
             </Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t("common.uploading")}
                 </>
               ) : (
                 <>
-                  <Upload className="h-4 w-4" /> Upload document
+                  <Upload className="h-4 w-4" /> {t("travelDocs.upload")}
                 </>
               )}
             </Button>
@@ -275,19 +286,20 @@ const UploadForm = ({ sessionToken, onUploaded }) => {
 };
 
 const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
   const [revealNumber, setRevealNumber] = useState(false);
   const days = daysUntil(doc.expiryDate);
 
   const onDelete = async () => {
-    if (!window.confirm(`Delete "${doc.title}"? This cannot be undone.`)) return;
+    if (!window.confirm(t("travelDocs.deleteConfirm", { title: doc.title }))) return;
     setDeleting(true);
     try {
       await deleteTravelDoc(sessionToken, doc.id);
-      toast.success("Document deleted.");
+      toast.success(t("travelDocs.deletedToast"));
       onDeleted(doc.id);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete.");
+      toast.error(err?.response?.data?.message || t("travelDocs.deleteFailed"));
       setDeleting(false);
     }
   };
@@ -307,7 +319,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error("Could not download file.");
+      toast.error(t("travelDocs.downloadFailed"));
     }
   };
 
@@ -322,7 +334,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank", "noopener");
     } catch {
-      toast.error("Could not open file.");
+      toast.error(t("travelDocs.openFailed"));
     }
   };
 
@@ -339,7 +351,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-bold text-ink">{doc.title}</h3>
-                  <p className="text-xs text-muted">{TYPE_LABELS[doc.type] || doc.type}</p>
+                  <p className="text-xs text-muted">{travelTypeLabel(t, doc.type, doc.type)}</p>
                 </div>
                 <StatusChip status={doc.verificationStatus} />
               </div>
@@ -358,7 +370,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
                       onClick={() => setRevealNumber((v) => !v)}
                       className="text-[10px] font-bold uppercase text-primary hover:underline"
                     >
-                      {revealNumber ? "Hide" : "Reveal"}
+                      {revealNumber ? t("common.hide") : t("common.reveal")}
                     </button>
                   )}
                 </div>
@@ -374,7 +386,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
                 {doc.issuedDate && (
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    Issued {formatDate(doc.issuedDate)}
+                    {t("travelDocs.issuedPrefix", { date: formatDate(doc.issuedDate) })}
                   </span>
                 )}
                 {doc.expiryDate && (
@@ -386,30 +398,33 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
                     ].join(" ")}
                   >
                     <Calendar className="h-3.5 w-3.5" />
-                    Expires {formatDate(doc.expiryDate)}
-                    {days != null && days >= 0 && days < 180 && ` (in ${days} days)`}
-                    {days != null && days < 0 && ` (expired)`}
+                    {t("travelDocs.expiresPrefix", { date: formatDate(doc.expiryDate) })}
+                    {days != null && days >= 0 && days < 180 && " " + t("travelDocs.expiresInDays", { count: days })}
+                    {days != null && days < 0 && " " + t("travelDocs.expired")}
                   </span>
                 )}
               </div>
 
               {doc.verificationNote && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                  <span className="font-semibold">Reviewer note:</span> {doc.verificationNote}
+                  <span className="font-semibold">{t("travelDocs.reviewerNote")}</span> {doc.verificationNote}
                 </p>
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[11px] text-muted">
-                  {doc.originalName} · {formatBytes(doc.sizeBytes)} · Uploaded{" "}
-                  {formatDate(doc.createdAt)}
+                  {t("travelDocs.uploadedMeta", {
+                    name: doc.originalName,
+                    size: formatBytes(doc.sizeBytes),
+                    date: formatDate(doc.createdAt),
+                  })}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" variant="ghost" onClick={previewWithAuth}>
-                    <Eye className="h-3.5 w-3.5" /> View
+                    <Eye className="h-3.5 w-3.5" /> {t("common.view")}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={downloadWithAuth}>
-                    <Download className="h-3.5 w-3.5" /> Download
+                    <Download className="h-3.5 w-3.5" /> {t("common.download")}
                   </Button>
                   <Button
                     size="sm"
@@ -423,7 +438,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
                     ) : (
                       <Trash2 className="h-3.5 w-3.5" />
                     )}
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </div>
               </div>
@@ -436,6 +451,7 @@ const TravelDocCard = ({ doc, sessionToken, onDeleted }) => {
 };
 
 const TravelDocsPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scholarProfile, sessionToken, signOut } = useAuth();
 
@@ -459,7 +475,7 @@ const TravelDocsPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          toast.error(err?.response?.data?.message || "Failed to load.");
+          toast.error(err?.response?.data?.message || t("travelDocs.loadFailed"));
         }
       })
       .finally(() => {
@@ -468,7 +484,7 @@ const TravelDocsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionToken]);
+  }, [sessionToken, t]);
 
   const handleSignOut = useCallback(() => {
     signOut();
@@ -498,8 +514,8 @@ const TravelDocsPage = () => {
     <DashboardLayout
       role="scholar"
       user={{ name: scholar.name, email: scholar.email, role: scholar.role }}
-      title="Travel documents"
-      subtitle="Passport, visa, and insurance documents for scholarship travel"
+      title={t("travelDocs.pageTitle")}
+      subtitle={t("travelDocs.pageSubtitle")}
       onSignOut={handleSignOut}
     >
       <div className="space-y-6">
@@ -509,13 +525,12 @@ const TravelDocsPage = () => {
             <Lock className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <div className="text-sm">
               <p className="font-semibold text-primary-dark">
-                Encrypted at rest, hidden by default.
+                {t("travelDocs.privacyTitle")}
               </p>
               <p className="text-muted">
-                Document numbers are encrypted with AES-256-GCM. Admins can only
-                see your travel documents after at least one of your
-                scholarship applications has been{" "}
-                <span className="font-semibold text-emerald-700">approved</span>.
+                {t("travelDocs.privacyBodyPrefix")}
+                <span className="font-semibold text-emerald-700">{t("travelDocs.privacyBodyApproved")}</span>
+                {t("travelDocs.privacyBodySuffix")}
               </p>
             </div>
           </CardContent>
@@ -527,16 +542,15 @@ const TravelDocsPage = () => {
               <Award className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div className="text-sm">
                 <p className="font-semibold text-amber-900">
-                  No approved scholarship yet
+                  {t("travelDocs.noApprovedTitle")}
                 </p>
                 <p className="text-amber-800">
-                  You can upload travel documents now to keep them safe — but no
-                  admin will see them until one of your applications is approved.{" "}
+                  {t("travelDocs.noApprovedBody")}{" "}
                   <Link
                     to="/scholar/scholarships"
                     className="font-semibold text-amber-900 underline hover:no-underline"
                   >
-                    Browse scholarships
+                    {t("travelDocs.noApprovedBrowse")}
                   </Link>
                 </p>
               </div>
@@ -550,11 +564,10 @@ const TravelDocsPage = () => {
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div className="text-sm">
                 <p className="font-semibold text-emerald-900">
-                  Scholarship approved — documents are now visible to admins
+                  {t("travelDocs.approvedTitle")}
                 </p>
                 <p className="text-emerald-800">
-                  Reviewers can now access your travel documents to help process
-                  visa and travel logistics.
+                  {t("travelDocs.approvedBody")}
                 </p>
               </div>
             </CardContent>
@@ -576,18 +589,17 @@ const TravelDocsPage = () => {
                 <Plane className="h-8 w-8" />
               </span>
               <h3 className="mt-4 text-lg font-bold text-ink">
-                No travel documents yet
+                {t("travelDocs.emptyTitle")}
               </h3>
               <p className="mt-1 max-w-md text-sm text-muted">
-                When you're ready, upload your passport, visa, or insurance
-                certificate here. They'll be safely encrypted.
+                {t("travelDocs.emptyDescription")}
               </p>
             </CardContent>
           </Card>
         ) : (
           <>
             <p className="text-xs text-muted">
-              {counts.total} document{counts.total === 1 ? "" : "s"}
+              {t("travelDocs.documentsCount", { count: counts.total })}
             </p>
             <div className="grid gap-3">
               {docs.map((d) => (

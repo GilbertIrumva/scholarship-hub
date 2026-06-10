@@ -5,20 +5,30 @@ on:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+  workflow_dispatch: {}
 
 # Cancel in-progress runs when a new commit lands on the same branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend (lint + tests)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: project
+    env:
+      NODE_ENV: test
+      # Pin the binary version so the cache key is deterministic. Bump in
+      # lockstep with mongodb-memory-server.
+      MONGOMS_VERSION: '7.0.14'
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.cache/mongodb-binaries
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,17 +36,20 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: project/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Run vitest suite
-        # mongodb-memory-server downloads a MongoDB binary on first run; cache
-        # speeds up subsequent runs.
-        run: npm test
+      # Cache BEFORE running tests so the first cold run still benefits from
+      # any previously-cached binary. (Previously the cache step ran AFTER
+      # `npm test`, meaning every run re-downloaded the 100 MB binary.)
       - name: Cache MongoDB binaries
         uses: actions/cache@v4
         with:
-          path: ~/.cache/mongodb-binaries
-          key: mongo-binaries-${{ runner.os }}
+          path: ${{ github.workspace }}/.cache/mongodb-binaries
+          key: mongo-binaries-${{ runner.os }}-${{ env.MONGOMS_VERSION }}
+          restore-keys: |
+            mongo-binaries-${{ runner.os }}-
+      - name: Install dependencies
+        run: npm ci
+      - name: Run vitest suite
+        run: npm test
 
   frontend:
     name: Frontend (lint + build + tests)

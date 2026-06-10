@@ -10,6 +10,7 @@ import {
   Tag,
   Compass,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import { useSavedScholarships } from "../../context/useSavedScholarships";
 import DashboardLayout from "../auth/DashboardLayout";
@@ -23,6 +24,7 @@ import { SaveButton } from "./SaveButton";
 
 // Compact card mirroring the browse-page styling so the page feels familiar.
 const SavedCard = ({ scholarship }) => {
+  const { t } = useTranslation();
   const id = scholarship._id || scholarship.id;
   const days = (() => {
     if (!scholarship.deadline) return null;
@@ -44,7 +46,7 @@ const SavedCard = ({ scholarship }) => {
     }
   };
   const fmtDeadline = (d) => {
-    if (!d) return "Rolling";
+    if (!d) return t("catalog.rolling");
     try {
       return new Date(d).toLocaleDateString("en", {
         month: "short",
@@ -71,12 +73,12 @@ const SavedCard = ({ scholarship }) => {
           </h3>
           {isUrgent && !isClosed && (
             <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-dark">
-              {days === 0 ? "Today" : `${days}d left`}
+              {days === 0 ? t("catalog.todayBadge") : t("catalog.daysLeft", { count: days })}
             </span>
           )}
           {isClosed && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Closed
+              {t("catalog.closed")}
             </span>
           )}
         </div>
@@ -130,7 +132,7 @@ const SavedCard = ({ scholarship }) => {
         <div className="mt-auto pt-5">
           <div className="flex items-center gap-2">
             <Button asChild className="flex-1">
-              <Link to={`/scholar/scholarships/${id}`}>View details</Link>
+              <Link to={`/scholar/scholarships/${id}`}>{t("applications.viewDetails")}</Link>
             </Button>
             <SaveButton
               scholarshipId={id}
@@ -145,6 +147,7 @@ const SavedCard = ({ scholarship }) => {
 };
 
 const SavedScholarshipsPage = () => {
+  const { t } = useTranslation();
   const { sessionToken, scholarProfile, signOut } = useAuth();
   const { ids, refresh } = useSavedScholarships();
   const [items, setItems] = useState([]);
@@ -178,11 +181,11 @@ const SavedScholarshipsPage = () => {
   return (
     <DashboardLayout
       role="scholar"
-      title="Saved scholarships"
-      subtitle="Your bookmarked opportunities, all in one place."
+      title={t("applications.savedTitle")}
+      subtitle={t("applications.savedSubtitle")}
       onLogout={signOut}
     >
-      <Seo title="Saved scholarships" noindex />
+      <Seo title={t("applications.savedTitle")} noindex />
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -194,13 +197,13 @@ const SavedScholarshipsPage = () => {
         <Card className="p-8 sm:p-12">
           <EmptyState
             icon={Heart}
-            title="No saved scholarships yet"
-            description="Bookmark scholarships you're interested in so you can find them quickly later. Click the heart icon on any scholarship card."
+            title={t("applications.savedEmptyTitle")}
+            description={t("applications.savedEmptyDescription")}
             action={
               <Button asChild>
                 <Link to="/scholar/scholarships">
                   <Compass className="mr-2 h-4 w-4" />
-                  Browse scholarships
+                  {t("applications.browseScholarships")}
                 </Link>
               </Button>
             }
@@ -210,9 +213,9 @@ const SavedScholarshipsPage = () => {
         <>
           <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-sm text-muted">
-              You have{" "}
+              {t("applications.savedCountPrefix")}{" "}
               <span className="font-semibold text-ink">{items.length}</span>{" "}
-              saved {items.length === 1 ? "scholarship" : "scholarships"}.
+              {t("applications.savedCount", { count: items.length })}.
             </p>
             <Button
               variant="outline"
@@ -220,7 +223,7 @@ const SavedScholarshipsPage = () => {
               onClick={() => refresh()}
               className="hidden sm:inline-flex"
             >
-              <Loader2 className="mr-1.5 h-3.5 w-3.5" /> Refresh
+              <Loader2 className="mr-1.5 h-3.5 w-3.5" /> {t("applications.savedRefresh")}
             </Button>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

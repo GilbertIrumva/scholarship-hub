@@ -2,24 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, ShieldAlert } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/useAuth";
 import { Seo } from "../seo/Seo";
 
-// User-facing copy for the error codes the backend redirects with.
-const ERROR_COPY = {
-  google_denied: "Google sign-in was cancelled. You can try again any time.",
-  invalid_state:
-    "Your sign-in link expired or was tampered with. Please start the sign-in again.",
-  missing_code:
-    "Google did not return an authorization code. Please start the sign-in again.",
-  token_exchange_failed:
-    "We could not exchange the Google authorization code for a session. Please try again.",
-  userinfo_failed:
-    "We could not load your Google profile. Please try again in a moment.",
-  unverified_google_email:
-    "Google reports that this email address is not verified. Please verify it with Google and try again.",
-  account_conflict:
-    "Another account is already linked to this email. Try signing in with your password first.",
+// Maps backend error codes → translation keys under `auth`.
+const ERROR_KEYS = {
+  google_denied: "auth.oauthErrorGoogleDenied",
+  invalid_state: "auth.oauthErrorInvalidState",
+  missing_code: "auth.oauthErrorMissingCode",
+  token_exchange_failed: "auth.oauthErrorTokenExchange",
+  userinfo_failed: "auth.oauthErrorUserInfo",
+  unverified_google_email: "auth.oauthErrorUnverified",
+  account_conflict: "auth.oauthErrorAccountConflict",
 };
 
 const sanitizeReturnTo = (raw) => {
@@ -29,6 +24,7 @@ const sanitizeReturnTo = (raw) => {
 };
 
 const OAuthCallbackPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { completeScholarOAuth } = useAuth();
@@ -49,7 +45,9 @@ const OAuthCallbackPage = () => {
     if (error) {
       setStatus({
         kind: "error",
-        message: ERROR_COPY[error] || "Google sign-in failed. Please try again.",
+        message: ERROR_KEYS[error]
+          ? t(ERROR_KEYS[error])
+          : t("auth.oauthErrorFallback"),
       });
       return;
     }
@@ -57,7 +55,7 @@ const OAuthCallbackPage = () => {
     if (!token) {
       setStatus({
         kind: "error",
-        message: ERROR_COPY.invalid_state,
+        message: t("auth.oauthErrorInvalidState"),
       });
       return;
     }
@@ -67,28 +65,32 @@ const OAuthCallbackPage = () => {
       if (!result.ok) {
         setStatus({
           kind: "error",
-          message: result.message || "Unable to complete Google sign-in.",
+          message: result.message || t("auth.oauthErrorGeneric"),
         });
         return;
       }
-      toast.success(created ? "Welcome to ScholarshipZone!" : "Welcome back!");
+      toast.success(
+        created
+          ? t("auth.oauthToastWelcomeNew")
+          : t("auth.oauthToastWelcomeBack"),
+      );
       navigate(returnTo, { replace: true });
     })();
-  }, [params, completeScholarOAuth, navigate]);
+  }, [params, completeScholarOAuth, navigate, t]);
 
   return (
     <>
-      <Seo title="Signing you in…" noindex path="/auth/google" />
+      <Seo title={t("auth.oauthSeoTitle")} noindex path="/auth/google" />
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           {status.kind === "loading" && (
             <>
               <Loader2 className="mx-auto h-10 w-10 animate-spin text-emerald-600" />
               <h1 className="mt-4 text-lg font-semibold text-slate-900">
-                Finishing your Google sign-in…
+                {t("auth.oauthLoadingTitle")}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Hang tight — we&apos;re setting up your session.
+                {t("auth.oauthLoadingBody")}
               </p>
             </>
           )}
@@ -99,7 +101,7 @@ const OAuthCallbackPage = () => {
                 <ShieldAlert className="h-6 w-6 text-rose-600" />
               </div>
               <h1 className="mt-4 text-lg font-semibold text-slate-900">
-                Google sign-in failed
+                {t("auth.oauthErrorTitle")}
               </h1>
               <p className="mt-2 text-sm text-slate-600">{status.message}</p>
               <div className="mt-6 flex flex-col gap-2">
@@ -108,14 +110,14 @@ const OAuthCallbackPage = () => {
                   onClick={() => navigate("/login", { replace: true })}
                   className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
                 >
-                  Back to sign in
+                  {t("auth.backToSignIn")}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate("/", { replace: true })}
                   className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Go home
+                  {t("auth.oauthGoHome")}
                 </button>
               </div>
             </>

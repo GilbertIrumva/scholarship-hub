@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Plane,
   Loader2,
@@ -56,8 +57,6 @@ const MILESTONE_META = {
   skipped: { chip: "bg-slate-100 text-slate-500", icon: XCircle },
 };
 
-const STATUS_LABEL = Object.fromEntries(WORKFLOW_STATUSES.map((s) => [s.value, s.label]));
-
 const formatDate = (date) => {
   if (!date) return "—";
   const d = new Date(date);
@@ -82,12 +81,13 @@ const formatDateTime = (date) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const cfg = STATUS_META[status] || STATUS_META["not-started"];
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${cfg.chip}`}>
       <Icon className="h-3 w-3" />
-      {STATUS_LABEL[status] || status}
+      {t(`visa.workflowStatuses.${status}`, { defaultValue: status })}
     </span>
   );
 };
@@ -107,6 +107,7 @@ const StatTile = ({ icon: Icon, label, value, accent = "bg-primary/10 text-prima
 );
 
 const MiniMilestone = ({ milestone, sessionToken, workflowId, onUpdated }) => {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const cfg = MILESTONE_META[milestone.status] || MILESTONE_META.pending;
   const Icon = cfg.icon;
@@ -125,7 +126,7 @@ const MiniMilestone = ({ milestone, sessionToken, workflowId, onUpdated }) => {
       );
       onUpdated(workflow);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update milestone.");
+      toast.error(err?.response?.data?.message || t("adminVisa.failedUpdateMilestone"));
     } finally {
       setSaving(false);
     }
@@ -137,13 +138,13 @@ const MiniMilestone = ({ milestone, sessionToken, workflowId, onUpdated }) => {
       onClick={cycle}
       disabled={saving}
       className="flex w-full items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-left transition-colors hover:bg-slate-50"
-      title="Click to cycle status"
+      title={t("adminVisa.cycleStatusHint")}
     >
       <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ${cfg.chip}`}>
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
-        {milestone.label}
+        {t(`visa.milestoneLabels.${milestone.key}`, { defaultValue: milestone.label })}
       </span>
       {milestone.dueDate && (
         <span className="shrink-0 text-[10px] text-muted">
@@ -155,6 +156,7 @@ const MiniMilestone = ({ milestone, sessionToken, workflowId, onUpdated }) => {
 };
 
 const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
+  const { t } = useTranslation();
   const [status, setStatus] = useState(workflow.status);
   const [savingStatus, setSavingStatus] = useState(false);
   const [noteBody, setNoteBody] = useState("");
@@ -171,11 +173,11 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
         workflow.id,
         { status: next }
       );
-      toast.success("Status updated.");
+      toast.success(t("adminVisa.statusUpdated"));
       onUpdated(updated);
     } catch (err) {
       setStatus(workflow.status);
-      toast.error(err?.response?.data?.message || "Failed to update status.");
+      toast.error(err?.response?.data?.message || t("adminVisa.failedUpdateStatus"));
     } finally {
       setSavingStatus(false);
     }
@@ -193,9 +195,9 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
       );
       onUpdated(updated);
       setNoteBody("");
-      toast.success("Note added.");
+      toast.success(t("adminVisa.noteAdded"));
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to add note.");
+      toast.error(err?.response?.data?.message || t("adminVisa.failedAddNote"));
     } finally {
       setPostingNote(false);
     }
@@ -205,7 +207,7 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
     <div className="space-y-4 border-t border-border bg-slate-50 p-4">
       <div className="grid gap-3 md:grid-cols-3">
         <div className="grid gap-1.5">
-          <Label className="text-xs">Status</Label>
+          <Label className="text-xs">{t("adminVisa.statusLabel")}</Label>
           <select
             value={status}
             onChange={(e) => saveStatus(e.target.value)}
@@ -213,12 +215,12 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
             className="h-9 rounded-md border border-border bg-white px-2 text-sm"
           >
             {WORKFLOW_STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
+              <option key={s.value} value={s.value}>{t(`visa.workflowStatuses.${s.value}`, { defaultValue: s.label })}</option>
             ))}
           </select>
         </div>
         <div className="grid gap-1.5">
-          <Label className="text-xs">Destination</Label>
+          <Label className="text-xs">{t("adminVisa.destinationLabel")}</Label>
           <div className="flex h-9 items-center gap-2 rounded-md border border-border bg-white px-2 text-sm">
             <Globe2 className="h-3.5 w-3.5 text-muted" />
             <span className="font-semibold text-ink">
@@ -227,16 +229,22 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
           </div>
         </div>
         <div className="grid gap-1.5">
-          <Label className="text-xs">Visa type</Label>
+          <Label className="text-xs">{t("adminVisa.visaTypeLabel")}</Label>
           <div className="flex h-9 items-center rounded-md border border-border bg-white px-2 text-sm font-semibold text-ink">
-            {VISA_TYPES.find((t) => t.value === workflow.visaType)?.label || workflow.visaType}
+            {t(`visa.visaTypes.${workflow.visaType}`, {
+              defaultValue:
+                VISA_TYPES.find((tp) => tp.value === workflow.visaType)?.label || workflow.visaType,
+            })}
           </div>
         </div>
       </div>
 
       <div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
-          Milestones ({workflow.milestones.filter((m) => m.status === "done").length}/{workflow.milestones.length})
+          {t("adminVisa.milestonesProgress", {
+            done: workflow.milestones.filter((m) => m.status === "done").length,
+            total: workflow.milestones.length,
+          })}
         </p>
         <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
           {workflow.milestones.map((m) => (
@@ -253,15 +261,15 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
 
       <div>
         <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
-          Key dates
+          {t("adminVisa.keyDates")}
         </p>
         <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
           {[
-            ["Appointment", workflow.appointmentDate],
-            ["Submitted", workflow.submittedAt],
-            ["Decision", workflow.decisionAt],
-            ["Issued", workflow.visaIssuedAt],
-            ["Expiry", workflow.visaExpiry],
+            [t("adminVisa.appointmentLabel"), workflow.appointmentDate],
+            [t("adminVisa.submittedLabel"), workflow.submittedAt],
+            [t("adminVisa.decisionLabel"), workflow.decisionAt],
+            [t("adminVisa.issuedLabel"), workflow.visaIssuedAt],
+            [t("adminVisa.expiryLabel"), workflow.visaExpiry],
           ].map(([label, val]) => (
             <div key={label} className="rounded-md border border-border bg-white px-2 py-1.5">
               <p className="text-[10px] font-bold uppercase text-muted">{label}</p>
@@ -274,7 +282,7 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
       {(workflow.embassy?.country || workflow.embassy?.city || workflow.embassy?.contactEmail) && (
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
-            Embassy / Consulate
+            {t("adminVisa.embassySection")}
           </p>
           <div className="rounded-md border border-border bg-white px-3 py-2 text-xs text-ink">
             {[workflow.embassy.city, workflow.embassy.country].filter(Boolean).join(", ") || "—"}
@@ -301,14 +309,14 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
       <div>
         <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted">
           <MessageSquare className="h-3 w-3" />
-          Timeline ({workflow.timeline.length})
+          {t("adminVisa.timelineCount", { count: workflow.timeline.length })}
         </p>
         <div className="grid gap-2">
           <div className="flex gap-2">
             <textarea
               value={noteBody}
               onChange={(e) => setNoteBody(e.target.value.slice(0, 1000))}
-              placeholder="Reply to the scholar with guidance or a status update..."
+              placeholder={t("adminVisa.replyPlaceholder")}
               rows={2}
               className="flex-1 rounded-md border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
@@ -318,7 +326,7 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
           </div>
           {workflow.timeline.length === 0 ? (
             <p className="rounded-md bg-white px-3 py-2 text-center text-xs text-muted">
-              No notes yet on this workflow.
+              {t("adminVisa.noNotes")}
             </p>
           ) : (
             <ul className="max-h-60 space-y-1.5 overflow-y-auto">
@@ -333,7 +341,7 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold uppercase tracking-wider text-muted">
-                      {note.author === "admin" ? "Admin" : "Scholar"} · {note.authorName || ""}
+                      {note.author === "admin" ? t("adminVisa.adminBadge") : t("adminVisa.scholarBadge")} · {note.authorName || ""}
                     </span>
                     <span className="text-[10px] text-muted">{formatDateTime(note.createdAt)}</span>
                   </div>
@@ -349,6 +357,7 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
 };
 
 const WorkflowRow = ({ workflow, sessionToken, onUpdated, defaultOpen = false }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
   const doneCount = workflow.milestones.filter((m) => m.status === "done").length;
   const pct = workflow.milestones.length > 0
@@ -369,11 +378,11 @@ const WorkflowRow = ({ workflow, sessionToken, onUpdated, defaultOpen = false })
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-extrabold text-ink">
-                {workflow.scholarship?.title || "Approved scholarship"}
+                {workflow.scholarship?.title || t("adminVisa.approvedScholarship")}
               </p>
               <p className="truncate text-xs text-muted">
                 <User className="mr-1 inline h-3 w-3" />
-                {workflow.scholar?.name || "Unknown scholar"}
+                {workflow.scholar?.name || t("adminVisa.unknownScholar")}
                 {workflow.scholar?.email ? ` · ${workflow.scholar.email}` : ""}
                 {workflow.destinationCountry && ` · ${workflow.destinationCountry}`}
               </p>
@@ -385,8 +394,8 @@ const WorkflowRow = ({ workflow, sessionToken, onUpdated, defaultOpen = false })
           </div>
           <div className="mt-2">
             <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-muted">
-              <span>Progress</span>
-              <span>{doneCount} / {workflow.milestones.length} · {pct}%</span>
+              <span>{t("adminVisa.progress")}</span>
+              <span>{t("adminVisa.progressValue", { done: doneCount, total: workflow.milestones.length, pct })}</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div
@@ -439,6 +448,7 @@ const AlertList = ({ icon: Icon, title, items, accent, empty, render }) => (
 );
 
 const AdminVisaTrackerPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { sessionToken, adminDashboard, signOut } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -464,11 +474,11 @@ const AdminVisaTrackerPage = () => {
       setWorkflows(Array.isArray(list?.workflows) ? list.workflows : []);
       setStats(summary || null);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to load visa workflows.");
+      toast.error(err?.response?.data?.message || t("adminVisa.failedLoad"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, scholarFilter]);
+  }, [sessionToken, scholarFilter, t]);
 
   useEffect(() => {
     fetchAll();
@@ -511,13 +521,13 @@ const AdminVisaTrackerPage = () => {
     <DashboardLayout
       role="admin"
       user={adminDashboard?.admin}
-      title="Visa workflows"
-      subtitle="Monitor every approved scholar's visa journey"
+      title={t("adminVisa.pageTitle")}
+      subtitle={t("adminVisa.pageSubtitle")}
       onSignOut={handleSignOut}
       actions={
         scholarFilter ? (
           <Button variant="outline" size="sm" onClick={clearScholarFilter}>
-            Clear scholar filter
+            {t("adminVisa.clearScholarFilter")}
           </Button>
         ) : null
       }
@@ -533,24 +543,24 @@ const AdminVisaTrackerPage = () => {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatTile
                 icon={Plane}
-                label="Workflows"
+                label={t("adminVisa.tileWorkflows")}
                 value={stats.total}
               />
               <StatTile
                 icon={TrendingUp}
-                label="Milestones done"
+                label={t("adminVisa.tileMilestonesDone")}
                 value={`${stats.milestones.completionRate}%`}
                 accent="bg-emerald-100 text-emerald-700"
               />
               <StatTile
                 icon={AlertTriangle}
-                label="Overdue milestones"
+                label={t("adminVisa.tileOverdueLong")}
                 value={stats.overdueMilestones.length}
                 accent="bg-rose-100 text-rose-700"
               />
               <StatTile
                 icon={Calendar}
-                label="Appointments ≤30d"
+                label={t("adminVisa.tileAppts")}
                 value={stats.upcomingAppointments.length}
                 accent="bg-amber-100 text-amber-700"
               />
@@ -559,7 +569,7 @@ const AdminVisaTrackerPage = () => {
             <div className="grid gap-3 lg:grid-cols-3">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">By status</CardTitle>
+                  <CardTitle className="text-sm">{t("adminVisa.byStatus")}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <ul className="space-y-1.5">
@@ -570,7 +580,7 @@ const AdminVisaTrackerPage = () => {
                         : 0;
                       return (
                         <li key={s.value} className="flex items-center gap-2 text-xs">
-                          <span className="w-24 shrink-0 font-semibold text-ink">{s.label}</span>
+                          <span className="w-24 shrink-0 font-semibold text-ink">{t(`visa.workflowStatuses.${s.value}`, { defaultValue: s.label })}</span>
                           <div className="flex-1">
                             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                               <div
@@ -589,12 +599,12 @@ const AdminVisaTrackerPage = () => {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Top destinations</CardTitle>
+                  <CardTitle className="text-sm">{t("adminVisa.topDestinations")}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   {stats.topDestinations.length === 0 ? (
                     <p className="rounded-md bg-slate-50 px-3 py-3 text-center text-xs text-muted">
-                      No destination data yet.
+                      {t("adminVisa.noDestData")}
                     </p>
                   ) : (
                     <ul className="space-y-1.5">
@@ -619,7 +629,7 @@ const AdminVisaTrackerPage = () => {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Milestone breakdown</CardTitle>
+                  <CardTitle className="text-sm">{t("adminVisa.milestoneBreakdown")}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <ul className="max-h-56 space-y-1 overflow-y-auto">
@@ -634,7 +644,7 @@ const AdminVisaTrackerPage = () => {
                       return (
                         <li key={m.key} className="grid gap-0.5 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="truncate font-semibold text-ink">{m.label}</span>
+                            <span className="truncate font-semibold text-ink">{t(`visa.milestoneLabels.${m.key}`, { defaultValue: m.label })}</span>
                             <span className="shrink-0 text-muted">
                               {m.done || 0}/{total}
                             </span>
@@ -657,14 +667,14 @@ const AdminVisaTrackerPage = () => {
               <AlertList
                 icon={AlertTriangle}
                 accent="text-rose-600"
-                title="Overdue milestones"
+                title={t("adminVisa.overdueMilestones")}
                 items={stats.overdueMilestones}
-                empty="Nothing overdue — great work."
+                empty={t("adminVisa.overdueEmpty")}
                 render={(item) => (
                   <div className="grid gap-0.5">
-                    <span className="font-bold text-ink">{item.milestoneLabel}</span>
+                    <span className="font-bold text-ink">{t(`visa.milestoneLabels.${item.milestoneKey}`, { defaultValue: item.milestoneLabel })}</span>
                     <span className="text-muted">
-                      {item.scholar?.name || "Scholar"} · {item.daysOverdue}d overdue
+                      {item.scholar?.name || t("adminVisa.scholar")} · {t("adminVisa.overdueDays", { count: item.daysOverdue })}
                     </span>
                   </div>
                 )}
@@ -672,17 +682,17 @@ const AdminVisaTrackerPage = () => {
               <AlertList
                 icon={Calendar}
                 accent="text-amber-600"
-                title="Upcoming appointments"
+                title={t("adminVisa.upcomingAppts")}
                 items={stats.upcomingAppointments}
-                empty="No appointments in the next 30 days."
+                empty={t("adminVisa.upcomingEmpty")}
                 render={(item) => (
                   <div className="grid gap-0.5">
                     <span className="font-bold text-ink">
-                      {item.scholar?.name || "Scholar"}
+                      {item.scholar?.name || t("adminVisa.scholar")}
                       {item.destinationCountry && ` → ${item.destinationCountry}`}
                     </span>
                     <span className="text-muted">
-                      {formatDate(item.appointmentDate)} · in {item.daysUntil}d
+                      {t("adminVisa.appointmentIn", { date: formatDate(item.appointmentDate), count: item.daysUntil })}
                     </span>
                   </div>
                 )}
@@ -690,16 +700,16 @@ const AdminVisaTrackerPage = () => {
               <AlertList
                 icon={Stamp}
                 accent="text-sky-600"
-                title="Visas expiring ≤90d"
+                title={t("adminVisa.visasExpiring")}
                 items={stats.expiringVisas}
-                empty="No visas expiring soon."
+                empty={t("adminVisa.expiringEmpty")}
                 render={(item) => (
                   <div className="grid gap-0.5">
                     <span className="font-bold text-ink">
-                      {item.scholar?.name || "Scholar"}
+                      {item.scholar?.name || t("adminVisa.scholar")}
                     </span>
                     <span className="text-muted">
-                      Expires {formatDate(item.visaExpiry)} · {item.daysUntil}d
+                      {t("adminVisa.expiresOn", { date: formatDate(item.visaExpiry), count: item.daysUntil })}
                     </span>
                   </div>
                 )}
@@ -716,7 +726,7 @@ const AdminVisaTrackerPage = () => {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search scholar, scholarship, destination..."
+                placeholder={t("adminVisa.searchPlaceholder")}
                 className="h-9 pl-8"
               />
             </div>
@@ -725,13 +735,13 @@ const AdminVisaTrackerPage = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-9 rounded-md border border-border bg-white px-3 text-sm"
             >
-              <option value="all">All statuses</option>
+              <option value="all">{t("adminVisa.allStatuses")}</option>
               {WORKFLOW_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+                <option key={s.value} value={s.value}>{t(`visa.workflowStatuses.${s.value}`, { defaultValue: s.label })}</option>
               ))}
             </select>
             <span className="text-xs font-semibold text-muted">
-              {filtered.length} / {workflows.length} workflow{workflows.length === 1 ? "" : "s"}
+              {t("adminVisa.workflowCount", { count: workflows.length, filtered: filtered.length, total: workflows.length })}
             </span>
           </CardContent>
         </Card>
@@ -746,11 +756,10 @@ const AdminVisaTrackerPage = () => {
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Plane className="h-10 w-10 text-muted/40" />
               <h3 className="mt-3 text-lg font-bold text-ink">
-                No matching visa workflows
+                {t("adminVisa.noMatching")}
               </h3>
               <p className="mt-1 max-w-md text-sm text-muted">
-                Workflows appear once a scholar starts tracking the visa journey
-                for an approved scholarship.
+                {t("adminVisa.noMatchingBody")}
               </p>
             </CardContent>
           </Card>

@@ -1,0 +1,37 @@
+# T4.3 — Keep the Docker build context small AND prevent host-only files
+# from polluting the image.
+node_modules
+npm-debug.log*
+.npm
+.env
+.env.*
+!.env.example
+
+# Test / dev only
+test/
+*.test.mjs
+*.test.js
+vitest.config.*
+coverage/
+
+# User-generated content (mounted as a volume in compose)
+uploads/credentials/*
+uploads/travel/*
+!uploads/credentials/.gitkeep
+!uploads/travel/.gitkeep
+
+# Editor / OS clutter
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build / debug artefacts
+*.log
+*.bak.*
+*.tmp

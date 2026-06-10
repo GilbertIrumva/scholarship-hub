@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import {
   Award,
@@ -80,45 +81,107 @@ const calculateCompleteness = (application) => {
 // MAIN
 // =============================================================================
 const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus, sessionToken }) => {
+  const { t } = useTranslation();
   const application = profile.application;
   const scholar = profile.scholar;
   const [isEditing, setIsEditing] = useState(false);
 
   const completeness = useMemo(() => calculateCompleteness(application), [application]);
 
-  const statCards = [
+  const statCards = useMemo(() => [
     {
       icon: ClipboardList,
-      label: "Application status",
-      value: application?.status || "Not linked",
-      note: application ? "Latest status on record" : "Link an application to begin",
+      label: t("profile.statApplicationStatus"),
+      value: application?.status || t("profile.statApplicationNotLinked"),
+      note: application
+        ? t("profile.statApplicationNoteLinked")
+        : t("profile.statApplicationNoteUnlinked"),
       accent: "bg-gradient-to-br from-primary to-emerald-700",
     },
     {
       icon: GraduationCap,
-      label: "Education",
-      value: application?.education || "—",
-      note: "Latest academic level",
+      label: t("profile.statEducation"),
+      value: application?.education || t("profile.statEducationValueEmpty"),
+      note: t("profile.statEducationNote"),
       accent: "bg-gradient-to-br from-sky-500 to-indigo-600",
     },
     {
       icon: UserRound,
-      label: "Profile completeness",
+      label: t("profile.statProfileCompleteness"),
       value: `${completeness}%`,
-      note: completeness >= 80 ? "Looking great" : "Add more details to stand out",
+      note: completeness >= 80
+        ? t("profile.profileCompletenessGreat")
+        : t("profile.profileCompletenessAdd"),
       accent: "bg-gradient-to-br from-accent to-orange-600",
     },
-  ];
+  ], [application, completeness, t]);
 
   // Mock-derived journey steps (real progress would come from backend)
-  const journey = [
-    { label: "Account created", done: true },
-    { label: "Profile started", done: !!application?.name },
-    { label: "Education added", done: !!application?.education && application?.education !== "Not supplied" },
-    { label: "Photo uploaded", done: !!application?.photo },
-    { label: "Application submitted", done: application?.status === "submitted" || application?.status === "reviewed" },
-  ];
+  const journey = useMemo(() => [
+    { label: t("profile.journeyStepAccount"), done: true },
+    { label: t("profile.journeyStepProfile"), done: !!application?.name },
+    { label: t("profile.journeyStepEducation"), done: !!application?.education && application?.education !== "Not supplied" },
+    { label: t("profile.journeyStepPhoto"), done: !!application?.photo },
+    { label: t("profile.journeyStepApplication"), done: application?.status === "submitted" || application?.status === "reviewed" },
+  ], [application, t]);
   const journeyDone = journey.filter((s) => s.done).length;
+
+  const tips = useMemo(() => [
+    { icon: BookOpen, text: t("profile.tipCompleteProfile") },
+    { icon: CalendarDays, text: t("profile.tipCheckCatalog") },
+    { icon: Award, text: t("profile.tipAddBioPhoto") },
+  ], [t]);
+
+  const nextActions = useMemo(() => [
+    {
+      title: completeness < 100
+        ? t("profile.actionFinishProfileTitle")
+        : t("profile.actionPolishBioTitle"),
+      description: completeness < 100
+        ? t("profile.actionFinishProfileDescription", { percent: completeness })
+        : t("profile.actionPolishBioDescription"),
+      action: () => setIsEditing(true),
+      icon: UserRound,
+    },
+    {
+      title: t("profile.actionBrowseTitle"),
+      description: t("profile.actionBrowseDescription"),
+      href: "/scholar/scholarships",
+      icon: BookOpen,
+    },
+    {
+      title: t("profile.actionTrackTitle"),
+      description: application
+        ? t("profile.actionTrackDescription", { id: application.id, status: application.status })
+        : t("profile.actionTrackDescriptionEmpty"),
+      href: "/scholar/applications",
+      icon: ClipboardList,
+    },
+    {
+      title: t("profile.actionConvertGradesTitle"),
+      description: t("profile.actionConvertGradesDescription"),
+      href: "/grade-converter",
+      icon: Calculator,
+    },
+    {
+      title: t("profile.actionUploadCredentialsTitle"),
+      description: t("profile.actionUploadCredentialsDescription"),
+      href: "/scholar/credentials",
+      icon: FolderArchive,
+    },
+    {
+      title: t("profile.actionTravelDocsTitle"),
+      description: t("profile.actionTravelDocsDescription"),
+      href: "/scholar/travel-docs",
+      icon: Plane,
+    },
+    {
+      title: t("profile.actionVisaTitle"),
+      description: t("profile.actionVisaDescription"),
+      href: "/scholar/visa-tracker",
+      icon: ClipboardCheck,
+    },
+  ], [application, completeness, t]);
 
   return (
     <div className="space-y-6">
@@ -145,7 +208,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       >
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-primary">
-            Scholar workspace
+            {t("profile.workspaceEyebrow")}
           </p>
           <h2 className="mt-1 text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
             {scholar.name}
@@ -157,7 +220,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
         </div>
         <Button onClick={() => setIsEditing((v) => !v)} variant={isEditing ? "outline" : "default"}>
           <Pencil className="h-4 w-4" />
-          {isEditing ? "Cancel edit" : "Edit profile"}
+          {isEditing ? t("profile.cancelEdit") : t("profile.editProfile")}
         </Button>
       </motion.div>
 
@@ -199,10 +262,10 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" /> Your journey
+                <TrendingUp className="h-4 w-4 text-primary" /> {t("profile.journeyTitle")}
               </CardTitle>
               <p className="text-sm text-muted">
-                {journeyDone} of {journey.length} steps completed
+                {t("profile.journeyProgress", { done: journeyDone, total: journey.length })}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -231,24 +294,11 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-accent" /> Tips
+                <Sparkles className="h-4 w-4 text-accent" /> {t("profile.tipsTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                {
-                  icon: BookOpen,
-                  text: "Complete your profile to unlock more scholarship matches.",
-                },
-                {
-                  icon: CalendarDays,
-                  text: "Check the catalog regularly — new opportunities open weekly.",
-                },
-                {
-                  icon: Award,
-                  text: "Add a clear bio and photo — verified profiles get reviewed faster.",
-                },
-              ].map((tip) => (
+              {tips.map((tip) => (
                 <div
                   key={tip.text}
                   className="flex items-start gap-3 rounded-xl border border-border bg-slate-50/60 p-3"
@@ -267,60 +317,12 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       {/* Quick links / next actions */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Next actions</CardTitle>
-          <p className="text-sm text-muted">Keep moving forward.</p>
+          <CardTitle className="text-lg">{t("profile.nextActionsTitle")}</CardTitle>
+          <p className="text-sm text-muted">{t("profile.nextActionsSubtitle")}</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: completeness < 100 ? "Finish your profile" : "Polish your bio",
-                description:
-                  completeness < 100
-                    ? `Your profile is ${completeness}% complete. Add the missing details.`
-                    : "Refresh your bio so reviewers see the latest you.",
-                action: () => setIsEditing(true),
-                icon: UserRound,
-              },
-              {
-                title: "Browse opportunities",
-                description: "Explore the catalog and shortlist scholarships you qualify for.",
-                href: "/scholar/scholarships",
-                icon: BookOpen,
-              },
-              {
-                title: "Track your application",
-                description: application
-                  ? `Application #${application.id} is currently ${application.status}.`
-                  : "Submit your first application to start tracking progress.",
-                href: "/scholar/applications",
-                icon: ClipboardList,
-              },
-              {
-                title: "Convert your grades",
-                description: "See how your certificate maps to US GPA, UK class, and ECTS.",
-                href: "/grade-converter",
-                icon: Calculator,
-              },
-              {
-                title: "Upload credentials",
-                description: "Add certificates, transcripts, and ID documents to speed up applications.",
-                href: "/scholar/credentials",
-                icon: FolderArchive,
-              },
-              {
-                title: "Travel documents",
-                description: "Securely store your passport and visa for when a scholarship is approved.",
-                href: "/scholar/travel-docs",
-                icon: Plane,
-              },
-              {
-                title: "Track your visa",
-                description: "Follow embassy steps, milestones, and notes for each approved scholarship.",
-                href: "/scholar/visa-tracker",
-                icon: ClipboardCheck,
-              },
-            ].map((item) => (
+            {nextActions.map((item) => (
               <button
                 key={item.title}
                 type="button"
@@ -349,9 +351,9 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       {sessionToken && (
         <section className="space-y-3">
           <header>
-            <h2 className="text-xl font-extrabold tracking-tight text-ink">Security</h2>
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">{t("profile.securityHeading")}</h2>
             <p className="text-sm text-muted">
-              Protect your account with two-factor authentication and review where you&apos;re signed in.
+              {t("profile.securitySubtitle")}
             </p>
           </header>
           <TwoFactorAndSessionsPanel sessionToken={sessionToken} principalKind="scholar" />

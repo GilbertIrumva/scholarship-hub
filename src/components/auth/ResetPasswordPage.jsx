@@ -3,12 +3,14 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import AuthShell from "./shared/AuthShell";
 import { Seo } from "../seo/Seo";
 import { PasswordStrengthMeter } from "../ui/password-strength";
 import { resetPassword } from "../../services/scholarAccount";
 
 const ResetPasswordPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const token = params.get("token") || "";
@@ -22,14 +24,13 @@ const ResetPasswordPage = () => {
 
   const validate = () => {
     const next = {};
-    if (!token) next.token = "This reset link is missing a token. Request a new one from the forgot-password page.";
-    if (!form.password || form.password.length < 8) next.password = "New password must be at least 8 characters.";
+    if (!token) next.token = t("auth.resetValidationTokenMissing");
+    if (!form.password || form.password.length < 8) next.password = t("auth.resetValidationPasswordMin");
     else if (passwordBreached)
-      next.password =
-        "This password appeared in a known data breach. Please choose a different one.";
+      next.password = t("auth.passwordBreached");
     else if (passwordScore < 2)
-      next.password = "Please choose a stronger password.";
-    if (form.password !== form.confirm) next.confirm = "Passwords do not match.";
+      next.password = t("auth.passwordWeak");
+    if (form.password !== form.confirm) next.confirm = t("auth.passwordsDontMatch");
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -40,12 +41,12 @@ const ResetPasswordPage = () => {
     setSubmitting(true);
     try {
       await resetPassword({ token, password: form.password });
-      toast.success("Password updated. Sign in with your new password.");
+      toast.success(t("auth.resetToastSuccess"));
       navigate("/login", { replace: true });
     } catch (err) {
       const message =
         err.response?.data?.message ||
-        "Could not reset your password. The link may have expired — request a new one.";
+        t("auth.resetToastError");
       toast.error(message);
       setErrors((prev) => ({ ...prev, token: message }));
     } finally {
@@ -55,11 +56,11 @@ const ResetPasswordPage = () => {
 
   return (
     <>
-      <Seo title="Reset password" path="/reset-password" noindex />
+      <Seo title={t("auth.resetSeoTitle")} path="/reset-password" noindex />
       <AuthShell
-      eyebrow="Set a new password"
-      headline="Pick a strong new password"
-      subtitle="At least 8 characters. Use a passphrase you'll remember."
+      eyebrow={t("auth.resetEyebrow")}
+      headline={t("auth.resetTitle")}
+      subtitle={t("auth.resetSubtitle")}
     >
       <motion.form
         onSubmit={onSubmit}
@@ -74,7 +75,7 @@ const ResetPasswordPage = () => {
 
         <div className="space-y-1.5">
           <label htmlFor="reset-password" className="text-sm font-semibold text-slate-700">
-            New password
+            {t("auth.resetNewPasswordLabel")}
           </label>
           <div className="relative">
             <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -91,7 +92,7 @@ const ResetPasswordPage = () => {
               type="button"
               onClick={() => setShow((s) => !s)}
               tabIndex={-1}
-              aria-label={show ? "Hide password" : "Show password"}
+              aria-label={show ? t("auth.passwordHide") : t("auth.passwordShow")}
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -109,7 +110,7 @@ const ResetPasswordPage = () => {
 
         <div className="space-y-1.5">
           <label htmlFor="reset-confirm" className="text-sm font-semibold text-slate-700">
-            Confirm new password
+            {t("auth.resetConfirmLabel")}
           </label>
           <input
             id="reset-confirm"
@@ -129,12 +130,12 @@ const ResetPasswordPage = () => {
           className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-60"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-          {submitting ? "Updating…" : "Update password"}
+          {submitting ? t("auth.resetSubmitting") : t("auth.resetSubmit")}
         </button>
 
         <p className="text-center text-sm text-slate-600">
           <Link to="/login" className="font-semibold text-emerald-700 hover:underline">
-            Back to sign in
+            {t("auth.backToSignIn")}
           </Link>
         </p>
       </motion.form>

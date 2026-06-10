@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Plane,
   Loader2,
@@ -14,10 +15,7 @@ import {
 import toast from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  WORKFLOW_STATUSES,
-  listAdminVisaWorkflows,
-} from "../../services/visaWorkflow";
+import { listAdminVisaWorkflows } from "../../services/visaWorkflow";
 
 const STATUS_META = {
   "not-started": { chip: "bg-slate-100 text-slate-600", icon: Clock },
@@ -28,8 +26,6 @@ const STATUS_META = {
   completed: { chip: "bg-emerald-100 text-emerald-800", icon: CheckCircle2 },
   "on-hold": { chip: "bg-amber-100 text-amber-800", icon: AlertCircle },
 };
-
-const STATUS_LABEL = Object.fromEntries(WORKFLOW_STATUSES.map((s) => [s.value, s.label]));
 
 const formatDate = (date) => {
   if (!date) return null;
@@ -43,17 +39,19 @@ const formatDate = (date) => {
 };
 
 const StatusChip = ({ status }) => {
+  const { t } = useTranslation();
   const cfg = STATUS_META[status] || STATUS_META["not-started"];
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.chip}`}>
       <Icon className="h-2.5 w-2.5" />
-      {STATUS_LABEL[status] || status}
+      {t(`visa.workflowStatuses.${status}`, { defaultValue: status })}
     </span>
   );
 };
 
 const AdminVisaSection = ({ sessionToken, scholarId }) => {
+  const { t } = useTranslation();
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -66,11 +64,11 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
       });
       setWorkflows(Array.isArray(wfs) ? wfs : []);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to load visa workflows.");
+      toast.error(err?.response?.data?.message || t("adminVisa.failedLoad"));
     } finally {
       setLoading(false);
     }
-  }, [sessionToken, scholarId]);
+  }, [sessionToken, scholarId, t]);
 
   useEffect(() => {
     fetchAll();
@@ -81,7 +79,7 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <Plane className="h-4 w-4 text-primary" />
-          Visa workflows
+          {t("adminVisa.workflowsTitle")}
           {workflows.length > 0 && (
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
               {workflows.length}
@@ -90,7 +88,7 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
         </CardTitle>
         <Button asChild variant="ghost" size="sm">
           <Link to={`/admin/visa-tracker?scholar=${scholarId}`}>
-            Manage <ExternalLink className="h-3 w-3" />
+            {t("adminVisa.manage")} <ExternalLink className="h-3 w-3" />
           </Link>
         </Button>
       </CardHeader>
@@ -101,7 +99,7 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
           </div>
         ) : workflows.length === 0 ? (
           <p className="rounded-md bg-slate-50 px-3 py-4 text-center text-xs text-muted">
-            No visa workflows yet — this scholar hasn't started tracking one.
+            {t("adminVisa.noWorkflowsForScholar")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -122,13 +120,13 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-bold text-ink group-hover:text-primary">
-                          {w.scholarship?.title || "Approved scholarship"}
+                          {w.scholarship?.title || t("adminVisa.approvedScholarship")}
                         </p>
                         <StatusChip status={w.status} />
                       </div>
                       <p className="text-xs text-muted">
                         {w.destinationCountry || "—"}
-                        {w.appointmentDate && ` · Appt ${formatDate(w.appointmentDate)}`}
+                        {w.appointmentDate && ` · ${t("adminVisa.appointmentLabel")} ${formatDate(w.appointmentDate)}`}
                       </p>
                       <div className="mt-1.5 flex items-center gap-2">
                         <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100">
