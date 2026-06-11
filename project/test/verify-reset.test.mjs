@@ -36,12 +36,17 @@ describe('email verification flow', () => {
         const created = await Scholar.findOne({ email: 'newkid@example.com' });
         expect(created.emailVerified).toBe(false);
 
-        // Give the fire-and-forget verification email a tick to land.
-        await new Promise((r) => setTimeout(r, 50));
-        const token = await VerificationToken.findOne({
-            principalId: created._id,
-            kind: 'email-verify',
-        });
+        // Poll for the fire-and-forget verification email; CI runners can
+        // take far longer than the typical handful of ms.
+        let token = null;
+        for (let i = 0; i < 50; i++) {
+            token = await VerificationToken.findOne({
+                principalId: created._id,
+                kind: 'email-verify',
+            });
+            if (token) break;
+            await new Promise((r) => setTimeout(r, 100));
+        }
         expect(token).toBeTruthy();
         expect(token.principalKind).toBe('scholar');
     });
