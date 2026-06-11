@@ -55,13 +55,15 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm ci --foreground-scripts 2>&1 | tee /tmp/npm-ci-backend.log
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          npm ci 2>&1 | tee /tmp/npm-ci-backend.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            echo "::group::npm ci failed (exit $rc) — full output"
-            cat /tmp/npm-ci-backend.log
+            echo "::group::npm ci failed (exit $rc) — first 60 lines"
+            head -60 /tmp/npm-ci-backend.log
             echo "::endgroup::"
-            tail -20 /tmp/npm-ci-backend.log | while IFS= read -r line; do
+            head -40 /tmp/npm-ci-backend.log | while IFS= read -r line; do
               printf '::error::%s\n' "$line"
             done
           fi
@@ -86,13 +88,15 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm ci --foreground-scripts 2>&1 | tee /tmp/npm-ci-frontend.log
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          npm ci 2>&1 | tee /tmp/npm-ci-frontend.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            echo "::group::npm ci failed (exit $rc) — full output"
-            cat /tmp/npm-ci-frontend.log
+            echo "::group::npm ci failed (exit $rc) — first 60 lines"
+            head -60 /tmp/npm-ci-frontend.log
             echo "::endgroup::"
-            tail -20 /tmp/npm-ci-frontend.log | while IFS= read -r line; do
+            head -40 /tmp/npm-ci-frontend.log | while IFS= read -r line; do
               printf '::error::%s\n' "$line"
             done
           fi
