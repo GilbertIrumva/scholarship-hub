@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CalendarDays,
   Loader2,
-  Star,
   Target,
   RefreshCcw,
 } from "lucide-react";
@@ -72,7 +71,7 @@ const RecommendedRail = ({ sessionToken }) => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Star className="h-4 w-4 text-accent" /> {t("recommendations.title")}
+              <Target className="h-4 w-4 text-primary" /> {t("recommendations.title")}
             </CardTitle>
             <p className="mt-1 text-sm text-muted">
               {personalised

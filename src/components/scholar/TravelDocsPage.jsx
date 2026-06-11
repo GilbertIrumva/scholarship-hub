@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { EmptyState } from "../ui/empty-state";
+import { TravelDocsIllustration } from "../ui/empty-illustrations";
 import {
   TRAVEL_DOC_TYPES,
   listTravelDocs,
@@ -584,16 +586,12 @@ const TravelDocsPage = () => {
           </div>
         ) : docs.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
-                <Plane className="h-8 w-8" />
-              </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">
-                {t("travelDocs.emptyTitle")}
-              </h3>
-              <p className="mt-1 max-w-md text-sm text-muted">
-                {t("travelDocs.emptyDescription")}
-              </p>
+            <CardContent className="py-6">
+              <EmptyState
+                illustration={<TravelDocsIllustration />}
+                title={t("travelDocs.emptyTitle")}
+                description={t("travelDocs.emptyDescription")}
+              />
             </CardContent>
           </Card>
         ) : (

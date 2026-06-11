@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const MARITAL_OPTIONS = [
+  { value: "single", labelKey: "profile.maritalSingle" },
+  { value: "married", labelKey: "profile.maritalMarried" },
+  { value: "divorced", labelKey: "profile.maritalDivorced" },
+  { value: "widowed", labelKey: "profile.maritalWidowed" },
+  { value: "prefer-not-to-say", labelKey: "profile.maritalPreferNotToSay" },
+];
+
 const FIELD_DEFS = [
   { name: "name", labelKey: "profile.formFieldFullName", type: "text", required: true },
   { name: "contact", labelKey: "profile.formFieldContact", type: "text" },
@@ -13,7 +21,14 @@ const FIELD_DEFS = [
   { name: "gender", labelKey: "profile.formFieldGender", type: "text" },
   { name: "dateOfBirth", labelKey: "profile.formFieldDateOfBirth", type: "date" },
   { name: "nationality", labelKey: "profile.formFieldNationality", type: "text" },
-  { name: "status", labelKey: "profile.formFieldMaritalStatus", type: "text" },
+  {
+    name: "status",
+    labelKey: "profile.formFieldMaritalStatus",
+    type: "select",
+    helpKey: "profile.maritalStatusHelp",
+    options: MARITAL_OPTIONS,
+    placeholderKey: "profile.maritalStatusPlaceholder",
+  },
   { name: "education", labelKey: "profile.formFieldEducation", type: "text" },
   { name: "address", labelKey: "profile.formFieldAddress", type: "text", fullWidth: true },
 ];
@@ -158,14 +173,36 @@ const ScholarProfileForm = ({ application, onCancel, onSave, isSubmitting }) => 
                   {field.label}
                   {field.required && <span className="text-danger"> *</span>}
                 </Label>
-                <Input
-                  id={`pf-${field.name}`}
-                  name={field.name}
-                  type={field.type}
-                  value={form[field.name] ?? ""}
-                  onChange={handleChange}
-                  placeholder={field.label}
-                />
+                {field.type === "select" ? (
+                  <select
+                    id={`pf-${field.name}`}
+                    name={field.name}
+                    value={form[field.name] ?? ""}
+                    onChange={handleChange}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="">
+                      {field.placeholderKey ? t(field.placeholderKey) : field.label}
+                    </option>
+                    {field.options?.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {t(opt.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id={`pf-${field.name}`}
+                    name={field.name}
+                    type={field.type}
+                    value={form[field.name] ?? ""}
+                    onChange={handleChange}
+                    placeholder={field.label}
+                  />
+                )}
+                {field.helpKey && (
+                  <p className="text-xs text-muted">{t(field.helpKey)}</p>
+                )}
               </div>
             ))}
 

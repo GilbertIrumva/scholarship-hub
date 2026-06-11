@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: scholarshipzone
+    runtime: node
+    plan: free
+    region: oregon
+    branch: master
+    healthCheckPath: /readyz
+    buildCommand: npm ci && npm install --prefix project && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      # Required — set in the Render dashboard after first deploy.
+      - key: MONGODB_URI
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_SECRET
+        generateValue: true
+      - key: TRAVEL_DOC_SECRET
+        generateValue: true
+      - key: OAUTH_STATE_SECRET
+        generateValue: true
+      # Same-origin in single-host mode — adjust if you split the SPA later.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: APP_BASE_URL
+        sync: false

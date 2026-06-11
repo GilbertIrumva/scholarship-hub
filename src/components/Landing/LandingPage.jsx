@@ -65,6 +65,9 @@ import whatWeDoCurateImage from "../../assets/landing/whatwedo/curate.jpg";
 import whatWeDoMatchImage from "../../assets/landing/whatwedo/match.jpg";
 import whatWeDoGuideImage from "../../assets/landing/whatwedo/guide.jpg";
 import whatWeDoChampionImage from "../../assets/landing/whatwedo/champion.jpg";
+import testimonialAmaniPhoto from "../../assets/landing/testimonials/amani.jpg";
+import testimonialGracePhoto from "../../assets/landing/testimonials/grace.jpg";
+import testimonialJosephPhoto from "../../assets/landing/testimonials/joseph.jpg";
 
 // =============================================================================
 // CONSTANTS
@@ -249,10 +252,7 @@ const WhatsAppIcon = (props) => (
 );
 
 // Scholar testimonials shown between "What we do" and "Why us".
-// TODO: drop real Pexels/Unsplash portraits in
-// `src/assets/landing/testimonials/` (e.g. amani.webp, grace.webp, joseph.webp),
-// import them at the top of this file, and assign to the `avatar` field below.
-// Until then, the card renders a tasteful gradient initials avatar.
+// Portraits are CC0 Pexels stock saved to src/assets/landing/testimonials/.
 const buildTestimonials = (t) => [
   {
     id: "amani",
@@ -261,7 +261,7 @@ const buildTestimonials = (t) => [
     scholarship: t("landing.testimonial1Scholarship"),
     quote: t("landing.testimonial1Quote"),
     initials: "AM",
-    avatar: null,
+    avatar: testimonialAmaniPhoto,
     gradient: "from-primary/30 via-primary/15 to-accent/25",
   },
   {
@@ -271,7 +271,7 @@ const buildTestimonials = (t) => [
     scholarship: t("landing.testimonial2Scholarship"),
     quote: t("landing.testimonial2Quote"),
     initials: "GN",
-    avatar: null,
+    avatar: testimonialGracePhoto,
     gradient: "from-accent/25 via-primary/15 to-primary/30",
   },
   {
@@ -281,7 +281,7 @@ const buildTestimonials = (t) => [
     scholarship: t("landing.testimonial3Scholarship"),
     quote: t("landing.testimonial3Quote"),
     initials: "JK",
-    avatar: null,
+    avatar: testimonialJosephPhoto,
     gradient: "from-primary/25 via-accent/20 to-primary/15",
   },
 ];
@@ -554,7 +554,7 @@ const PartnersStrip = ({ partners, t }) => (
     aria-labelledby="partners-title"
     className="mx-auto section-mt w-[min(100%-1.5rem,80rem)]"
   >
-    <div className="rounded-3xl border border-border bg-surface/60 px-6 py-10 shadow-elev-1 sm:px-10 sm:py-12">
+    <div className="section-y-sm rounded-3xl border border-border bg-surface/60 px-6 shadow-elev-1 sm:px-10">
       <div className="text-center">
         <span className="eyebrow">{t("landing.partnersEyebrow")}</span>
         <h2 id="partners-title" className="mt-3 text-h4 text-ink sm:text-h3">
@@ -614,7 +614,7 @@ const TestimonialsBlock = ({ testimonials, t }) => (
         {t("landing.testimonialsSubtitle")}
       </p>
     </div>
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {testimonials.map((item, idx) => (
         <motion.figure
           key={item.id}
@@ -622,14 +622,16 @@ const TestimonialsBlock = ({ testimonials, t }) => (
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: 0.5, delay: idx * 0.08, ease: [0.25, 1, 0.5, 1] }}
-          className="hover-lift relative flex h-full flex-col rounded-2xl border border-border bg-surface p-6 shadow-elev-1 hover:border-primary/40 hover:shadow-elev-3"
+          className="hover-lift relative flex h-full flex-col rounded-2xl border border-border bg-surface p-6 pt-8 shadow-elev-1 hover:border-primary/40 hover:shadow-elev-3"
         >
-          <Quote
-            className="absolute top-5 right-5 h-8 w-8 text-primary/15"
+          <span
             aria-hidden="true"
-          />
+            className="absolute -top-5 right-6 grid h-10 w-10 place-items-center rounded-full border border-border bg-surface text-primary shadow-elev-2"
+          >
+            <Quote className="h-5 w-5" />
+          </span>
           <blockquote className="text-body italic text-ink">
-            &ldquo;{item.quote}&rdquo;
+            {item.quote}
           </blockquote>
           <figcaption className="mt-6 flex items-center gap-4 border-t border-border pt-5">
             {item.avatar ? (
@@ -781,15 +783,16 @@ const LandingPage = () => {
       <FAQSchema items={LANDING_FAQ} />
 
       {/* ===================== NAV ===================== */}
-      <nav
-        aria-label={t("landing.navPrimaryAria")}
-        className="sticky top-3 z-50 mx-auto mt-3 flex w-[min(100%-1.5rem,80rem)] items-center justify-between gap-4 rounded-2xl border border-border/80 bg-surface/80 px-4 py-2.5 shadow-nav backdrop-blur-xl supports-[backdrop-filter]:bg-surface/65 sm:px-6"
-      >
-        <Link to="/" className="flex shrink-0 items-center font-extrabold text-ink" aria-label={t("landing.navHomeAria")}>
+      <header className="sticky top-0 z-50 mx-auto w-[min(100%-1.5rem,80rem)]">
+        <nav
+          aria-label={t("landing.navPrimaryAria")}
+          className="flex items-center justify-between gap-2 rounded-2xl border border-border/80 bg-surface/80 px-3 py-2 shadow-nav backdrop-blur-xl supports-[backdrop-filter]:bg-surface/65 sm:gap-4 sm:px-4 sm:py-2.5 lg:px-6"
+        >
+        <Link to="/" className="flex min-w-0 shrink items-center font-extrabold text-ink" aria-label={t("landing.navHomeAria")}>
           <img
             src="/logo.png"
             alt=""
-            className="h-14 w-auto shrink-0 object-contain sm:h-16"
+            className="h-10 w-auto max-w-[140px] object-contain sm:h-12 sm:max-w-[180px] lg:h-14 lg:max-w-none"
           />
           <span className="sr-only">ScholarshipZone</span>
         </Link>
@@ -812,28 +815,28 @@ const LandingPage = () => {
           ))}
         </ul>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <Link
             to="/grade-converter"
-            className="hidden md:inline-flex items-center gap-1 rounded-lg px-3 py-2 text-small font-semibold text-primary-dark hover:bg-primary/10 transition-colors"
+            className="hidden lg:inline-flex items-center gap-1 rounded-lg px-3 py-2 text-small font-semibold text-primary-dark hover:bg-primary/10 transition-colors"
           >
             {t("landing.navGradeConverter")}
           </Link>
           <Link
             to="/login/admin"
-            className="hidden md:inline-flex text-small font-semibold text-muted hover:text-ink transition-colors px-2"
+            className="hidden lg:inline-flex text-small font-semibold text-muted hover:text-ink transition-colors px-2"
           >
             {t("landing.navAdmin")}
           </Link>
-          <LanguageSwitcher variant="compact" className="hidden md:inline-flex" />
-          <ThemeToggle variant="icon" className="hidden md:inline-flex" />
+          <LanguageSwitcher variant="compact" className="hidden lg:inline-flex" />
+          <ThemeToggle variant="icon" className="hidden lg:inline-flex" />
           <Button asChild size="sm">
             <Link to="/login/scholar">{t('common.signIn')}</Link>
           </Button>
           <button
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
-            className="lg:hidden grid h-10 w-10 place-items-center rounded-lg border border-border text-ink transition-colors hover:bg-surface-2"
+            className="lg:hidden grid h-10 w-10 place-items-center rounded-lg border border-border bg-surface text-ink transition-colors hover:bg-surface-2"
             aria-label={menuOpen ? t("landing.navClose") : t("landing.navOpen")}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
@@ -841,51 +844,59 @@ const LandingPage = () => {
             {menuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
-      </nav>
+        </nav>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            id="mobile-nav"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-            className="lg:hidden mx-auto mt-2 w-[min(100%-1.5rem,80rem)] overflow-hidden rounded-2xl border border-border bg-surface shadow-nav"
-          >
-            <ul className="flex flex-col p-2">
-              {NAV_SECTIONS.map((section) => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
+        {/* Mobile Menu — lives inside the sticky header so it floats above
+            every section while scrolling and never gets covered. */}
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div
+              id="mobile-nav"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+              className="lg:hidden mt-2 overflow-hidden rounded-2xl border border-border bg-surface shadow-nav"
+            >
+              <ul className="flex flex-col p-2">
+                {NAV_SECTIONS.map((section) => (
+                  <li key={section.id}>
+                    <a
+                      href={`#${section.id}`}
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-lg px-3 py-2.5 text-small font-semibold text-ink transition-colors hover:bg-surface-2"
+                    >
+                      {section.label}
+                    </a>
+                  </li>
+                ))}
+                <li className="border-t border-border mt-2 pt-2">
+                  <Link
+                    to="/grade-converter"
                     onClick={() => setMenuOpen(false)}
-                    className="block rounded-lg px-3 py-2.5 text-small font-semibold text-ink transition-colors hover:bg-surface-2"
+                    className="block rounded-lg px-3 py-2.5 text-small font-semibold text-primary-dark hover:bg-primary/10"
                   >
-                    {section.label}
-                  </a>
+                    {t("landing.navGradeConverter")}
+                  </Link>
+                  <Link
+                    to="/login/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-lg px-3 py-2.5 text-small font-semibold text-muted hover:bg-surface-2"
+                  >
+                    {t("landing.navAdminSignIn")}
+                  </Link>
                 </li>
-              ))}
-              <li className="md:hidden border-t border-border mt-2 pt-2">
-                <Link
-                  to="/grade-converter"
-                  onClick={() => setMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2.5 text-small font-semibold text-primary-dark hover:bg-primary/10"
-                >
-                  {t("landing.navGradeConverter")}
-                </Link>
-                <Link
-                  to="/login/admin"
-                  onClick={() => setMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2.5 text-small font-semibold text-muted hover:bg-surface-2"
-                >
-                  {t("landing.navAdminSignIn")}
-                </Link>
-              </li>
-            </ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <li className="border-t border-border mt-2 pt-2">
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <LanguageSwitcher variant="compact" />
+                    <ThemeToggle variant="icon" />
+                  </div>
+                </li>
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
       <main id="main" className="focus:outline-none" tabIndex={-1}>
 
@@ -898,7 +909,7 @@ const LandingPage = () => {
             className="h-[clamp(28rem,75vh,44rem)] w-full object-cover"
             loading="eager"
             decoding="async"
-            fetchpriority="high"
+            fetchPriority="high"
           />
           {/* Layered, refined gradient — deeper at the bottom-left, lifts content cleanly. */}
           <div className="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/55 to-black/20" aria-hidden="true" />
@@ -992,8 +1003,8 @@ const LandingPage = () => {
       </section>
 
       {/* ===================== TRUST SIGNALS ===================== */}
-      <section aria-label={t("landing.trustAria")} className="mx-auto mt-16 w-[min(100%-1.5rem,80rem)]">
-        <div className="grid gap-5 md:grid-cols-3">
+      <section aria-label={t("landing.trustAria")} className="mx-auto section-mt-sm w-[min(100%-1.5rem,80rem)]">
+        <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
           {TRUST_SIGNALS.map((item, idx) => (
             <motion.div
               key={item.title}
@@ -1005,8 +1016,8 @@ const LandingPage = () => {
             >
               {/* Top row: icon chip + metric pill */}
               <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 transition-transform duration-300 group-hover:scale-110">
-                  <item.icon className="h-6 w-6" aria-hidden="true" />
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15 transition-transform duration-300 group-hover:scale-110">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div className="flex flex-col items-end text-right">
                   <span className="text-h4 font-extrabold leading-none text-primary">
@@ -1150,7 +1161,7 @@ const LandingPage = () => {
           title={t("landing.howTitle")}
           subtitle={t("landing.howSubtitle")}
         />
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           {HOW_STEPS.map((step, idx) => (
             <motion.div
               key={step.title}

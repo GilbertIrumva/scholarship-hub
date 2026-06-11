@@ -31,7 +31,6 @@ const SavedCard = ({ scholarship }) => {
     const ms = new Date(scholarship.deadline).getTime() - Date.now();
     return Math.ceil(ms / (1000 * 60 * 60 * 24));
   })();
-  const isUrgent = days !== null && days >= 0 && days <= 14;
   const isClosed = days !== null && days < 0;
   const fmtAmount = (amount, currency) => {
     if (!amount) return "—";
@@ -71,11 +70,6 @@ const SavedCard = ({ scholarship }) => {
           <h3 className="line-clamp-2 text-lg font-bold leading-snug text-ink group-hover:text-primary-dark">
             {scholarship.title}
           </h3>
-          {isUrgent && !isClosed && (
-            <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-dark">
-              {days === 0 ? t("catalog.todayBadge") : t("catalog.daysLeft", { count: days })}
-            </span>
-          )}
           {isClosed && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {t("catalog.closed")}

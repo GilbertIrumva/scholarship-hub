@@ -18,6 +18,8 @@ import { useAuth } from "../../context/useAuth";
 import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
+import { EmptyState } from "../ui/empty-state";
+import { NotificationsIllustration } from "../ui/empty-illustrations";
 import {
   listScholarNotifications,
   markAllScholarNotificationsRead,
@@ -361,18 +363,16 @@ const NotificationsPage = () => {
           </div>
         ) : items.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
-                <Inbox className="h-8 w-8" />
-              </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">
-                {filter === "unread"
-                  ? t("notifications.noUnread")
-                  : t("notifications.noneYet")}
-              </h3>
-              <p className="mt-1 max-w-sm text-sm text-muted">
-                {t("notifications.nonePrompt")}
-              </p>
+            <CardContent className="py-6">
+              <EmptyState
+                illustration={<NotificationsIllustration />}
+                title={
+                  filter === "unread"
+                    ? t("notifications.noUnread")
+                    : t("notifications.noneYet")
+                }
+                description={t("notifications.nonePrompt")}
+              />
             </CardContent>
           </Card>
         ) : (

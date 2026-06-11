@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCcw, Search, UserRound, Users } from "lucide-react";
+import { ChevronRight, RefreshCcw, Search, Users } from "lucide-react";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ApplicantsIllustration, SearchEmptyIllustration } from "@/components/ui/empty-illustrations";
 
 const AdminApplicantsPage = () => {
   const { t } = useTranslation();
@@ -155,19 +157,24 @@ const AdminApplicantsPage = () => {
           </div>
         ) : (
           <Card>
-            <CardContent className="p-12 text-center">
-              <UserRound className="mx-auto h-12 w-12 text-muted/40" />
-              <p className="mt-4 text-sm font-semibold text-ink">
-                {query ? t("adminApplicants.noMatchingSearch") : t("adminApplicants.noneFound")}
-              </p>
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  className="mt-2 text-xs font-semibold text-primary hover:text-primary-dark"
-                >
-                  {t("adminApplicants.clearSearch")}
-                </button>
-              )}
+            <CardContent className="py-6">
+              <EmptyState
+                illustration={
+                  query ? (
+                    <SearchEmptyIllustration />
+                  ) : (
+                    <ApplicantsIllustration />
+                  )
+                }
+                title={query ? t("adminApplicants.noMatchingSearch") : t("adminApplicants.noneFound")}
+                action={
+                  query ? (
+                    <Button variant="outline" size="sm" onClick={() => setQuery("")}>
+                      {t("adminApplicants.clearSearch")}
+                    </Button>
+                  ) : undefined
+                }
+              />
             </CardContent>
           </Card>
         )}

@@ -87,7 +87,7 @@ const ScholarProfileCard = ({ application, email, onEdit, onPhotoChange }) => {
         {/* Avatar + header */}
         <div className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-slate-50 shadow-sm">
+            <div className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-slate-50 shadow-sm">
               {application?.photo ? (
                 <img
                   src={application.photo}
@@ -168,7 +168,24 @@ const ScholarProfileCard = ({ application, email, onEdit, onPhotoChange }) => {
             <Field label={t("profile.fieldGender")} value={application.gender} emptyLabel={emptyLabel} />
             <Field label={t("profile.fieldDateOfBirth")} value={application.dateOfBirth} emptyLabel={emptyLabel} />
             <Field label={t("profile.fieldNationality")} value={application.nationality} emptyLabel={emptyLabel} />
-            <Field label={t("profile.fieldMaritalStatus")} value={application.status} emptyLabel={emptyLabel} />
+            <Field
+              label={t("profile.fieldMaritalStatus")}
+              value={
+                application.status
+                  ? t(
+                      {
+                        single: "profile.maritalSingle",
+                        married: "profile.maritalMarried",
+                        divorced: "profile.maritalDivorced",
+                        widowed: "profile.maritalWidowed",
+                        "prefer-not-to-say": "profile.maritalPreferNotToSay",
+                      }[application.status] || application.status,
+                      { defaultValue: application.status }
+                    )
+                  : null
+              }
+              emptyLabel={emptyLabel}
+            />
             <Field label={t("profile.fieldEducation")} value={application.education} emptyLabel={emptyLabel} />
             <Field label={t("profile.fieldAddress")} value={application.address} emptyLabel={emptyLabel} />
             <Field label={t("profile.fieldApplicationId")} value={application.id ? `#${application.id}` : null} emptyLabel={emptyLabel} />

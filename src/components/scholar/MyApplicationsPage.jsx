@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { EmptyState } from "../ui/empty-state";
-import { ApplicationsIllustration } from "../ui/empty-illustrations";
+import { ApplicationsIllustration, SearchEmptyIllustration } from "../ui/empty-illustrations";
 import { listMyApplications } from "../../services/applications";
 
 const STATUS_STYLES = {
@@ -324,11 +324,12 @@ const MyApplicationsPage = () => {
           </Card>
         ) : filtered.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <Search className="h-10 w-10 text-muted/40" />
-              <p className="mt-3 text-sm font-semibold text-muted">
-                {t("applications.filterNoMatch")}
-              </p>
+            <CardContent className="py-4">
+              <EmptyState
+                size="sm"
+                illustration={<SearchEmptyIllustration className="h-24 w-auto text-primary" />}
+                title={t("applications.filterNoMatch")}
+              />
             </CardContent>
           </Card>
         ) : (

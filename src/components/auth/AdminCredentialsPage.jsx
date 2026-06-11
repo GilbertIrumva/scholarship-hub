@@ -27,6 +27,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CredentialsIllustration, SearchEmptyIllustration } from "@/components/ui/empty-illustrations";
 import {
   listAdminCredentials,
   reviewAdminCredential,
@@ -582,25 +584,22 @@ const AdminCredentialsPage = () => {
           </div>
         ) : credentials.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
-                <ShieldCheck className="h-8 w-8" />
-              </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">
-                {t("adminCredentials.emptyTitle")}
-              </h3>
-              <p className="mt-1 max-w-md text-sm text-muted">
-                {t("adminCredentials.emptyBody")}
-              </p>
+            <CardContent className="py-6">
+              <EmptyState
+                illustration={<CredentialsIllustration />}
+                title={t("adminCredentials.emptyTitle")}
+                description={t("adminCredentials.emptyBody")}
+              />
             </CardContent>
           </Card>
         ) : filtered.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Filter className="h-8 w-8 text-muted/40" />
-              <p className="mt-2 text-sm font-semibold text-muted">
-                {t("adminCredentials.filterEmpty")}
-              </p>
+            <CardContent className="py-4">
+              <EmptyState
+                size="sm"
+                illustration={<SearchEmptyIllustration className="h-24 w-auto text-primary" />}
+                title={t("adminCredentials.filterEmpty")}
+              />
             </CardContent>
           </Card>
         ) : (

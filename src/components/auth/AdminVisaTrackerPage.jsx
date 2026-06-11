@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InlineEmptyMark } from "@/components/ui/empty-illustrations";
 import {
   VISA_TYPES,
   WORKFLOW_STATUSES,
@@ -325,9 +326,10 @@ const WorkflowExpanded = ({ workflow, sessionToken, onUpdated }) => {
             </Button>
           </div>
           {workflow.timeline.length === 0 ? (
-            <p className="rounded-md bg-white px-3 py-2 text-center text-xs text-muted">
-              {t("adminVisa.noNotes")}
-            </p>
+            <div className="flex flex-col items-center gap-1 rounded-md bg-white px-3 py-3">
+              <InlineEmptyMark className="h-10 w-auto text-primary" />
+              <p className="text-center text-xs text-muted">{t("adminVisa.noNotes")}</p>
+            </div>
           ) : (
             <ul className="max-h-60 space-y-1.5 overflow-y-auto">
               {workflow.timeline.slice().reverse().map((note) => (
@@ -428,9 +430,10 @@ const AlertList = ({ icon: Icon, title, items, accent, empty, render }) => (
     </CardHeader>
     <CardContent className="pt-0">
       {items.length === 0 ? (
-        <p className="rounded-md bg-slate-50 px-3 py-3 text-center text-xs text-muted">
-          {empty}
-        </p>
+        <div className="flex flex-col items-center gap-1 rounded-md bg-slate-50 px-3 py-3">
+          <InlineEmptyMark className="h-10 w-auto text-primary" />
+          <p className="text-center text-xs text-muted">{empty}</p>
+        </div>
       ) : (
         <ul className="space-y-1.5">
           {items.slice(0, 6).map((item, i) => (
@@ -603,9 +606,10 @@ const AdminVisaTrackerPage = () => {
                 </CardHeader>
                 <CardContent className="pt-0">
                   {stats.topDestinations.length === 0 ? (
-                    <p className="rounded-md bg-slate-50 px-3 py-3 text-center text-xs text-muted">
-                      {t("adminVisa.noDestData")}
-                    </p>
+                    <div className="flex flex-col items-center gap-1 rounded-md bg-slate-50 px-3 py-3">
+                      <InlineEmptyMark className="h-10 w-auto text-primary" />
+                      <p className="text-center text-xs text-muted">{t("adminVisa.noDestData")}</p>
+                    </div>
                   ) : (
                     <ul className="space-y-1.5">
                       {stats.topDestinations.map((d) => (

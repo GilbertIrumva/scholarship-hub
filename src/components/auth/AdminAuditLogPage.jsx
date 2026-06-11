@@ -7,7 +7,6 @@ import {
   Filter,
   Loader2,
   RefreshCcw,
-  ScrollText,
   ShieldAlert,
   X,
 } from "lucide-react";
@@ -16,6 +15,8 @@ import { useAuth } from "../../context/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AuditLogIllustration } from "@/components/ui/empty-illustrations";
 import { fetchAuditLog } from "../../services/auditLog";
 
 const formatDate = (iso) => {
@@ -195,9 +196,11 @@ const AdminAuditLogPage = () => {
                 {t("admin.loadingEntries")}
               </div>
             ) : items.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-slate-500">
-                <ScrollText className="h-8 w-8 text-slate-300" />
-                {t("adminAudit.noEntries")}
+              <div className="p-6">
+                <EmptyState
+                  illustration={<AuditLogIllustration />}
+                  title={t("adminAudit.noEntries")}
+                />
               </div>
             ) : (
               <table className="min-w-full divide-y divide-slate-200 text-sm">

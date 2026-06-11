@@ -393,6 +393,27 @@ a {
 .dark ::-webkit-scrollbar-thumb       { background: #334155; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
+/* Sidebar scroll — slim, subtle, reveals on hover. Applied to <nav> in DashboardLayout. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable;
+  transition: scrollbar-color 200ms ease;
+}
+.sidebar-scroll::-webkit-scrollbar        { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-track  { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb  {
+  background: transparent;
+  border-radius: 99px;
+  transition: background-color 200ms ease;
+}
+.sidebar-scroll:hover { scrollbar-color: rgba(148, 163, 184, 0.55) transparent; }
+.sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.55); }
+.sidebar-scroll:hover::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.75); }
+.dark .sidebar-scroll:hover { scrollbar-color: rgba(71, 85, 105, 0.7) transparent; }
+.dark .sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.7); }
+.dark .sidebar-scroll:hover::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.9); }
+
 /* ============================================================
    Animations — small set used by Dialog and other overlays.
    Triggered by `data-state` attributes set by Radix primitives.

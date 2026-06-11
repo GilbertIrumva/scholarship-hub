@@ -57,8 +57,10 @@ const SegmentedToggle = ({ theme, setTheme, className }) => {
 
 const IconToggle = ({ resolvedTheme, toggleTheme, className }) => {
   const { t } = useTranslation();
-  const Icon = resolvedTheme === "dark" ? Sun : Moon;
-  const next = resolvedTheme === "dark" ? "light" : "dark";
+  const isDark = resolvedTheme === "dark";
+  const Icon = isDark ? Moon : Sun;
+  const currentLabel = t(isDark ? "themeToggle.dark" : "themeToggle.light");
+  const next = isDark ? "light" : "dark";
   const switchLabel = t("themeToggle.switchTo", { theme: t(`themeToggle.${next}`) });
   return (
     <button
@@ -67,13 +69,14 @@ const IconToggle = ({ resolvedTheme, toggleTheme, className }) => {
       aria-label={switchLabel}
       title={switchLabel}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-ink shadow-card transition-all",
+        "inline-flex h-9 items-center gap-2 rounded-full border border-border bg-surface px-3 text-sm font-semibold text-ink shadow-card transition-all",
         "hover:bg-surface-2",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         className
       )}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
+      <span>{currentLabel}</span>
     </button>
   );
 };

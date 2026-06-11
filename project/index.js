@@ -982,10 +982,19 @@ const requireScholarSession = async (req, res, next) => {
     }
 };
 
-// ---------------------------------------------------------------------------
+// -----------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
-app.get('/', (req, res) => res.send('ScholarshipZone API is running!'));
+// Sanity placeholder for `/` — only used when no SPA bundle is mounted
+// (i.e. local dev where Vite serves the frontend on a separate port).
+// When SERVE_SPA is enabled in production, the static SPA handler below
+// the API routes returns dist/index.html instead.
+const SPA_DIR = path.resolve(__dirname, '..', 'dist');
+const SERVE_SPA = (process.env.SERVE_SPA === '1' || IS_PROD)
+    && fs.existsSync(path.join(SPA_DIR, 'index.html'));
+if (!SERVE_SPA) {
+    app.get('/', (req, res) => res.send('ScholarshipZone API is running!'));
+}
 
 // ----- Sliding-session refresh + logout (T3.3) ----------------------------
 //
@@ -4562,6 +4571,33 @@ app.post('/api/scholarships', async (req, res, next) => {
         next(err);
     }
 });
+
+// ---------------------------------------------------------------------------
+// SPA static hosting (single-host deploy)
+// ---------------------------------------------------------------------------
+// When the Vite frontend is built into ../dist (Render / single-container
+// deploy), serve it from the same Express process. Registered AFTER all
+// /api/* and /healthz routes so it never shadows them, and BEFORE the
+// error handler so the wildcard fallback only catches truly unmatched paths.
+if (SERVE_SPA) {
+    app.use(express.static(SPA_DIR, {
+        index: false,
+        maxAge: IS_PROD ? '1y' : 0,
+        setHeaders: (res, filePath) => {
+            // The HTML shell must never be cached — the asset hashes inside
+            // it change every build and stale HTML would point at deleted JS.
+            if (filePath.endsWith('.html') || filePath.endsWith('/sw.js')) {
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            }
+        },
+    }));
+    // SPA fallback for client-side routes (anything not under /api, /healthz,
+    // /readyz, or /uploads). Express 5 accepts named regex params.
+    app.get(/^\/(?!api\/|healthz|readyz|uploads\/).*/, (req, res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.sendFile(path.join(SPA_DIR, 'index.html'));
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Error handler

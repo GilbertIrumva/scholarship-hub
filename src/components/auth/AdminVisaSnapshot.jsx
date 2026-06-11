@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { InlineEmptyMark } from "@/components/ui/empty-illustrations";
 import { getAdminVisaStats } from "../../services/visaWorkflow";
 
 const formatDate = (date) => {
@@ -145,9 +146,10 @@ const AdminVisaSnapshot = ({ sessionToken }) => {
                 {t("adminVisa.overdueMilestones")}
               </p>
               {stats.overdueMilestones.length === 0 ? (
-                <p className="rounded-md bg-slate-50 px-2 py-3 text-center text-xs text-muted">
-                  {t("adminVisa.nothingOverdue")}
-                </p>
+                <div className="flex flex-col items-center gap-1 rounded-md bg-slate-50 px-2 py-3">
+                  <InlineEmptyMark className="h-10 w-auto text-primary" />
+                  <p className="text-center text-xs text-muted">{t("adminVisa.nothingOverdue")}</p>
+                </div>
               ) : (
                 <ul className="space-y-1">
                   {stats.overdueMilestones.slice(0, 4).map((item, i) => (
@@ -173,9 +175,10 @@ const AdminVisaSnapshot = ({ sessionToken }) => {
                 {t("adminVisa.upcomingAppts")}
               </p>
               {stats.upcomingAppointments.length === 0 ? (
-                <p className="rounded-md bg-slate-50 px-2 py-3 text-center text-xs text-muted">
-                  {t("adminVisa.none30Days")}
-                </p>
+                <div className="flex flex-col items-center gap-1 rounded-md bg-slate-50 px-2 py-3">
+                  <InlineEmptyMark className="h-10 w-auto text-primary" />
+                  <p className="text-center text-xs text-muted">{t("adminVisa.none30Days")}</p>
+                </div>
               ) : (
                 <ul className="space-y-1">
                   {stats.upcomingAppointments.slice(0, 4).map((item, i) => (

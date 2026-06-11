@@ -26,6 +26,7 @@ import { Progress } from "../ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
+import { InlineEmptyMark } from "../ui/empty-illustrations";
 import { getPublicScholarshipById } from "../../services/publicApi";
 import {
   getApplicationDraft,
@@ -772,14 +773,17 @@ const StepDocuments = ({ motivation, setMotivation, selected, credentials, onTog
           </span>
         </Label>
         {credentials.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-surface p-4 text-sm text-muted">
-            {t("wizard.noCredentialsYet")}{" "}
-            <Link
-              to="/scholar/credentials"
-              className="font-semibold text-primary hover:underline"
-            >
-              {t("wizard.uploadOneHere")}
-            </Link>
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-surface p-4 text-sm text-muted">
+            <InlineEmptyMark className="h-10 w-auto text-primary" />
+            <p className="text-center">
+              {t("wizard.noCredentialsYet")}{" "}
+              <Link
+                to="/scholar/credentials"
+                className="font-semibold text-primary hover:underline"
+              >
+                {t("wizard.uploadOneHere")}
+              </Link>
+            </p>
           </div>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
@@ -901,7 +905,10 @@ const StepReview = ({ form, scholarship }) => {
     <div className="rounded-xl border border-border bg-surface p-4">
       <h3 className="mb-2 text-sm font-bold text-ink">{t("wizard.sectionDocuments")}</h3>
       {form.documents.length === 0 ? (
-        <p className="text-sm text-muted">{t("wizard.noDocuments")}</p>
+        <div className="flex flex-col items-center gap-1 py-2">
+          <InlineEmptyMark className="h-10 w-auto text-primary" />
+          <p className="text-sm text-muted">{t("wizard.noDocuments")}</p>
+        </div>
       ) : (
         <ul className="space-y-1.5 text-sm">
           {form.documents.map((d) => (

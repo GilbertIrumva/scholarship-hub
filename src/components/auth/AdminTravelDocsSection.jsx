@@ -23,6 +23,8 @@ import toast from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { TravelDocsIllustration } from "@/components/ui/empty-illustrations";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   listAdminTravelDocs,
   checkTravelDocEligibility,
@@ -398,9 +400,11 @@ const AdminTravelDocsSection = ({ sessionToken, scholarId }) => {
             </div>
           </div>
         ) : docs.length === 0 ? (
-          <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-muted">
-            {t("adminTravelDocs.empty")}
-          </p>
+          <EmptyState
+            size="sm"
+            illustration={<TravelDocsIllustration className="h-24 w-auto text-primary" />}
+            title={t("adminTravelDocs.empty")}
+          />
         ) : (
           <div className="grid gap-3">
             {docs.map((d) => (

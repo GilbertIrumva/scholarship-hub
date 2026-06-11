@@ -10,14 +10,15 @@ import {
   ChevronRight,
   ClipboardCheck,
   ClipboardList,
+  Compass,
   FolderArchive,
   GraduationCap,
+  Info,
   Mail,
   PartyPopper,
   Pencil,
   Plane,
-  Lightbulb,
-  Sparkles,
+  Settings2,
   TrendingUp,
   UserRound,
 } from "lucide-react";
@@ -105,7 +106,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       label: t("profile.statEducation"),
       value: application?.education || t("profile.statEducationValueEmpty"),
       note: t("profile.statEducationNote"),
-      accent: "bg-gradient-to-br from-sky-500 to-indigo-600",
+      accent: "bg-gradient-to-br from-primary to-emerald-700",
     },
     {
       icon: UserRound,
@@ -114,7 +115,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       note: completeness >= 80
         ? t("profile.profileCompletenessGreat")
         : t("profile.profileCompletenessAdd"),
-      accent: "bg-gradient-to-br from-accent to-orange-600",
+      accent: "bg-gradient-to-br from-emerald-500 to-emerald-800",
     },
   ], [application, completeness, t]);
 
@@ -136,6 +137,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
 
   const nextActions = useMemo(() => [
     {
+      group: "apply",
       title: completeness < 100
         ? t("profile.actionFinishProfileTitle")
         : t("profile.actionPolishBioTitle"),
@@ -146,12 +148,21 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       icon: UserRound,
     },
     {
+      group: "apply",
       title: t("profile.actionBrowseTitle"),
       description: t("profile.actionBrowseDescription"),
       href: "/scholar/scholarships",
       icon: BookOpen,
     },
     {
+      group: "apply",
+      title: t("profile.actionConvertGradesTitle"),
+      description: t("profile.actionConvertGradesDescription"),
+      href: "/grade-converter",
+      icon: Calculator,
+    },
+    {
+      group: "track",
       title: t("profile.actionTrackTitle"),
       description: application
         ? t("profile.actionTrackDescription", { id: application.id, status: application.status })
@@ -160,30 +171,59 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
       icon: ClipboardList,
     },
     {
-      title: t("profile.actionConvertGradesTitle"),
-      description: t("profile.actionConvertGradesDescription"),
-      href: "/grade-converter",
-      icon: Calculator,
+      group: "track",
+      title: t("profile.actionVisaTitle"),
+      description: t("profile.actionVisaDescription"),
+      href: "/scholar/visa-tracker",
+      icon: ClipboardCheck,
     },
     {
+      group: "settings",
       title: t("profile.actionUploadCredentialsTitle"),
       description: t("profile.actionUploadCredentialsDescription"),
       href: "/scholar/credentials",
       icon: FolderArchive,
     },
     {
+      group: "settings",
       title: t("profile.actionTravelDocsTitle"),
       description: t("profile.actionTravelDocsDescription"),
       href: "/scholar/travel-docs",
       icon: Plane,
     },
-    {
-      title: t("profile.actionVisaTitle"),
-      description: t("profile.actionVisaDescription"),
-      href: "/scholar/visa-tracker",
-      icon: ClipboardCheck,
-    },
   ], [application, completeness, t]);
+
+  const actionGroups = useMemo(() => {
+    const groups = [
+      {
+        key: "apply",
+        label: t("profile.actionGroupApplyLabel"),
+        description: t("profile.actionGroupApplyDescription"),
+        icon: Compass,
+        accent: "text-primary",
+        accentRing: "ring-emerald-200",
+      },
+      {
+        key: "track",
+        label: t("profile.actionGroupTrackLabel"),
+        description: t("profile.actionGroupTrackDescription"),
+        icon: ClipboardCheck,
+        accent: "text-sky-700",
+        accentRing: "ring-sky-200",
+      },
+      {
+        key: "settings",
+        label: t("profile.actionGroupSettingsLabel"),
+        description: t("profile.actionGroupSettingsDescription"),
+        icon: Settings2,
+        accent: "text-primary",
+        accentRing: "ring-emerald-200",
+      },
+    ];
+    return groups
+      .map((g) => ({ ...g, items: nextActions.filter((a) => a.group === g.key) }))
+      .filter((g) => g.items.length > 0);
+  }, [nextActions, t]);
 
   return (
     <div className="space-y-6">
@@ -262,7 +302,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
 
         <div className="space-y-6">
           {/* Journey */}
-          <Card className="overflow-hidden border-emerald-200/60 bg-gradient-to-br from-emerald-50 via-white to-amber-50/40">
+          <Card className="overflow-hidden border-emerald-200/60 bg-gradient-to-br from-emerald-50 via-white to-amber-50/40 dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-surface dark:to-amber-950/20">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -273,7 +313,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
                     {t("profile.journeyProgress", { done: journeyDone, total: journey.length })}
                   </p>
                 </div>
-                <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-extrabold text-primary shadow-sm ring-1 ring-emerald-200">
+                <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-extrabold text-primary shadow-sm ring-1 ring-emerald-200 dark:bg-surface-2/80 dark:ring-emerald-800/50">
                   {Math.round((journeyDone / journey.length) * 100)}%
                 </span>
               </div>
@@ -285,9 +325,9 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
                 <motion.div
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-white/70 px-3 py-2.5 text-sm font-semibold text-emerald-800"
+                  className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-white/70 px-3 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800/60 dark:bg-surface-2/60 dark:text-emerald-300"
                 >
-                  <PartyPopper className="h-4 w-4 text-emerald-600" />
+                  <PartyPopper className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   {t("profile.journeyAllDone")}
                 </motion.div>
               )}
@@ -301,10 +341,10 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
                       className={
                         "group flex items-center gap-3 rounded-xl border px-3 py-2 transition-all " +
                         (step.done
-                          ? "border-emerald-200/70 bg-white/70"
+                          ? "border-emerald-200/70 bg-white/70 dark:border-emerald-800/40 dark:bg-surface-2/60"
                           : isActive
-                          ? "border-emerald-300 bg-white shadow-sm ring-2 ring-emerald-300/40"
-                          : "border-transparent bg-white/40")
+                          ? "border-emerald-300 bg-white shadow-sm ring-2 ring-emerald-300/40 dark:border-emerald-700/60 dark:bg-surface dark:ring-emerald-700/30"
+                          : "border-transparent bg-white/40 dark:bg-surface-2/30")
                       }
                     >
                       <span
@@ -313,25 +353,14 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
                           (step.done
                             ? "bg-gradient-to-br from-primary to-emerald-700"
                             : isActive
-                            ? "bg-white text-primary ring-2 ring-primary"
-                            : "bg-slate-200 text-slate-400")
+                            ? "bg-white text-primary ring-2 ring-primary dark:bg-surface"
+                            : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500")
                         }
                       >
                         {step.done ? (
                           <Check className="h-3.5 w-3.5" strokeWidth={3} />
                         ) : (
                           <span className="text-[11px] font-extrabold">{idx + 1}</span>
-                        )}
-                        {step.done && (
-                          <motion.span
-                            initial={{ scale: 0, rotate: -20, opacity: 0 }}
-                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                            transition={{ delay: 0.05 * idx, type: "spring", stiffness: 260, damping: 18 }}
-                            className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-amber-400 text-white shadow"
-                            aria-hidden="true"
-                          >
-                            <Sparkles className="h-2.5 w-2.5" />
-                          </motion.span>
                         )}
                       </span>
 
@@ -354,7 +383,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
                         </span>
                       )}
                       {step.done && (
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700/70">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700/70 dark:text-emerald-400/70">
                           {t("profile.journeyDoneLabel")}
                         </span>
                       )}
@@ -369,7 +398,7 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-accent" /> {t("profile.tipsTitle")}
+                <Info className="h-4 w-4 text-primary" /> {t("profile.tipsTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -395,30 +424,58 @@ const ScholarDashboard = ({ profile, onSaveProfile, isSubmitting, profileStatus,
           <CardTitle className="text-lg">{t("profile.nextActionsTitle")}</CardTitle>
           <p className="text-sm text-muted">{t("profile.nextActionsSubtitle")}</p>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {nextActions.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={item.action || (() => item.href && (window.location.href = item.href))}
-                className="group flex items-start gap-3 rounded-xl border border-border bg-white p-4 text-left transition-all hover:border-primary hover:shadow-md"
-              >
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <item.icon className="h-5 w-5" />
+        <CardContent className="space-y-7">
+          {actionGroups.map((group, groupIdx) => {
+            const GroupIcon = group.icon;
+            return (
+              <section key={group.key} className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white shadow-sm ring-1 ${group.accentRing} ${group.accent}`}
+                  >
+                    <GroupIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className={`text-[11px] font-extrabold uppercase tracking-[0.18em] ${group.accent}`}>
+                      {group.label}
+                    </p>
+                    <p className="text-xs text-muted leading-snug">{group.description}</p>
+                  </div>
+                  <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-muted">
+                    {group.items.length}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-ink group-hover:text-primary transition-colors">
-                    {item.title}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted leading-snug">
-                    {item.description}
-                  </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.title}
+                      type="button"
+                      onClick={item.action || (() => item.href && (window.location.href = item.href))}
+                      className="group flex items-start gap-3 rounded-xl border border-border bg-white p-4 text-left transition-all hover:border-primary hover:shadow-md"
+                    >
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                        <item.icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-ink group-hover:text-primary transition-colors">
+                          {item.title}
+                        </p>
+                        <p className="mt-0.5 text-sm text-muted leading-snug">
+                          {item.description}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted group-hover:text-primary transition-colors" />
+                    </button>
+                  ))}
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted group-hover:text-primary transition-colors" />
-              </button>
-            ))}
-          </div>
+                {groupIdx < actionGroups.length - 1 && (
+                  <div className="pt-1">
+                    <div className="h-px w-full bg-gradient-to-r from-transparent via-border to-transparent" />
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </CardContent>
       </Card>
 

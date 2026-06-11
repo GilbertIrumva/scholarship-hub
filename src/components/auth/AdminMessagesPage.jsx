@@ -19,6 +19,8 @@ import { useAuth } from "../../context/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MessagesIllustration } from "@/components/ui/empty-illustrations";
 import {
   listAdminMessages,
   updateAdminMessage,
@@ -268,8 +270,16 @@ const AdminMessagesPage = () => {
           </div>
           <div className="flex-1 divide-y divide-border overflow-y-auto">
             {filtered.length === 0 ? (
-              <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
-                {loading ? t("common.loading") : t("adminMessages.noMessages")}
+              <div className="flex h-full items-center justify-center p-4">
+                {loading ? (
+                  <span className="text-sm text-muted">{t("common.loading")}</span>
+                ) : (
+                  <EmptyState
+                    size="sm"
+                    illustration={<MessagesIllustration className="h-24 w-auto text-primary" />}
+                    title={t("adminMessages.noMessages")}
+                  />
+                )}
               </div>
             ) : (
               filtered.map((msg) => {

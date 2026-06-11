@@ -15,6 +15,7 @@ import {
 import toast from "react-hot-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { InlineEmptyMark } from "@/components/ui/empty-illustrations";
 import { listAdminVisaWorkflows } from "../../services/visaWorkflow";
 
 const STATUS_META = {
@@ -98,9 +99,10 @@ const AdminVisaSection = ({ sessionToken, scholarId }) => {
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
         ) : workflows.length === 0 ? (
-          <p className="rounded-md bg-slate-50 px-3 py-4 text-center text-xs text-muted">
-            {t("adminVisa.noWorkflowsForScholar")}
-          </p>
+          <div className="flex flex-col items-center gap-1 rounded-md bg-slate-50 px-3 py-4">
+            <InlineEmptyMark className="h-10 w-auto text-primary" />
+            <p className="text-center text-xs text-muted">{t("adminVisa.noWorkflowsForScholar")}</p>
+          </div>
         ) : (
           <ul className="space-y-2">
             {workflows.map((w) => {

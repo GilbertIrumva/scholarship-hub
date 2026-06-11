@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
+import { InlineEmptyMark } from "@/components/ui/empty-illustrations";
 import {
   Copy,
   Download,
@@ -595,7 +596,10 @@ const TwoFactorAndSessionsPanel = ({ sessionToken, principalKind = "scholar" }) 
             {t("settings.sessionsLoading")}
           </div>
         ) : sessions.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("settings.noSessions")}</p>
+          <div className="flex flex-col items-center gap-1 py-2">
+            <InlineEmptyMark className="h-10 w-auto text-primary" />
+            <p className="text-sm text-slate-500">{t("settings.noSessions")}</p>
+          </div>
         ) : (
           <ul className="divide-y divide-slate-200">
             {sessions.map((s) => (

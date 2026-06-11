@@ -16,7 +16,6 @@ import {
   GraduationCap,
   ShieldCheck,
   ChevronRight,
-  Inbox,
   Compass,
   FileText,
   FolderArchive,
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationsIllustration } from "@/components/ui/empty-illustrations";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/useAuth";
 import {
@@ -249,7 +249,7 @@ const DashboardLayout = ({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 pt-4">
+      <nav className="flex-1 min-h-0 overflow-y-auto sidebar-scroll p-4 pt-4">
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.key + item.to}>
@@ -300,6 +300,10 @@ const DashboardLayout = ({
             <p className="truncate text-sm font-bold text-ink">{user?.name || t("layout.userFallback")}</p>
             <p className="truncate text-xs text-muted">{user?.email || ""}</p>
           </div>
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-2 py-1.5">
+          <LanguageSwitcher variant="compact" />
+          <ThemeToggle variant="icon" />
         </div>
         <Button
           variant="outline"
@@ -441,10 +445,10 @@ const DashboardLayout = ({
                       {notifLoading && notifs.length === 0 ? (
                         <div className="px-4 py-8 text-center text-xs text-muted">{t("common.loading")}</div>
                       ) : notifs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-                          <Inbox className="h-10 w-10 text-muted/40" />
-                          <p className="mt-3 text-sm font-semibold text-ink">{t("notifications.noneYet")}</p>
-                          <p className="mt-1 text-xs text-muted">
+                        <div className="px-2 py-6">
+                          <NotificationsIllustration className="mx-auto h-20 w-auto text-primary" />
+                          <p className="mt-3 text-center text-sm font-semibold text-ink">{t("notifications.noneYet")}</p>
+                          <p className="mx-auto mt-1 max-w-[18rem] text-center text-xs text-muted">
                             {t("notifications.nonePrompt")}
                           </p>
                         </div>
@@ -498,9 +502,9 @@ const DashboardLayout = ({
             <Link
               to={role === "admin" ? "/admin/settings" : "/scholar"}
               aria-label={t("layout.viewProfileAria", { name: user?.name || t("layout.userFallback") })}
-              className="group inline-flex items-center gap-2 rounded-full border border-border bg-surface px-1 py-1 pr-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="group inline-flex items-center gap-2.5 rounded-full border border-border bg-surface px-1 py-1 pr-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
             >
-              <Avatar className="h-7 w-7 shrink-0">
+              <Avatar className="h-8 w-8 shrink-0">
                 {photoUrl && (
                   <AvatarImage src={photoUrl} alt={user?.name || t("layout.userFallback")} />
                 )}
@@ -508,9 +512,36 @@ const DashboardLayout = ({
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden lg:inline max-w-[10rem] truncate text-xs font-semibold text-ink">
-                {user?.name || t("layout.userFallback")}
-              </span>
+              <div className="hidden lg:flex min-w-0 flex-col items-start leading-tight">
+                <span className="max-w-[10rem] truncate text-xs font-semibold text-ink">
+                  {user?.name || t("layout.userFallback")}
+                </span>
+                {role === "admin" && (
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0 text-[9px] font-extrabold uppercase tracking-wider",
+                      styles.accentLight,
+                      styles.accentText
+                    )}
+                  >
+                    <Icon className="h-2.5 w-2.5" aria-hidden="true" />
+                    {brandLabel}
+                  </span>
+                )}
+              </div>
+              {role === "admin" && (
+                <span
+                  className={cn(
+                    "lg:hidden inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider",
+                    styles.accentLight,
+                    styles.accentText
+                  )}
+                  aria-hidden="true"
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  {brandLabel}
+                </span>
+              )}
             </Link>
           </div>
         </header>

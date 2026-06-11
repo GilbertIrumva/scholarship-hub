@@ -23,6 +23,7 @@ import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
+import { SearchEmptyIllustration } from "../ui/empty-illustrations";
 import { SkeletonCard } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
 import {
@@ -74,7 +75,6 @@ const daysUntil = (deadline) => {
 const ScholarshipCard = ({ scholarship }) => {
   const { t } = useTranslation();
   const days = daysUntil(scholarship.deadline);
-  const isUrgent = days !== null && days >= 0 && days <= 14;
   const isClosed = days !== null && days < 0;
   return (
     <motion.article
@@ -89,11 +89,6 @@ const ScholarshipCard = ({ scholarship }) => {
           <h3 className="line-clamp-2 text-lg font-bold leading-snug text-ink group-hover:text-primary-dark">
             {scholarship.title}
           </h3>
-          {isUrgent && !isClosed && (
-            <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-dark">
-              {days === 0 ? t("catalog.todayBadge") : t("catalog.daysLeft", { count: days })}
-            </span>
-          )}
           {isClosed && (
             <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {t("catalog.closed")}
@@ -597,7 +592,7 @@ const ScholarshipsPage = () => {
         {/* Facet chips */}
         <Card>
           <CardContent className="p-5">
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 lg:grid-cols-3">
               <FilterChips
                 label={t("catalog.filterCountry")}
                 icon={MapPin}
@@ -656,7 +651,7 @@ const ScholarshipsPage = () => {
           </div>
         ) : items.length === 0 ? (
           <EmptyState
-            icon={Compass}
+            illustration={<SearchEmptyIllustration />}
             title={t("catalog.emptyTitle")}
             description={t("catalog.emptyDescription")}
             action={
