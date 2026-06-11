@@ -5,12 +5,14 @@ import {
   ArrowRight,
   CalendarDays,
   Loader2,
-  Sparkles,
+  Star,
   Target,
   RefreshCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RecommendationsIllustration } from "@/components/ui/empty-illustrations";
 import { SaveButton } from "../scholar/SaveButton";
 import { fetchRecommendations } from "../../services/scholarship";
 
@@ -70,7 +72,7 @@ const RecommendedRail = ({ sessionToken }) => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Sparkles className="h-4 w-4 text-accent" /> {t("recommendations.title")}
+              <Star className="h-4 w-4 text-accent" /> {t("recommendations.title")}
             </CardTitle>
             <p className="mt-1 text-sm text-muted">
               {personalised
@@ -106,9 +108,19 @@ const RecommendedRail = ({ sessionToken }) => {
         )}
 
         {!loading && !error && items.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border bg-slate-50/60 p-6 text-center text-sm text-muted">
-            {t("recommendations.none")}
-          </div>
+          <EmptyState
+            illustration={<RecommendationsIllustration />}
+            title={t("recommendations.noneTitle")}
+            description={t("recommendations.none")}
+            action={
+              <Button asChild size="sm">
+                <Link to="/scholar/scholarships">
+                  {t("recommendations.browseAll")}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            }
+          />
         )}
 
         {!loading && !error && items.length > 0 && (

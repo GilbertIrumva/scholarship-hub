@@ -1,7 +1,10 @@
-import { Mail, Pencil, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Loader2, Mail, Pencil, Trash2, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AvatarError, processAvatarFile, ACCEPTED_TYPES } from "@/lib/avatarImage";
 
 const Field = ({ label, value, emptyLabel }) => (
   <div className="rounded-xl border border-border bg-slate-50/50 p-3">
@@ -12,7 +15,7 @@ const Field = ({ label, value, emptyLabel }) => (
   </div>
 );
 
-const ScholarProfileCard = ({ application, email, onEdit }) => {
+const ScholarProfileCard = ({ application, email, onEdit, onPhotoChange }) => {
   const { t } = useTranslation();
   const hasProfile = !!application;
   const fallbackName = t("profile.avatarFallbackName");
@@ -24,13 +27,67 @@ const ScholarProfileCard = ({ application, email, onEdit }) => {
     .map((p) => p[0].toUpperCase())
     .join("");
 
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const canChangePhoto = typeof onPhotoChange === "function";
+
+  const handlePickPhoto = () => {
+    if (!canChangePhoto || isUploading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const dataUrl = await processAvatarFile(file);
+      const result = await onPhotoChange(dataUrl);
+      if (result?.ok === false) {
+        toast.error(result?.message || t("profile.photoUpdateFailed"));
+      } else {
+        toast.success(t("profile.photoUpdated"));
+      }
+    } catch (err) {
+      if (err instanceof AvatarError) {
+        const map = {
+          invalid_type: t("profile.photoInvalidType"),
+          too_large: t("profile.photoTooLarge"),
+        };
+        toast.error(map[err.code] || t("profile.photoUpdateFailed"));
+      } else {
+        toast.error(t("profile.photoUpdateFailed"));
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!canChangePhoto || isUploading) return;
+    setIsUploading(true);
+    try {
+      const result = await onPhotoChange("");
+      if (result?.ok === false) {
+        toast.error(result?.message || t("profile.photoUpdateFailed"));
+      } else {
+        toast.success(t("profile.photoRemoved"));
+      }
+    } catch {
+      toast.error(t("profile.photoUpdateFailed"));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <Card>
       <CardContent className="p-6">
         {/* Avatar + header */}
         <div className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-slate-50 shadow-sm">
+            <div className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-slate-50 shadow-sm">
               {application?.photo ? (
                 <img
                   src={application.photo}
@@ -41,6 +98,30 @@ const ScholarProfileCard = ({ application, email, onEdit }) => {
                 <div className="grid h-full w-full place-items-center bg-gradient-to-br from-primary to-emerald-700 text-white text-xl font-extrabold">
                   {initials || <UserRound className="h-7 w-7" />}
                 </div>
+              )}
+              {canChangePhoto && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePickPhoto}
+                    disabled={isUploading}
+                    aria-label={t("profile.changePhoto")}
+                    className="absolute inset-0 grid place-items-center bg-black/45 text-white opacity-0 transition-opacity duration-150 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none disabled:cursor-wait"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Camera className="h-5 w-5" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ACCEPTED_TYPES.join(",")}
+                    className="sr-only"
+                    onChange={handleFileSelected}
+                  />
+                </>
               )}
             </div>
             <div className="min-w-0">
@@ -56,11 +137,26 @@ const ScholarProfileCard = ({ application, email, onEdit }) => {
               </p>
             </div>
           </div>
-          {onEdit && (
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              <Pencil className="h-3.5 w-3.5" />
-              {t("profile.editButton")}
-            </Button>
+          {(onEdit || (canChangePhoto && application?.photo)) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {canChangePhoto && application?.photo && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemovePhoto}
+                  disabled={isUploading}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {t("profile.removePhoto")}
+                </Button>
+              )}
+              {onEdit && (
+                <Button variant="outline" size="sm" onClick={onEdit}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  {t("profile.editButton")}
+                </Button>
+              )}
+            </div>
           )}
         </div>
 

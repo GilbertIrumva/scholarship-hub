@@ -1,0 +1,3 @@
+# Drop scholar portrait images here (amani.webp, grace.webp, joseph.webp).
+# Then import them in src/components/Landing/LandingPage.jsx and assign to
+# the `avatar` field in buildTestimonials().

@@ -8,7 +8,6 @@ import {
   GraduationCap,
   ShieldCheck,
   Users,
-  Sparkles,
 } from "lucide-react";
 import { Seo } from "../seo/Seo";
 
@@ -230,7 +229,7 @@ const HeroIllustration = () => {
       </g>
     </g>
 
-    {/* Floating sparkles */}
+    {/* Floating accent dots */}
     <motion.g
       animate={{ rotate: [0, 360] }}
       transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -314,7 +313,7 @@ const RoleLandingPage = () => {
             transition={{ delay: 0.2 }}
             className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-md"
           >
-            <Sparkles className="h-3.5 w-3.5" />
+            <GraduationCap className="h-3.5 w-3.5" />
             {t("roleLanding.eyebrow")}
           </motion.span>
 

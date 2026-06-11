@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  FileText,
   Loader2,
   ExternalLink,
   Calendar,
@@ -21,6 +20,8 @@ import DashboardLayout from "../auth/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { EmptyState } from "../ui/empty-state";
+import { ApplicationsIllustration } from "../ui/empty-illustrations";
 import { listMyApplications } from "../../services/applications";
 
 const STATUS_STYLES = {
@@ -307,21 +308,19 @@ const MyApplicationsPage = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : applications.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
-                <FileText className="h-8 w-8" />
-              </span>
-              <h3 className="mt-4 text-lg font-bold text-ink">{t("applications.noneTitle")}</h3>
-              <p className="mt-1 max-w-sm text-sm text-muted">
-                {t("applications.noneDescription")}
-              </p>
-              <Button asChild className="mt-5">
-                <Link to="/scholar/scholarships">
-                  <Compass className="h-4 w-4" /> {t("applications.browseScholarships")}
-                </Link>
-              </Button>
-            </CardContent>
+          <Card className="p-8 sm:p-12">
+            <EmptyState
+              illustration={<ApplicationsIllustration />}
+              title={t("applications.noneTitle")}
+              description={t("applications.noneDescription")}
+              action={
+                <Button asChild>
+                  <Link to="/scholar/scholarships">
+                    <Compass className="h-4 w-4" /> {t("applications.browseScholarships")}
+                  </Link>
+                </Button>
+              }
+            />
           </Card>
         ) : filtered.length === 0 ? (
           <Card>

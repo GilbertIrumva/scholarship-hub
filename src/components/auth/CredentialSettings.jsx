@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
+  FileCheck2,
   KeyRound,
   Mail,
   RefreshCcw,
   Save,
   ShieldCheck,
-  Sparkles,
   Trash2,
   UserRound,
   Users,
@@ -266,7 +266,7 @@ const CredentialSettings = ({
           <div className="flex h-full flex-col">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/60 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.28em] text-emerald-700 shadow-sm">
-                <Sparkles size={14} />
+                <FileCheck2 size={14} />
                 {t("settings.credEyebrow")}
               </div>
               <h2 className="mt-5 text-2xl font-black tracking-tight text-emerald-950">{t("settings.credTitle")}</h2>

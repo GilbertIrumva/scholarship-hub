@@ -81,6 +81,14 @@ export default {
       "ScholarshipZone connecte les étudiants déplacés et sous-représentés à des bourses vérifiées, des mentors et des parcours d’opportunités — où que vous soyez, quel que soit votre niveau.",
     heroCtaPrimary: "Rejoindre le Hub",
     heroCtaSecondary: "Explorer les bourses",
+    heroWatchHowItWorks: "Voir comment ça marche",
+    heroWatchDuration: "(30 s)",
+    previewClose: "Fermer l’aperçu",
+    previewSubtitle: "Un tour rapide pour chercher, enregistrer et postuler.",
+    previewJumpToSteps: "Voir les étapes",
+    previewComingSoonTitle: "Présentation complète bientôt disponible",
+    previewComingSoonCopy:
+      "Nous enregistrons une présentation visuelle de 30 secondes. En attendant, découvrez le processus pas à pas ci-dessous.",
 
     // Navigation
     navHome: "Accueil",
@@ -115,6 +123,41 @@ export default {
     trustPartnerTitle: "Flux prêts pour les partenaires",
     trustPartnerCopy:
       "Le support aux boursiers, l’ingestion de bourses et le routage des candidats sont structurés pour que les écoles, ONG et bailleurs travaillent à grande échelle.",
+    trustVerifiedMetric: "Annonces vérifiées par un humain",
+    trustLowBwMetric: "Premier rendu médian",
+    trustPartnerMetric: "Standard de traitement des données",
+
+    // Partenaires / bandeau de preuve sociale
+    partnersEyebrow: "Partenaires de confiance",
+    partnersTitle: "Soutenus par des bailleurs, ONG et réseaux éducatifs de la région",
+    partnersFootnote: "Logos présentés à titre indicatif pendant la formalisation des partenariats.",
+    partnerKindFoundation: "Fondation",
+    partnerKindFunder: "Bailleur",
+    partnerKindNgo: "ONG",
+    partnerKindProgram: "Programme",
+    partnerKindNetwork: "Réseau",
+    partnerKindFund: "Fonds",
+
+    // Témoignages
+    testimonialsEyebrow: "Témoignages de boursiers",
+    testimonialsTitle: "Des parcours réels, des résultats concrets",
+    testimonialsSubtitle:
+      "Écoutez les boursiers qui sont passés de la recherche au placement grâce à notre accompagnement.",
+    testimonial1Name: "Amani Mwangi",
+    testimonial1Country: "Nairobi, Kenya",
+    testimonial1Scholarship: "Programme MasterCard Foundation Scholars",
+    testimonial1Quote:
+      "La plateforme a rendu simple la recherche de bourses correspondant vraiment à mon profil. Je suis passée de la confusion à l’admission en moins de trois mois.",
+    testimonial2Name: "Grace Nshimirimana",
+    testimonial2Country: "Kigali, Rwanda",
+    testimonial2Scholarship: "Bourse DAAD EPOS",
+    testimonial2Quote:
+      "Vérification des documents, rappels d’échéances et conseils clairs m’ont gardée sur la bonne voie. J’ai été soutenue à chaque étape.",
+    testimonial3Name: "Joseph Kabongo",
+    testimonial3Country: "Kinshasa, RDC",
+    testimonial3Scholarship: "Bourse Chevening",
+    testimonial3Quote:
+      "Je n’aurais jamais imaginé pouvoir étudier à l’étranger. L’outil de correspondance a révélé des opportunités que j’aurais manquées seul.",
 
     // Impact / statistiques
     impactEyebrow: "Notre Impact",
@@ -184,6 +227,10 @@ export default {
       "Un avenir dans lequel chaque camp de réfugiés, école rurale et salle de classe urbaine sous-équipée est à un clic d’une chance équitable d’accéder à l’enseignement supérieur.",
 
     whatWeDoHeading: "Quatre actions, un résultat : étudiants inscrits.",
+    whatWeDoCurateImageAlt: "Curer et vérifier les annonces de bourses",
+    whatWeDoMatchImageAlt: "Mettre en relation les étudiants avec les bonnes opportunités",
+    whatWeDoGuideImageAlt: "Accompagner les boursiers tout au long du processus de candidature",
+    whatWeDoChampionImageAlt: "Célébrer un boursier admis pour étudier à l’étranger",
     whatWeDoCurateTitle: "Curer",
     whatWeDoCurateCopy:
       "Nous vérifions à la main les bourses des fondations, ONG et universités pour que personne ne perde de temps sur des liens morts ou des arnaques.",
@@ -201,22 +248,22 @@ export default {
       "Construit léger. Apprécié des boursiers. Adoré des partenaires.",
     whyUs01Title: "Vérifié, pas vague",
     whyUs01Copy:
-      "Chaque annonce est examinée par un humain avant d’atteindre votre tableau de bord — pas de liens cassés, pas d’appels expirés.",
+      "Chaque annonce est examinée par un humain avant d’atteindre votre tableau de bord — pas de liens cassés, pas d’appels expirés. Éligibilité, délais et montants de financement sont vérifiés auprès de la source originale.",
     whyUs02Title: "Conçu pour les réseaux lents",
     whyUs02Copy:
       "Toute la plateforme est conçue pour fonctionner sur un téléphone basique avec un signal faible. La vitesse, c’est l’accès.",
     whyUs03Title: "Confidentialité par défaut",
     whyUs03Copy:
-      "Nous ne collectons que ce qui est nécessaire pour soutenir les candidatures, et gardons les données des boursiers hors des circuits publicitaires et de revente.",
+      "Nous ne collectons que ce qui est nécessaire pour soutenir les candidatures, et gardons les données des boursiers hors des circuits publicitaires et de revente. Vous contrôlez ce qui est partagé, et pouvez exporter ou supprimer votre dossier à tout moment.",
     whyUs04Title: "Gratuit pour les boursiers, pour toujours",
     whyUs04Copy:
-      "Aucuns frais de candidature. Aucune offre premium. Le financement va aux étudiants, pas aux plateformes.",
+      "Aucuns frais de candidature. Aucune offre premium. Le financement va aux étudiants, pas aux plateformes — partenaires et bailleurs prennent en charge le coût du service.",
     whyUs05Title: "Contexte local d’abord",
     whyUs05Copy:
       "Construit avec — non pour — les communautés d’Afrique de l’Est et au-delà. De vraies histoires façonnent chaque fonctionnalité.",
     whyUs06Title: "Toujours en apprentissage",
     whyUs06Copy:
-      "Nous traitons chaque retour de candidat comme une feuille de route et déployons des améliorations chaque semaine.",
+      "Nous traitons chaque retour de candidat comme une feuille de route et déployons des améliorations chaque semaine. Les dernières mises à jour incluent une recherche plus rapide, la validation de documents et des brouillons utilisables hors-ligne.",
 
     // Contact
     contactEyebrow: "Nous contacter",
@@ -224,6 +271,16 @@ export default {
       "Questions, partenariats, ou une bourse à publier ?",
     contactSubtitle:
       "Dites-nous-en un peu sur vous et nous orienterons votre message à la bonne personne. Nous répondons sous un jour ouvré.",
+    contactImageAlt: "Équipe de support Scholarship Zone prête à aider",
+    contactStatusOnline: "Équipe en ligne",
+    contactReplyBadge: "Réponse sous 24h",
+    contactStatAvgReply: "Réponse moy.",
+    contactStatAnswered: "Répondus",
+    contactStatHours: "Couverture",
+    contactQuickLinksEyebrow: "Liens rapides",
+    contactQuickFaq: "FAQ",
+    contactQuickEmail: "E-mail",
+    contactQuickWhatsApp: "WhatsApp",
     contactEmailLabel: "E-mail",
     contactPartnerLabel: "Support partenaire",
     contactPartnerValue:
@@ -563,7 +620,8 @@ export default {
     genericSubtitle:
       "Ajoutez votre nationalité, votre niveau d'études et une courte biographie pour débloquer les recommandations personnalisées.",
     findingFits: "Recherche des meilleurs résultats…",
-    none: "Aucune bourse active dans le catalogue pour le moment. Revenez bientôt.",
+    noneTitle: "Pas encore de correspondances",
+    none: "Dès que de nouvelles bourses correspondent à votre profil, elles apparaîtront ici.",
     refresh: "Actualiser",
     match: "compatibilité",
     viewDetails: "Voir les détails",
@@ -582,6 +640,7 @@ export default {
     publicSite: "Site public",
     signOut: "Se déconnecter",
     userFallback: "Utilisateur",
+    viewProfileAria: "Ouvrir le profil de {{name}}",
     pageAdminTitle: "Console administrateur",
     pageScholarTitle: "Tableau de bord boursier",
     openCommandPalette: "Ouvrir la palette de commandes",
@@ -601,6 +660,7 @@ export default {
     sidebarBrowse: "Parcourir les bourses",
     sidebarSaved: "Favoris",
     sidebarApplications: "Mes candidatures",
+    sidebarNotifications: "Notifications",
     sidebarAcademicCredentials: "Diplômes",
     sidebarTravelDocs: "Documents de voyage",
     sidebarMyVisaTracker: "Suivi de visa",
@@ -621,6 +681,9 @@ export default {
     profileCompletenessAdd: "Ajoutez plus de détails pour vous démarquer",
     journeyTitle: "Votre parcours",
     journeyProgress: "{{done}} étape(s) sur {{total}} complétée(s)",
+    journeyAllDone: "Vous avez completé toutes les étapes — bravo !",
+    journeyNextLabel: "Suivant",
+    journeyDoneLabel: "Fait",
     journeyStepAccount: "Compte créé",
     journeyStepProfile: "Profil commencé",
     journeyStepEducation: "Éducation ajoutée",
@@ -669,6 +732,12 @@ export default {
     addYourName: "Ajoutez votre nom",
     avatarAlt: "Avatar de {{name}}",
     avatarFallbackName: "Boursier",
+    changePhoto: "Changer la photo",
+    photoUpdated: "Photo de profil mise à jour",
+    photoRemoved: "Photo de profil supprimée",
+    photoUpdateFailed: "Impossible de mettre à jour la photo. Veuillez réessayer.",
+    photoInvalidType: "Veuillez choisir une image JPG, PNG, WEBP ou GIF.",
+    photoTooLarge: "L’image dépasse 8 Mo. Veuillez choisir un fichier plus petit.",
     editButton: "Modifier",
     noProfileTitle: "Aucun détail de profil pour l’instant",
     noProfileBodyPrefix: "Cliquez sur ",
@@ -688,7 +757,7 @@ export default {
     formEyebrow: "Modifier le profil",
     formHeading: "Mettre à jour vos informations",
     uploadPhoto: "Téléverser une photo",
-    removePhoto: "Retirer",
+    removePhoto: "Supprimer la photo",
     photoPreviewAlt: "Aperçu",
     formFieldFullName: "Nom complet",
     formFieldContact: "Contact / téléphone",
@@ -886,12 +955,31 @@ export default {
   },
   notifications: {
     title: "Notifications",
+    pageTitle: "Notifications",
+    pageSubtitle: "Tout ce qui requiert votre attention",
     unreadCount: "{{count}} non lue(s)",
     allCaughtUp: "Vous êtes à jour.",
     markAllRead: "Tout marquer comme lu",
+    markAllDone: "Toutes les notifications ont été marquées comme lues.",
+    markAllFailed: "Impossible de marquer les notifications comme lues.",
+    loadFailed: "Impossible de charger les notifications.",
     noneYet: "Aucune notification pour l'instant",
     nonePrompt:
       "Nous vous préviendrons dès qu'une action vous concernera.",
+    noUnread: "Aucune notification non lue",
+    newBadge: "Nouveau",
+    filterAll: "Toutes",
+    filterUnread: "Non lues",
+    groupToday: "Aujourd'hui",
+    groupYesterday: "Hier",
+    groupEarlier: "Plus tôt",
+    kind: {
+      "application.status": "Mise à jour de candidature",
+      "message.reply": "Réponse à un message",
+      "scholarship.new": "Nouvelle correspondance",
+      "admin.message.new": "Nouveau message",
+      "admin.audit.alert": "Alerte d'audit",
+    },
   },
   scholarships: {
     title: "Bourses",

@@ -33,6 +33,7 @@ const ScholarshipDetailPage = lazy(() => import("./components/scholar/Scholarshi
 const ApplicationWizardPage = lazy(() => import("./components/scholar/ApplicationWizardPage"));
 const SavedScholarshipsPage = lazy(() => import("./components/scholar/SavedScholarshipsPage"));
 const MyApplicationsPage = lazy(() => import("./components/scholar/MyApplicationsPage"));
+const NotificationsPage = lazy(() => import("./components/scholar/NotificationsPage"));
 const CredentialsPage = lazy(() => import("./components/scholar/CredentialsPage"));
 const TravelDocsPage = lazy(() => import("./components/scholar/TravelDocsPage"));
 const VisaTrackerPage = lazy(() => import("./components/scholar/VisaTrackerPage"));
@@ -79,6 +80,7 @@ const App = () => {
         <Route path="/scholar/scholarships/:id/apply" element={<ApplicationWizardPage />} />
         <Route path="/scholar/saved" element={<SavedScholarshipsPage />} />
         <Route path="/scholar/applications" element={<MyApplicationsPage />} />
+        <Route path="/scholar/notifications" element={<NotificationsPage />} />
         <Route path="/scholar/credentials" element={<CredentialsPage />} />
         <Route path="/scholar/travel-docs" element={<TravelDocsPage />} />
         <Route path="/scholar/visa-tracker" element={<VisaTrackerPage />} />

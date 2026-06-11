@@ -44,6 +44,7 @@ const EmptyState = React.forwardRef(
   (
     {
       icon: Icon = Inbox,
+      illustration,
       title,
       description,
       action,
@@ -65,16 +66,20 @@ const EmptyState = React.forwardRef(
         )}
         {...props}
       >
-        {Icon && (
-          <div
-            className={cn(
-              "grid place-items-center rounded-2xl border border-border bg-surface-2 text-muted",
-              cfg.iconWrap
-            )}
-            aria-hidden="true"
-          >
-            <Icon className={cfg.icon} />
-          </div>
+        {illustration ? (
+          <div className="mb-1 flex items-center justify-center">{illustration}</div>
+        ) : (
+          Icon && (
+            <div
+              className={cn(
+                "grid place-items-center rounded-2xl border border-border bg-surface-2 text-muted",
+                cfg.iconWrap
+              )}
+              aria-hidden="true"
+            >
+              <Icon className={cfg.icon} />
+            </div>
+          )
         )}
         {title && (
           <p className={cn("mt-4 text-ink", cfg.title)}>{title}</p>

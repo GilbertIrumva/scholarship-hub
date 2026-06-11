@@ -26,7 +26,7 @@ import {
   Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/useAuth";
 import {
@@ -58,6 +58,7 @@ const SCHOLAR_NAV_ITEMS = [
   { to: "/scholar/scholarships", key: "sidebarBrowse", icon: Compass },
   { to: "/scholar/saved", key: "sidebarSaved", icon: Heart },
   { to: "/scholar/applications", key: "sidebarApplications", icon: FileText },
+  { to: "/scholar/notifications", key: "sidebarNotifications", icon: Bell },
   { to: "/scholar/credentials", key: "sidebarAcademicCredentials", icon: FolderArchive },
   { to: "/scholar/travel-docs", key: "sidebarTravelDocs", icon: Plane },
   { to: "/scholar/visa-tracker", key: "sidebarMyVisaTracker", icon: ClipboardCheck },
@@ -101,7 +102,7 @@ const DashboardLayout = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { sessionToken } = useAuth();
+  const { sessionToken, scholarProfile } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState([]);
@@ -200,6 +201,11 @@ const DashboardLayout = ({
 
   const notifCount = unread;
 
+  const photoUrl =
+    user?.photo ||
+    (role === "scholar" ? scholarProfile?.application?.photo : null) ||
+    null;
+
   const initials = (user?.name || t("layout.userFallback"))
     .split(" ")
     .map((p) => p[0])
@@ -285,6 +291,9 @@ const DashboardLayout = ({
       <div className="p-4 border-t border-border space-y-3">
         <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
           <Avatar className="h-9 w-9 shrink-0">
+            {photoUrl && (
+              <AvatarImage src={photoUrl} alt={user?.name || t("layout.userFallback")} />
+            )}
             <AvatarFallback className={styles.accent}>{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
@@ -486,6 +495,23 @@ const DashboardLayout = ({
                 )}
               </AnimatePresence>
             </div>
+            <Link
+              to={role === "admin" ? "/admin/settings" : "/scholar"}
+              aria-label={t("layout.viewProfileAria", { name: user?.name || t("layout.userFallback") })}
+              className="group inline-flex items-center gap-2 rounded-full border border-border bg-surface px-1 py-1 pr-3 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            >
+              <Avatar className="h-7 w-7 shrink-0">
+                {photoUrl && (
+                  <AvatarImage src={photoUrl} alt={user?.name || t("layout.userFallback")} />
+                )}
+                <AvatarFallback className={cn(styles.accent, "text-[10px]")}>
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden lg:inline max-w-[10rem] truncate text-xs font-semibold text-ink">
+                {user?.name || t("layout.userFallback")}
+              </span>
+            </Link>
           </div>
         </header>
 

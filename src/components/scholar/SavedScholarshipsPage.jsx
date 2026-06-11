@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Heart,
   Loader2,
   Calendar,
   DollarSign,
@@ -17,6 +16,7 @@ import DashboardLayout from "../auth/DashboardLayout";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
+import { SavedIllustration } from "../ui/empty-illustrations";
 import { SkeletonCard } from "../ui/skeleton";
 import { Seo } from "../seo/Seo";
 import { listSavedScholarships } from "../../services/scholarship";
@@ -196,7 +196,7 @@ const SavedScholarshipsPage = () => {
       ) : items.length === 0 ? (
         <Card className="p-8 sm:p-12">
           <EmptyState
-            icon={Heart}
+            illustration={<SavedIllustration />}
             title={t("applications.savedEmptyTitle")}
             description={t("applications.savedEmptyDescription")}
             action={

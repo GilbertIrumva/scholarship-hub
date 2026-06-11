@@ -89,6 +89,14 @@ export default {
       "ScholarshipZone connects displaced and underserved students to verified scholarships, mentors, and pathways — wherever you are, whatever your grade.",
     heroCtaPrimary: "Join the Hub",
     heroCtaSecondary: "Explore scholarships",
+    heroWatchHowItWorks: "Watch how it works",
+    heroWatchDuration: "(30s)",
+    previewClose: "Close preview",
+    previewSubtitle: "A quick tour of search, save, and apply.",
+    previewJumpToSteps: "Jump to steps",
+    previewComingSoonTitle: "Full walkthrough coming soon",
+    previewComingSoonCopy:
+      "We’re recording a 30-second visual walkthrough. In the meantime, see the full step-by-step process below.",
 
     // Top navigation
     navHome: "Home",
@@ -123,6 +131,41 @@ export default {
     trustPartnerTitle: "Partner-ready workflows",
     trustPartnerCopy:
       "Scholar support, scholarship intake, and applicant routing are structured so schools, NGOs, and sponsors can work at scale.",
+    trustVerifiedMetric: "Human-checked listings",
+    trustLowBwMetric: "Median first paint",
+    trustPartnerMetric: "Data handling standard",
+
+    // Partners / social proof strip
+    partnersEyebrow: "Trusted partners",
+    partnersTitle: "Backed by funders, NGOs, and learning networks across the region",
+    partnersFootnote: "Logos shown are illustrative while partnerships are formalised.",
+    partnerKindFoundation: "Foundation",
+    partnerKindFunder: "Funder",
+    partnerKindNgo: "NGO",
+    partnerKindProgram: "Program",
+    partnerKindNetwork: "Network",
+    partnerKindFund: "Fund",
+
+    // Testimonials
+    testimonialsEyebrow: "Scholar stories",
+    testimonialsTitle: "Real journeys, real outcomes",
+    testimonialsSubtitle:
+      "Hear from scholars who moved from search to placement with our support.",
+    testimonial1Name: "Amani Mwangi",
+    testimonial1Country: "Nairobi, Kenya",
+    testimonial1Scholarship: "MasterCard Foundation Scholars Program",
+    testimonial1Quote:
+      "The platform made it simple to find scholarships that actually matched my background. I went from confused to admitted in under three months.",
+    testimonial2Name: "Grace Nshimirimana",
+    testimonial2Country: "Kigali, Rwanda",
+    testimonial2Scholarship: "DAAD EPOS Scholarship",
+    testimonial2Quote:
+      "Document checks, deadline reminders, and clear guidance kept me on track. I felt supported through every step of my application.",
+    testimonial3Name: "Joseph Kabongo",
+    testimonial3Country: "Kinshasa, DRC",
+    testimonial3Scholarship: "Chevening Scholarship",
+    testimonial3Quote:
+      "I never imagined studying abroad was within reach. The matching tool surfaced opportunities I would have missed on my own.",
 
     // Impact / stats
     impactEyebrow: "Our Impact",
@@ -192,6 +235,10 @@ export default {
       "A future in which every refugee camp, rural school, and urban under-resourced classroom is one tap away from a fair shot at higher education.",
 
     whatWeDoHeading: "Four moves, one outcome: students enrolled.",
+    whatWeDoCurateImageAlt: "Curating and verifying scholarship listings",
+    whatWeDoMatchImageAlt: "Matching students to the right opportunities",
+    whatWeDoGuideImageAlt: "Guiding scholars through the application process",
+    whatWeDoChampionImageAlt: "Celebrating a scholar accepted to study abroad",
     whatWeDoCurateTitle: "Curate",
     whatWeDoCurateCopy:
       "We hand-verify scholarships from foundations, NGOs, and universities so no one wastes time on dead links or scams.",
@@ -208,28 +255,38 @@ export default {
     whyUsHeading: "Built lean. Trusted by scholars. Loved by partners.",
     whyUs01Title: "Verified, not vague",
     whyUs01Copy:
-      "Every listing is reviewed by a real human before it reaches your dashboard — no broken links, no expired calls.",
+      "Every listing is reviewed by a real human before it reaches your dashboard — no broken links, no expired calls. Eligibility, deadlines, and funding amounts are checked against the original source.",
     whyUs02Title: "Designed for slow networks",
     whyUs02Copy:
       "The whole platform is engineered to work on a basic phone with a weak signal. Speed is access.",
     whyUs03Title: "Privacy by default",
     whyUs03Copy:
-      "We collect only what is needed to support applications, and keep scholar data out of ad-tech and data resale workflows.",
+      "We collect only what is needed to support applications, and keep scholar data out of ad-tech and data resale workflows. You control what is shared, and you can export or delete your record at any time.",
     whyUs04Title: "Free for scholars, forever",
     whyUs04Copy:
-      "No application fees. No premium tier. Funding is for students, not platforms.",
+      "No application fees. No premium tier. Funding belongs to students, not platforms — partners and sponsors cover the cost of running the service.",
     whyUs05Title: "Local context first",
     whyUs05Copy:
       "Built with — not for — communities in Eastern Africa and beyond. Real stories shape every feature.",
     whyUs06Title: "Always learning",
     whyUs06Copy:
-      "We treat every applicant’s feedback as a roadmap, and ship improvements every single week.",
+      "We treat every applicant’s feedback as a roadmap, and ship improvements every single week. Recent updates alone include faster search, document validation, and offline-friendly drafts.",
 
     // Contact
     contactEyebrow: "Get in Touch",
     contactTitle: "Questions, partnerships, or a scholarship to list?",
     contactSubtitle:
       "Tell us a little about you and we’ll route your message to the right person. We reply within one working day.",
+    contactImageAlt: "Scholarship Zone support team ready to help",
+    contactStatusOnline: "Team online",
+    contactReplyBadge: "Replies in 24h",
+    contactStatAvgReply: "Avg. reply",
+    contactStatAnswered: "Answered",
+    contactStatHours: "Cover",
+    contactQuickLinksEyebrow: "Quick links",
+    contactQuickFaq: "FAQ",
+    contactQuickEmail: "Email",
+    contactQuickWhatsApp: "WhatsApp",
     contactEmailLabel: "Email",
     contactPartnerLabel: "Partner support",
     contactPartnerValue: "WhatsApp & direct support during onboarding",
@@ -556,7 +613,8 @@ export default {
     genericSubtitle:
       "Add your nationality, education level, and a short bio to unlock personalised matches.",
     findingFits: "Finding the best fits…",
-    none: "No active scholarships in the catalog yet. Check back soon.",
+    noneTitle: "No matches just yet",
+    none: "As soon as new scholarships match your profile they’ll appear here.",
     refresh: "Refresh",
     match: "match",
     viewDetails: "View details",
@@ -574,6 +632,7 @@ export default {
     publicSite: "Public site",
     signOut: "Sign out",
     userFallback: "User",
+    viewProfileAria: "Open {{name}}'s profile",
     pageAdminTitle: "Admin console",
     pageScholarTitle: "Scholar dashboard",
     openCommandPalette: "Open command palette",
@@ -593,6 +652,7 @@ export default {
     sidebarBrowse: "Browse scholarships",
     sidebarSaved: "Saved",
     sidebarApplications: "My applications",
+    sidebarNotifications: "Notifications",
     sidebarAcademicCredentials: "Academic credentials",
     sidebarTravelDocs: "Travel documents",
     sidebarMyVisaTracker: "Visa tracker",
@@ -613,6 +673,9 @@ export default {
     profileCompletenessAdd: "Add more details to stand out",
     journeyTitle: "Your journey",
     journeyProgress: "{{done}} of {{total}} steps completed",
+    journeyAllDone: "You’ve completed every milestone — amazing work!",
+    journeyNextLabel: "Next",
+    journeyDoneLabel: "Done",
     journeyStepAccount: "Account created",
     journeyStepProfile: "Profile started",
     journeyStepEducation: "Education added",
@@ -661,6 +724,12 @@ export default {
     addYourName: "Add your name",
     avatarAlt: "{{name}} avatar",
     avatarFallbackName: "Scholar",
+    changePhoto: "Change photo",
+    photoUpdated: "Profile photo updated",
+    photoRemoved: "Profile photo removed",
+    photoUpdateFailed: "Could not update photo. Please try again.",
+    photoInvalidType: "Please choose a JPG, PNG, WEBP, or GIF image.",
+    photoTooLarge: "Image is larger than 8 MB. Please choose a smaller file.",
     editButton: "Edit",
     noProfileTitle: "No profile details yet",
     noProfileBodyPrefix: "Click ",
@@ -680,7 +749,7 @@ export default {
     formEyebrow: "Edit profile",
     formHeading: "Update your details",
     uploadPhoto: "Upload photo",
-    removePhoto: "Remove",
+    removePhoto: "Remove photo",
     photoPreviewAlt: "Preview",
     formFieldFullName: "Full name",
     formFieldContact: "Contact / phone",
@@ -862,11 +931,30 @@ export default {
   },
   notifications: {
     title: "Notifications",
+    pageTitle: "Notifications",
+    pageSubtitle: "Everything you've been pinged about",
     unreadCount: "{{count}} unread",
     allCaughtUp: "You're all caught up.",
     markAllRead: "Mark all read",
+    markAllDone: "All notifications marked as read.",
+    markAllFailed: "Couldn't mark notifications as read.",
+    loadFailed: "Couldn't load notifications.",
     noneYet: "No notifications yet",
     nonePrompt: "We'll let you know when something needs your attention.",
+    noUnread: "No unread notifications",
+    newBadge: "New",
+    filterAll: "All",
+    filterUnread: "Unread",
+    groupToday: "Today",
+    groupYesterday: "Yesterday",
+    groupEarlier: "Earlier",
+    kind: {
+      "application.status": "Application update",
+      "message.reply": "Message reply",
+      "scholarship.new": "New match",
+      "admin.message.new": "New message",
+      "admin.audit.alert": "Audit alert",
+    },
   },
   scholarships: {
     title: "Scholarships",
