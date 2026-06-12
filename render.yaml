@@ -16,6 +16,7 @@ services:
       # Required — set in the Render dashboard after first deploy.
       - key: MONGODB_URI
         sync: false
+      # Bootstrap admin (one-shot: only seeded when the Admin collection is empty).
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

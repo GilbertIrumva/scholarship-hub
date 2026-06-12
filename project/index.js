@@ -4730,12 +4730,44 @@ const logMongoStartupFailure = (err) => {
     logger.warn('DB-backed endpoints will fail until the MongoDB connection in MONGODB_URI succeeds.');
 };
 
+// First-deploy convenience: if the Admin collection is empty and the
+// ADMIN_EMAIL / ADMIN_PASSWORD env vars are set, seed a single bootstrap
+// admin so the operator can sign in immediately. No-op once any admin
+// exists, so it's safe to leave the env vars set across restarts.
+const ensureBootstrapAdmin = async () => {
+    const email = normalizeEmail(process.env.ADMIN_EMAIL || '');
+    const password = process.env.ADMIN_PASSWORD || '';
+    if (!email || !password) return;
+
+    const existing = await Admin.estimatedDocumentCount();
+    if (existing > 0) return;
+
+    if (!isValidEmail(email) || !isValidPassword(password)) {
+        logger.warn('ADMIN_EMAIL / ADMIN_PASSWORD set but invalid; skipping bootstrap admin.');
+        return;
+    }
+
+    await Admin.create({
+        name: process.env.ADMIN_NAME || 'Bootstrap Admin',
+        email,
+        role: 'administrator',
+        department: process.env.ADMIN_DEPARTMENT || 'Operations',
+        departmentCode: process.env.ADMIN_DEPARTMENT_CODE || crypto.randomBytes(6).toString('hex').toUpperCase(),
+        twoFactorCode: process.env.ADMIN_TWO_FACTOR_CODE || crypto.randomInt(100000, 999999).toString(),
+        ...createPasswordRecord(password),
+    });
+    logger.info({ email }, 'bootstrap admin created');
+};
+
 // Only start the HTTP listener when run directly (e.g. `node index.js` or
 // `npm start`). When the file is `require()`'d (e.g. from a Supertest test
 // suite), we export the configured express `app` and a `boot()` helper
 // instead, so tests can drive requests in-process.
 if (require.main === module) {
     connectDb()
+        .then(() => ensureBootstrapAdmin().catch((err) => {
+            logger.warn({ err: err.message }, 'bootstrap admin seed failed');
+        }))
         .then(() => startServer())
         .catch((err) => {
             logMongoStartupFailure(err);
