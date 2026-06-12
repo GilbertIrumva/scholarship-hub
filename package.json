@@ -67,5 +67,8 @@
     "vite": "^8.0.4",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "string.prototype.trim": "1.2.10"
   }
 }
