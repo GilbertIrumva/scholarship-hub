@@ -4592,8 +4592,18 @@ if (SERVE_SPA) {
         },
     }));
     // SPA fallback for client-side routes (anything not under /api, /healthz,
-    // /readyz, or /uploads). Express 5 accepts named regex params.
-    app.get(/^\/(?!api\/|healthz|readyz|uploads\/).*/, (req, res) => {
+    // /readyz, /uploads, or /assets). Express 5 accepts named regex params.
+    // We exclude /assets/ explicitly so missing hashed chunks return a real
+    // 404 instead of an HTML page that the browser tries to parse as JS
+    // (which causes "Failed to load module script: ... MIME type text/html").
+    app.get(/^\/(?!api\/|healthz|readyz|uploads\/|assets\/).*/, (req, res) => {
+        // Any URL that looks like a static asset (has a file extension other
+        // than .html) but wasn't served by express.static above is genuinely
+        // missing — return 404 rather than the SPA shell.
+        const ext = path.extname(req.path);
+        if (ext && ext !== '.html') {
+            return res.status(404).type('text/plain').send('Not found');
+        }
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.sendFile(path.join(SPA_DIR, 'index.html'));
     });
