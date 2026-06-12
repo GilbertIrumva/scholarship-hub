@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, RefreshCcw, Search, Users } from "lucide-react";
+import { ChevronRight, RefreshCcw, Search, Users, UserRound } from "lucide-react";
 import DashboardLayout from "./DashboardLayout";
 import { useAuth } from "../../context/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
